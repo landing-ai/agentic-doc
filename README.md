@@ -11,7 +11,7 @@ Learn more about the Agentic Document Extraction API [here](https://support.land
 ### Installation
 
 ```bash
-pip install git+https://github.com/landing-ai/agentic-doc.git
+pip install agentic-doc
 ```
 
 ### Requirements
