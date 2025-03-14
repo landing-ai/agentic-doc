@@ -60,76 +60,72 @@ result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_
 
 ## Main Features
 
-With this library, you can do things that are otherwise hard to do with the REST API alone.
-Below are some of the highlighted features.
+With this library, you can do things that are otherwise hard to do with the Agentic Document Extraction API alone.
+This section describes some of the key features this library offers.
 
-### Parse a large PDF file (e.g. 500 pages)
+### Parse Large PDF Files
 
-A single REST API call can only handle up to 2 pages at a time. This library will automatically split a large file into multiple calls, using a thread pool to process the calls in parallel, and stitching the results back together as a single result.
+A single REST API call can only handle up to 2 pages at a time. This library automatically splits a large PDF into multiple calls, uses a thread pool to process the calls in parallel, and stitches the results back together as a single result.
+
+We've used this library to successfully parse PDFs that are 1000+ pages long.
 
 
-### Parse multiple documents in a batch
+### Parse Multiple Files in a Batch
 
-You can parse multiple documents in a single function call with this library. The library will process those documents in parallel.
+You can parse multiple files in a single function call with this library. The library processes files in parallel.
 
-NOTE: you can change the parallelism by setting the `batch_size` setting.
+NOTE: You can change the parallelism by setting the `batch_size` setting.
 
-### Automatically handle API errors and rate limits with retries
+### Automatically Handle API Errors and Rate Limits with Retries
 
 The REST API endpoint imposes rate limits per API key. This library automatically handles the rate limit error or other intermittent HTTP errors with retries.
 
-See [Error Handling](#error-handling) and [Configuration Options](#configuration-options) for more details.
-
-
-### File type and size support
-
-PDF and common image files are supported.
-The library should be able to process a single PDF file of 1000+ pages.
-
-NOTE: if anything is not working, please let us know by opening an issue or a PR.
+For more information, see [Error Handling](#error-handling) and [Configuration Options](#configuration-options).
 
 
 ### Error Handling
 
-The library implements a retry mechanism for handling API failures:
+This library implements a retry mechanism for handling API failures:
 
-- Retries are performed for HTTP status codes: 408, 429, 502, 503, 504
-- Exponential backoff with jitter is used for retry wait time
-- Initial retry wait time is 1 second, increasing exponentially
-- Retry will stop after `max_retries` attempts. Exceeding the limit will raise an exception and result in a failure for this request.
-- Retry wait time is capped at `max_retry_wait_time` seconds
-- Jitter of 10 seconds is added to prevent thundering herd
+- Retries are performed for these HTTP status codes: 408, 429, 502, 503, 504.
+- Exponential backoff with jitter is used for retry wait time.
+- The initial retry wait time is 1 second, which increases exponentially.
+- Retry will stop after `max_retries` attempts. Exceeding the limit raises an exception and results in a failure for this request.
+- Retry wait time is capped at `max_retry_wait_time` seconds.
+- Retries include a random jitter of up to 10 seconds to distribute requests and prevent the thundering herd problem.
 
 
 ## Configuration Options
 
-The library uses a [`Settings` object](./agentic_doc/config.py) to manage configuration. You can customize these settings either through environment variables or a `.env` file:
+The library uses a [`Settings`](./agentic_doc/config.py) object to manage configuration. You can customize these settings either through environment variables or a `.env` file:
 
-Below is an example `.env` file:
+Below is an example `.env` file that customizes the configurations:
 
 ```bash
 BATCH_SIZE=4 # Number of files to process in parallel, defaults to 4
-MAX_WORKERS=2 # Number of worker threads for parallel processing file parts for each file, defaults to 5
+MAX_WORKERS=2 # Number of threads used to process parts of each file in parallel, defaults to 5.
 MAX_RETRIES=80 # Maximum number of retry attempts for failed intermittent requests, defaults to 100
 MAX_RETRY_WAIT_TIME=30 # Maximum wait time in seconds for each retry, defaults to 60
 RETRY_LOGGING_STYLE=log_msg # Logging style for retry, defaults to log_msg
 ```
 
-### Setting `MAX_WORKERS`
+### Set `MAX_WORKERS`
 
-Increasing `MAX_WORKERS` will increase the number of concurrent requests, which can speed up the processing of large files if you have a enough API rate limit. Otherwise, you hit the rate limit error and the library just keeps retrying for you.
+Increasing `MAX_WORKERS` increase the number of concurrent requests, which can speed up the processing of large files if you have a high enough API rate limit. Otherwise, you hit the rate limit error and the library just keeps retrying for you.
 
-The best `MAX_WORKERS` value depends on your API rate limit and the latency of each REST API call. For example, if your account has a rate limit of 5 requests per minute, and each REST API call takes on average 60 seconds to complete, then `MAX_WORKERS` should be set to 5.
+The optimal `MAX_WORKERS` value depends on your API rate limit and the latency of each REST API call. For example, if your account has a rate limit of 5 requests per minute, and each REST API call takes on average 60 seconds to complete, then `MAX_WORKERS` should be set to 5.
+
+You can find your REST API latency in the logs.
 
 NOTE: you can find out your REST API latency from logs, and reach out to us if you want to increase your rate limit.
 
 
-### Setting `RETRY_LOGGING_STYLE`
+### Set `RETRY_LOGGING_STYLE`
 
-This setting controls how the library logs the retry attempts.
+The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attempts.
 
-- `log_msg`: Log the retry attempts as a log messages. Each attempt is logged as a separate message.
-- `inline_blobk`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to keep an eye on the number of retries has been made.
+- `log_msg`: Log the retry attempts as a log messages. Each attempt is logged as a separate message. This is the default setting.
+- `inline_blobk`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to track the number of retries has been made.
 - `none`: Do not log the retry attempts.
 
 
@@ -142,7 +138,7 @@ This setting controls how the library logs the retry attempts.
 Parse multiple documents and return their parsed results.
 
 - **Parameters:**
-  - `file_paths`: List of paths to documents (PDF or images)
+  - `file_paths`: List of paths to documents (PDFs or images)
 - **Returns:**
   - List of `ParsedDocument` objects containing parsed results
 - **Raises:**
@@ -150,13 +146,13 @@ Parse multiple documents and return their parsed results.
 
 #### `parse_and_save_documents(file_paths: list[str | Path], *, result_save_dir: str | Path) -> list[Path]`
 
-Parse multiple documents and save results to specified directory.
+Parse multiple documents and save results to the specified directory.
 
 - **Parameters:**
   - `file_paths`: List of paths to documents
   - `result_save_dir`: Directory to save parsed results
 - **Returns:**
-  - A list of json file paths to the saved results. The file paths are sorted by the order of the input file paths. The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_070305.json".
+  - A list of JSON file paths to the saved results. The file paths are sorted by the order of the input file paths. The file name is the original file name with a timestamp appended. For example, the input file "document.pdf" could have this output file: "document_20250313_070305.json".
 - **Raises:**
   - `FileNotFoundError`: If any input file doesn't exist
 
@@ -181,7 +177,7 @@ Parse a single document and optionally save results.
 Represents a parsed document with the following attributes:
 
 - `markdown`: str - Markdown representation of the document
-- `chunks`: list[Chunk] - List of parsed content chunks, sorted by page index, then the layout of the content in the page
+- `chunks`: list[Chunk] - List of parsed content chunks, sorted by page index, then the layout of the content on the page
 - `start_page_idx`: Optional[int] - Starting page index for PDFs
 - `end_page_idx`: Optional[int] - Ending page index for PDFs
 - `doc_type`: Literal["pdf", "image"] - Type of document
