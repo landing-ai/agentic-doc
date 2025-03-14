@@ -70,9 +70,9 @@ A single REST API call can only handle up to 2 pages at a time. This library wil
 
 ### Parse multiple documents in a batch
 
-You can parse multiple documents in a single function call with this library. 
-Be noted that the library processes a batch of files in sequence and only process file chunks in parallel within each file. If you have many 1-page or 2-page documents to process, consider creating a thread pool and run `parse_and_save_document` function in parallel.
+You can parse multiple documents in a single function call with this library. The library will process those documents in parallel.
 
+NOTE: you can change the parallelism by setting the `batch_size` setting.
 
 ### Automatically handle API errors and rate limits with retries
 
@@ -108,7 +108,8 @@ The library uses a [`Settings` object](./agentic_doc/config.py) to manage config
 Below is an example `.env` file:
 
 ```bash
-MAX_WORKERS=4 # Number of worker threads for parallel processing for each file, defaults to 10
+BATCH_SIZE=4 # Number of files to process in parallel, defaults to 4
+MAX_WORKERS=2 # Number of worker threads for parallel processing file parts for each file, defaults to 5
 MAX_RETRIES=80 # Maximum number of retry attempts for failed intermittent requests, defaults to 100
 MAX_RETRY_WAIT_TIME=30 # Maximum wait time in seconds for each retry, defaults to 60
 RETRY_LOGGING_STYLE=log_msg # Logging style for retry, defaults to log_msg

@@ -1,4 +1,5 @@
 import copy
+from functools import partial
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -38,7 +39,15 @@ def parse_documents(file_paths: list[str | Path]) -> list[ParsedDocument]:
         if not Path(file_path).exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-    return [parse_and_save_document(file_path) for file_path in file_paths]
+    _LOGGER.info(f"Parsing {len(file_paths)} documents")
+    with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
+        return list(
+            tqdm(
+                executor.map(parse_and_save_document, file_paths),
+                total=len(file_paths),
+                desc="Parsing documents",
+            )
+        )
 
 
 def parse_and_save_documents(
@@ -58,11 +67,16 @@ def parse_and_save_documents(
     for file_path in file_paths:
         if not Path(file_path).exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-
-    return [
-        parse_and_save_document(file_path, result_save_dir=result_save_dir)
-        for file_path in file_paths
-    ]
+    _LOGGER.info(f"Parsing {len(file_paths)} documents")
+    _parse_func = partial(parse_and_save_document, result_save_dir=result_save_dir)
+    with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
+        return list(
+            tqdm(
+                executor.map(_parse_func, file_paths),
+                total=len(file_paths),
+                desc="Parsing documents",
+            )
+        )
 
 
 def parse_and_save_document(
@@ -226,10 +240,3 @@ def _send_parsing_request(file_path: str) -> dict[str, Any]:
     )
     result = response.json()
     return result
-
-
-if __name__ == "__main__":
-    # Remove hardcoded path in production code
-    # file_path = "/Users/asia/Downloads/agentic-doc/pages_105.pdf"
-    file_path = "/Users/asia/Downloads/agentic-doc/red.jpg"
-    parse_and_save_document(file_path, result_save_dir="results")

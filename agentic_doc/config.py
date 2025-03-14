@@ -10,7 +10,8 @@ _LOGGER = structlog.get_logger(__name__)
 
 class Settings(BaseSettings):
     vision_agent_api_key: str = Field()
-    max_workers: int = Field(default=10)
+    batch_size: int = Field(default=4)
+    max_workers: int = Field(default=5)
     max_retries: int = Field(default=100)
     max_retry_wait_time: int = Field(default=60)
     retry_logging_style: Literal["none", "log_msg", "inline_blobk"] = Field(
