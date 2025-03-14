@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     max_workers: int = Field(default=5)
     max_retries: int = Field(default=100)
     max_retry_wait_time: int = Field(default=60)
-    retry_logging_style: Literal["none", "log_msg", "inline_blobk"] = Field(
+    retry_logging_style: Literal["none", "log_msg", "inline_block"] = Field(
         default="log_msg"
     )
 
