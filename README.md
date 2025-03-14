@@ -1,6 +1,10 @@
 # agentic-doc
 
-A Python library that wraps around [VisionAgent agentic document extraction REST API](https://va.landing.ai/demo/doc-extraction) to make documents extraction easy.
+The LandingAI [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) tool extracts structured information from visually complex documents with text, tables, pictures, charts, and other information. The API returns the extracted data in a hierarchical format and pinpoints the exact location of each element.
+
+This Python library wraps around the [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
+
+Learn more about the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
 
 ## Quick Start
 
@@ -10,30 +14,38 @@ A Python library that wraps around [VisionAgent agentic document extraction REST
 pip install git+https://github.com/landing-ai/agentic-doc.git
 ```
 
-### Prerequisites
+### Requirements
+- Python version 3.9, 3.10, or 3.11
+- LandingAI agentic AI API key (get the key [here](https://va.landing.ai/account/api-key))
 
-Set your Vision Agent API key as an environment variable (or put it in a `.env` file):
+### Set the API Key as an Environment Variable
+After you get the LandingAI agentic AI API key, set the key as an environment variable (or put it in a `.env` file):
 
 ```bash
 export VISION_AGENT_API_KEY=<your-api-key>
 ```
 
-NOTE: the API key can be found from [here](https://va.landing.ai/account/api-key)
+### Supported Files
+The library can extract data from:
+- PDFs (any length)
+- Images that are supported by OpenCV (the `agentic-doc` library imports the `cv2` library)
 
 ### Basic Usage
 
-#### Parse a single document
+#### Extract Data from One Document
+Run the following script to extract data from one document and return the results in both markdown and structured chunks.
 
 ```python
 from agentic_doc.parse import parse_documents
 
 results = parse_documents(["path/to/image.png"])
 parsed_doc = results[0]
-print(parsed_doc.markdown)  # Get markdown representation
-print(parsed_doc.chunks)  # Get structured chunks of content
+print(parsed_doc.markdown)  # Get the extracted data as markdown
+print(parsed_doc.chunks)  # Get the extracted data as structured chunks of content
 ```
 
-#### Parse multiple documents and save results to a directory
+#### Extract Data from Multiple Documents and Save the Results to a Directory
+Run the following script to extract data from multiple documents. The results will be saved as structured chunks in JSON files in the specified directory.
 
 ```python
 from agentic_doc.parse import parse_and_save_documents
@@ -41,7 +53,7 @@ from agentic_doc.parse import parse_and_save_documents
 file_paths = ["path/to/your/document1.pdf", "path/to/another/document2.pdf"]
 result_save_dir = "path/to/save/results"
 
-result_paths = parse_and_save_documents(file_paths, result_save_dir)
+result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_dir)
 # result_paths: ["path/to/save/results/document1_20250313_070305.json", "path/to/save/results/document2_20250313_070408.json"]
 ```
 
