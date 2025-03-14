@@ -70,7 +70,8 @@ A single REST API call can only handle up to 2 pages at a time. This library wil
 
 ### Parse multiple documents in a batch
 
-You can parse multiple documents in a single function call with this library. The library will process those documents in parallel.
+You can parse multiple documents in a single function call with this library. 
+Be noted that the library processes a batch of files in sequence and only process file chunks in parallel within each file. If you have many 1-page or 2-page documents to process, consider creating a thread pool and run `parse_and_save_document` function in parallel.
 
 
 ### Automatically handle API errors and rate limits with retries

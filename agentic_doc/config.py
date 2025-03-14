@@ -1,6 +1,11 @@
+import json
 from typing import Literal
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+import structlog
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_LOGGER = structlog.get_logger(__name__)
 
 
 class Settings(BaseSettings):
@@ -18,5 +23,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    def __str__(self):
+        # Create a copy of dict with redacted API key
+        settings_dict = self.model_dump()
+        if "vision_agent_api_key" in settings_dict:
+            settings_dict["vision_agent_api_key"] = (
+                settings_dict["vision_agent_api_key"][:5] + "[REDACTED]"
+            )
+        return f"{json.dumps(settings_dict, indent=2)}"
+
 
 settings = Settings()
+_LOGGER.info(f"Settings loaded: {settings}")

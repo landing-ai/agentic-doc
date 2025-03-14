@@ -80,7 +80,8 @@ def parse_and_save_document(
     Returns:
         Path | ParsedDocument: The file path to the saved result or the parsed document data.
     """
-    file_type = "pdf" if Path(file_path).suffix.lower() == ".pdf" else "image"
+    file_path = Path(file_path)
+    file_type = "pdf" if file_path.suffix.lower() == ".pdf" else "image"
     match file_type:
         case "image":
             result_raw = _send_parsing_request(file_path)
@@ -94,7 +95,7 @@ def parse_and_save_document(
         case "pdf":
             with tempfile.TemporaryDirectory() as temp_dir:
                 parts = split_pdf(file_path, temp_dir)
-                part_results = _parse_doc_in_parallel(parts)
+                part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
                 result = _merge_part_results(part_results)
         case _:
             raise ValueError(f"Unsupported file type: {file_type}")
@@ -143,13 +144,15 @@ def _merge_next_part(curr: ParsedDocument, next: ParsedDocument) -> None:
     curr.end_page_idx = next.end_page_idx
 
 
-def _parse_doc_in_parallel(doc_parts: list[Document]) -> list[ParsedDocument]:
+def _parse_doc_in_parallel(
+    doc_parts: list[Document], *, doc_name: str
+) -> list[ParsedDocument]:
     with ThreadPoolExecutor(max_workers=settings.max_workers) as executor:
         return list(
             tqdm(
                 executor.map(_parse_doc_parts, doc_parts),
                 total=len(doc_parts),
-                desc="Parsing document parts",
+                desc=f"Parsing document parts from '{doc_name}'",
             )
         )
 
@@ -227,5 +230,6 @@ def _send_parsing_request(file_path: str) -> dict[str, Any]:
 
 if __name__ == "__main__":
     # Remove hardcoded path in production code
-    file_path = "/Users/asia/Downloads/agentic-doc/pages_105.pdf"
+    # file_path = "/Users/asia/Downloads/agentic-doc/pages_105.pdf"
+    file_path = "/Users/asia/Downloads/agentic-doc/red.jpg"
     parse_and_save_document(file_path, result_save_dir="results")
