@@ -118,7 +118,6 @@ The optimal `MAX_WORKERS` value depends on your API rate limit and the latency o
 You can find your REST API latency in the logs. If you want to increase your rate limit, schedule a time to meet with us [here](https://scheduler.zoom.us/d/56i81uc2/landingai-document-extraction).
 
 
-
 ### Set `RETRY_LOGGING_STYLE`
 
 The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attempts.
