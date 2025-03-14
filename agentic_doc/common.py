@@ -1,7 +1,7 @@
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Union
 
 import httpx
 from pydantic import BaseModel, Field
@@ -30,16 +30,16 @@ class ChunkGroundingBox(BaseModel):
 class ChunkGrounding(BaseModel):
     page: int
     # NOTE: could be None if error happens in parsing the chunk
-    box: ChunkGroundingBox | None
+    box: Union[ChunkGroundingBox, None]
     # NOTE: image_path doesn't come from the server API, so it's null by default
-    image_path: Path | None = None
+    image_path: Union[Path, None] = None
 
 
 class Chunk(BaseModel):
     text: str
     grounding: list[ChunkGrounding]
     chunk_type: ChunkType
-    chunk_id: str | None
+    chunk_id: Union[str, None]
 
     @staticmethod
     def error_chunk(error_msg: str, page_idx: int) -> "Chunk":
