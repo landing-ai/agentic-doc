@@ -1,8 +1,7 @@
-from enum import Enum
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
-
 
 import httpx
 from pydantic import BaseModel, Field
