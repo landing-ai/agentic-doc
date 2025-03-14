@@ -65,22 +65,25 @@ def split_pdf(
 
 def log_retry_failure(retry_state: RetryCallState) -> None:
     if retry_state.outcome and retry_state.outcome.failed:
-        match settings.retry_logging_style:
-            case "log_msg":
-                exception = retry_state.outcome.exception()
-                func_name = (
-                    retry_state.fn.__name__ if retry_state.fn else "unknown_function"
-                )
-                # TODO: add a link to the error FAQ page
-                _LOGGER.debug(
-                    f"'{func_name}' failed on attempt {retry_state.attempt_number}. Error: '{exception}'.",
-                )
-            case "inline_block":
-                # Print yellow progress block that updates on the same line
-                print(
-                    f"\r\033[33m{'█' * retry_state.attempt_number}\033[0m",
-                    end="",
-                    flush=True,
-                )
-            case "none":
-                pass
+        if settings.retry_logging_style == "log_msg":
+            exception = retry_state.outcome.exception()
+            func_name = (
+                retry_state.fn.__name__ if retry_state.fn else "unknown_function"
+            )
+            # TODO: add a link to the error FAQ page
+            _LOGGER.debug(
+                f"'{func_name}' failed on attempt {retry_state.attempt_number}. Error: '{exception}'.",
+            )
+        elif settings.retry_logging_style == "inline_block":
+            # Print yellow progress block that updates on the same line
+            print(
+                f"\r\033[33m{'█' * retry_state.attempt_number}\033[0m",
+                end="",
+                flush=True,
+            )
+        elif settings.retry_logging_style == "none":
+            pass
+        else:
+            raise ValueError(
+                f"Invalid retry logging style: {settings.retry_logging_style}"
+            )

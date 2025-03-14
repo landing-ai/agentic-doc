@@ -99,23 +99,23 @@ def parse_and_save_document(
     """
     file_path = Path(file_path)
     file_type = "pdf" if file_path.suffix.lower() == ".pdf" else "image"
-    match file_type:
-        case "image":
-            result_raw = _send_parsing_request(str(file_path))
-            result_raw = {
-                **result_raw["data"],
-                "doc_type": "image",
-                "start_page_idx": 0,
-                "end_page_idx": 0,
-            }
-            result = ParsedDocument.model_validate(result_raw)
-        case "pdf":
-            with tempfile.TemporaryDirectory() as temp_dir:
-                parts = split_pdf(file_path, temp_dir)
-                part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
-                result = _merge_part_results(part_results)
-        case _:
-            raise ValueError(f"Unsupported file type: {file_type}")
+
+    if file_type == "image":
+        result_raw = _send_parsing_request(str(file_path))
+        result_raw = {
+            **result_raw["data"],
+            "doc_type": "image",
+            "start_page_idx": 0,
+            "end_page_idx": 0,
+        }
+        result = ParsedDocument.model_validate(result_raw)
+    elif file_type == "pdf":
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parts = split_pdf(file_path, temp_dir)
+            part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
+            result = _merge_part_results(part_results)
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
 
     if not result_save_dir:
         return result
