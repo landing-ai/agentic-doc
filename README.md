@@ -2,7 +2,7 @@
 
 The LandingAI [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) tool extracts structured information from visually complex documents with text, tables, pictures, charts, and other information. The API returns the extracted data in a hierarchical format and pinpoints the exact location of each element.
 
-This Python library wraps around the [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
+This `agentic-doc` Python library wraps around the [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
 
 Learn more about the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
 
@@ -111,13 +111,12 @@ RETRY_LOGGING_STYLE=log_msg # Logging style for retry, defaults to log_msg
 
 ### Set `MAX_WORKERS`
 
-Increasing `MAX_WORKERS` increase the number of concurrent requests, which can speed up the processing of large files if you have a high enough API rate limit. Otherwise, you hit the rate limit error and the library just keeps retrying for you.
+Increasing `MAX_WORKERS` increases the number of concurrent requests, which can speed up the processing of large files if you have a high enough API rate limit. Otherwise, you hit the rate limit error and the library just keeps retrying for you.
 
-The optimal `MAX_WORKERS` value depends on your API rate limit and the latency of each REST API call. For example, if your account has a rate limit of 5 requests per minute, and each REST API call takes on average 60 seconds to complete, then `MAX_WORKERS` should be set to 5.
+The optimal `MAX_WORKERS` value depends on your API rate limit and the latency of each REST API call. For example, if your account has a rate limit of 5 requests per minute, and each REST API call takes about 60 seconds to complete, then `MAX_WORKERS` should be set to 5.
 
-You can find your REST API latency in the logs.
+You can find your REST API latency in the logs. If you want to increase your rate limit, schedule a time to meet with us [here](https://scheduler.zoom.us/d/56i81uc2/landingai-document-extraction).
 
-NOTE: you can find out your REST API latency from logs, and reach out to us if you want to increase your rate limit.
 
 
 ### Set `RETRY_LOGGING_STYLE`
