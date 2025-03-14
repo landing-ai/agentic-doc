@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         # Create a copy of dict with redacted API key
         settings_dict = self.model_dump()
         if "vision_agent_api_key" in settings_dict:

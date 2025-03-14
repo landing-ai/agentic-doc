@@ -4,7 +4,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import structlog
@@ -43,7 +43,10 @@ def parse_documents(file_paths: list[str | Path]) -> list[ParsedDocument]:
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(parse_and_save_document, file_paths),
+                executor.map(
+                    parse_and_save_document,  # type: ignore [arg-type]
+                    file_paths,
+                ),
                 total=len(file_paths),
                 desc="Parsing documents",
             )
@@ -72,7 +75,7 @@ def parse_and_save_documents(
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(_parse_func, file_paths),
+                executor.map(_parse_func, file_paths),  # type: ignore [arg-type]
                 total=len(file_paths),
                 desc="Parsing documents",
             )
@@ -82,7 +85,7 @@ def parse_and_save_documents(
 def parse_and_save_document(
     file_path: str | Path,
     *,
-    result_save_dir: str | Path = None,
+    result_save_dir: str | Path | None = None,
 ) -> Path | ParsedDocument:
     """
     Parse a document and save the results to a local directory.
@@ -98,12 +101,12 @@ def parse_and_save_document(
     file_type = "pdf" if file_path.suffix.lower() == ".pdf" else "image"
     match file_type:
         case "image":
-            result_raw = _send_parsing_request(file_path)
+            result_raw = _send_parsing_request(str(file_path))
             result_raw = {
                 **result_raw["data"],
                 "doc_type": "image",
-                "start_page_idx": None,
-                "end_page_idx": None,
+                "start_page_idx": 0,
+                "end_page_idx": 0,
             }
             result = ParsedDocument.model_validate(result_raw)
         case "pdf":
@@ -135,8 +138,8 @@ def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
         return ParsedDocument(
             markdown="",
             chunks=[],
-            start_page_idx=None,
-            end_page_idx=None,
+            start_page_idx=0,
+            end_page_idx=0,
             doc_type="pdf",
         )
 
@@ -238,5 +241,5 @@ def _send_parsing_request(file_path: str) -> dict[str, Any]:
     _LOGGER.info(
         f"Time taken to successfully parse a document chunk: {timer.elapsed:.2f} seconds"
     )
-    result = response.json()
+    result = cast(dict[str, Any], response.json())
     return result

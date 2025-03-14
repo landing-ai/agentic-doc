@@ -29,7 +29,7 @@ structlog.configure(
         structlog.dev.ConsoleRenderer(
             exception_formatter=better_traceback,
             colors=True,
-            level_styles={  # type: ignore [arg-type]
+            level_styles={
                 "warning": structlog.dev.ConsoleRenderer.get_default_level_styles()[
                     "warning"
                 ],

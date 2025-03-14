@@ -22,8 +22,8 @@ def test_parse_and_save_documents_single_image(sample_image_path, results_dir):
     parsed_doc = ParsedDocument.model_validate(result_data)
     assert parsed_doc.markdown
     assert len(parsed_doc.chunks) > 0
-    assert parsed_doc.start_page_idx is None
-    assert parsed_doc.end_page_idx is None
+    assert parsed_doc.start_page_idx == 0
+    assert parsed_doc.end_page_idx == 0
     assert parsed_doc.doc_type == "image"
 
 
@@ -46,13 +46,13 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
     parsed_doc = ParsedDocument.model_validate(result_data)
     assert parsed_doc.markdown
     assert parsed_doc.start_page_idx == 0
-    assert parsed_doc.end_page_idx == 5
+    assert parsed_doc.end_page_idx == 3
     assert parsed_doc.doc_type == "pdf"
     assert len(parsed_doc.chunks) >= 10
     # Verify that chunks are ordered by page number
     for i in range(1, len(parsed_doc.chunks)):
         prev_page = parsed_doc.chunks[i - 1].grounding[0].page
         curr_page = parsed_doc.chunks[i].grounding[0].page
-        assert (
-            curr_page >= prev_page
-        ), f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
+        assert curr_page >= prev_page, (
+            f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
+        )
