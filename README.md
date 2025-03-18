@@ -99,6 +99,12 @@ This library implements a retry mechanism for handling API failures:
 - Retry wait time is capped at `max_retry_wait_time` seconds.
 - Retries include a random jitter of up to 10 seconds to distribute requests and prevent the thundering herd problem.
 
+### Parsing Errors
+
+If the REST API encounters an unrecoverable error during parsing, the library includes an [error chunk](./agentic_doc/common.py#L45) in the final result for the affected page.
+Each error chunk contains the error message and corresponding page index.
+Error chunks can be identified in the `ParsedDocument` by checking for `chunk_type=ChunkType.error`.
+
 
 ## Configuration Options
 
