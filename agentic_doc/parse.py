@@ -123,6 +123,7 @@ def parse_and_save_document(
 def _parse_pdf(file_path: Union[str, Path]) -> ParsedDocument:
     with tempfile.TemporaryDirectory() as temp_dir:
         parts = split_pdf(file_path, temp_dir)
+        file_path = Path(file_path)
         part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
         return _merge_part_results(part_results)
 
