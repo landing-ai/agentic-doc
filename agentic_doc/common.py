@@ -21,6 +21,12 @@ class ChunkType(str, Enum):
 
 
 class ChunkGroundingBox(BaseModel):
+    """
+    A bounding box of a chunk.
+
+    The coordinates are in the format of [left, top, right, bottom].
+    """
+
     l: float  # noqa: E741
     t: float
     r: float

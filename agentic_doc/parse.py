@@ -101,19 +101,9 @@ def parse_and_save_document(
     file_type = "pdf" if file_path.suffix.lower() == ".pdf" else "image"
 
     if file_type == "image":
-        result_raw = _send_parsing_request(str(file_path))
-        result_raw = {
-            **result_raw["data"],
-            "doc_type": "image",
-            "start_page_idx": 0,
-            "end_page_idx": 0,
-        }
-        result = ParsedDocument.model_validate(result_raw)
+        result = _parse_image(file_path)
     elif file_type == "pdf":
-        with tempfile.TemporaryDirectory() as temp_dir:
-            parts = split_pdf(file_path, temp_dir)
-            part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
-            result = _merge_part_results(part_results)
+        result = _parse_pdf(file_path)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
@@ -128,6 +118,36 @@ def parse_and_save_document(
     _LOGGER.info(f"Saved the parsed result to '{save_path}'")
 
     return save_path
+
+
+def _parse_pdf(file_path: Union[str, Path]) -> ParsedDocument:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        parts = split_pdf(file_path, temp_dir)
+        part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
+        return _merge_part_results(part_results)
+
+
+def _parse_image(file_path: Union[str, Path]) -> ParsedDocument:
+    try:
+        result_raw = _send_parsing_request(str(file_path))
+        result_raw = {
+            **result_raw["data"],
+            "doc_type": "image",
+            "start_page_idx": 0,
+            "end_page_idx": 0,
+        }
+        return ParsedDocument.model_validate(result_raw)
+    except Exception as e:
+        error_msg = str(e)
+        _LOGGER.error(f"Error parsing image '{file_path}' due to: {error_msg}")
+        chunks = [Chunk.error_chunk(error_msg, 0)]
+        return ParsedDocument(
+            markdown="",
+            chunks=chunks,
+            start_page_idx=0,
+            end_page_idx=0,
+            doc_type="image",
+        )
 
 
 def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:

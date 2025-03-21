@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Literal
 
 import structlog
@@ -6,6 +7,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _LOGGER = structlog.get_logger(__name__)
+_MAX_PARALLEL_TASKS = 100
 
 
 class Settings(BaseSettings):
@@ -36,3 +38,13 @@ class Settings(BaseSettings):
 
 settings = Settings()
 _LOGGER.info(f"Settings loaded: {settings}")
+
+if settings.batch_size * settings.max_workers > _MAX_PARALLEL_TASKS:
+    raise ValueError(
+        f"Batch size * max workers must be less than {_MAX_PARALLEL_TASKS}."
+        " Please reduce the batch size or max workers."
+        " Current settings: batch_size={settings.batch_size}, max_workers={settings.max_workers}"
+    )
+
+if settings.retry_logging_style == "inline_block":
+    logging.getLogger("httpx").setLevel(logging.WARNING)
