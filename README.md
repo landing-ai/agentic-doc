@@ -139,7 +139,7 @@ You can find your REST API latency in the logs. If you want to increase your rat
 The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attempts.
 
 - `log_msg`: Log the retry attempts as a log messages. Each attempt is logged as a separate message. This is the default setting.
-- `inline_blobk`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to track the number of retries has been made.
+- `inline_block`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to track the number of retries has been made.
 - `none`: Do not log the retry attempts.
 
 
