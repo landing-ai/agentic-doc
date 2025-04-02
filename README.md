@@ -70,7 +70,7 @@ This section describes some of the key features this library offers.
 
 ### Parse Large PDF Files
 
-A single REST API call can only handle up to 2 pages at a time. This library automatically splits a large PDF into multiple calls, uses a thread pool to process the calls in parallel, and stitches the results back together as a single result.
+**A single REST API call can only handle up to 2 pages at a time.** This library automatically splits a large PDF into multiple calls, uses a thread pool to process the calls in parallel, and stitches the results back together as a single result.
 
 We've used this library to successfully parse PDFs that are 1000+ pages long.
 
@@ -125,11 +125,17 @@ MAX_RETRY_WAIT_TIME=30
 RETRY_LOGGING_STYLE=log_msg
 ```
 
-### Set `MAX_WORKERS`
+### Max Parallelism
 
-Increasing `MAX_WORKERS` increases the number of concurrent requests, which can speed up the processing of large files if you have a high enough API rate limit. Otherwise, you hit the rate limit error and the library just keeps retrying for you.
+The maximum number of parallel requests is determined by multiplying `BATCH_SIZE` × `MAX_WORKERS`.
 
-The optimal `MAX_WORKERS` value depends on your API rate limit and the latency of each REST API call. For example, if your account has a rate limit of 5 requests per minute, and each REST API call takes about 60 seconds to complete, then `MAX_WORKERS` should be set to 5.
+> **NOTE:** The maximum parallelism allowed by this library is 100.
+
+Specifically, increasing `MAX_WORKERS` can speed up the processing of large individual files, while increasing `BATCH_SIZE` improves throughput when processing multiple files.
+
+> **NOTE:** Your job's maximum processing throughput may be limited by your API rate limit. If your rate limit isn't high enough, you may encounter rate limit errors, which the library will automatically handle through retries.
+
+The optimal values for `MAX_WORKERS` and `BATCH_SIZE` depend on your API rate limit and the latency of each REST API call. For example, if your account has a rate limit of 5 requests per minute, and each REST API call takes approximately 60 seconds to complete, and you're processing a single large file, then `MAX_WORKERS` should be set to 5 and `BATCH_SIZE` to 1.
 
 You can find your REST API latency in the logs. If you want to increase your rate limit, schedule a time to meet with us [here](https://scheduler.zoom.us/d/56i81uc2/landingai-document-extraction).
 
