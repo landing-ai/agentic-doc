@@ -2,12 +2,11 @@
 ![ci_status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci_cd.yml/badge.svg)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
+# Agentic Document Extraction Python SDK
 
-# agentic-doc
+The LandingAI [Agentic Document Extraction tool](https://va.landing.ai/demo/doc-extraction) extracts structured information from visually complex documents with text, tables, pictures, charts, and other information. The API returns the extracted data in a hierarchical format and pinpoints the exact location of each element.
 
-The LandingAI [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) tool extracts structured information from visually complex documents with text, tables, pictures, charts, and other information. The API returns the extracted data in a hierarchical format and pinpoints the exact location of each element.
-
-This `agentic-doc` Python library wraps around the [Agentic Document Extraction](https://va.landing.ai/demo/doc-extraction) API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
+This `agentic-doc` Python library wraps around the Agentic Document Extraction API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
 
 Learn more about the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
 
@@ -62,6 +61,12 @@ result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_
 # result_paths: ["path/to/save/results/document1_20250313_070305.json", "path/to/save/results/document2_20250313_070408.json"]
 ```
 
+## Why Use the SDK?
+
+- **Simplified Setup:** No need to manage API keys or handle low-level REST calls.
+- **Automatic Large File Processing:** Splits large PDFs into manageable parts and processes them in parallel.
+- **Built-In Error Handling:** Automatically retries requests with exponential backoff and jitter for common HTTP errors.
+- **Parallel Processing:** Efficiently parse multiple documents at once with configurable parallelism.
 
 ## Main Features
 
@@ -74,19 +79,17 @@ This section describes some of the key features this library offers.
 
 We've used this library to successfully parse PDFs that are 1000+ pages long.
 
-
 ### Parse Multiple Files in a Batch
 
 You can parse multiple files in a single function call with this library. The library processes files in parallel.
 
-NOTE: You can change the parallelism by setting the `batch_size` setting.
+> **NOTE:** You can change the parallelism by setting the `batch_size` setting.
 
 ### Automatically Handle API Errors and Rate Limits with Retries
 
 The REST API endpoint imposes rate limits per API key. This library automatically handles the rate limit error or other intermittent HTTP errors with retries.
 
 For more information, see [Error Handling](#error-handling) and [Configuration Options](#configuration-options).
-
 
 ### Error Handling
 
@@ -104,7 +107,6 @@ This library implements a retry mechanism for handling API failures:
 If the REST API encounters an unrecoverable error during parsing, the library includes an [error chunk](./agentic_doc/common.py#L45) in the final result for the affected page.
 Each error chunk contains the error message and corresponding page index.
 Error chunks can be identified in the `ParsedDocument` by checking for `chunk_type=ChunkType.error`.
-
 
 ## Configuration Options
 
@@ -139,15 +141,13 @@ The optimal values for `MAX_WORKERS` and `BATCH_SIZE` depend on your API rate li
 
 You can find your REST API latency in the logs. If you want to increase your rate limit, schedule a time to meet with us [here](https://scheduler.zoom.us/d/56i81uc2/landingai-document-extraction).
 
-
 ### Set `RETRY_LOGGING_STYLE`
 
 The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attempts.
 
 - `log_msg`: Log the retry attempts as a log messages. Each attempt is logged as a separate message. This is the default setting.
-- `inline_block`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to track the number of retries has been made.
+- `inline_block`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to track the number of retries that have been made.
 - `none`: Do not log the retry attempts.
-
 
 ## API Reference
 
@@ -184,13 +184,13 @@ Parse a single document and optionally save results.
   - `file_path`: Path to document
   - `result_save_dir`: Optional directory to save results
 - **Returns:**
-  - If `result_save_dir` provided: Path to saved result file
+  - If `result_save_dir` provided: Path to saved result file  
   - If no `result_save_dir`: ParsedDocument object
 - **Raises:**
-  - `FileNotFoundError`: If input file doesn't exist
+  - `FileNotFoundError`: If input file doesn't exist  
   - `ValueError`: If file type is not supported
 
-### Result Schema
+## Result Schema
 
 #### ParsedDocument
 
@@ -210,3 +210,15 @@ Represents a parsed content chunk with the following attributes:
 - `grounding`: list[Grounding] - List of content locations in document
 - `chunk_type`: Literal["text", "error"] - Type of chunk
 - `chunk_id`: Optional[str] - ID of the chunk
+
+## Troubleshooting & FAQ
+
+### Common Issues
+- **API Key Errors:**  
+  Ensure your API key is correctly set as an environment variable.
+- **Rate Limits:**  
+  The SDK automatically retries requests if you hit the API rate limit. Adjust `BATCH_SIZE` or `MAX_WORKERS` if you encounter frequent rate limit errors.
+- **Parsing Failures:**  
+  If a document fails to parse, an error chunk will be included in the result, detailing the error message and page index.
+
+---
