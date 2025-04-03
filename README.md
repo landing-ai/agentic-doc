@@ -8,7 +8,7 @@ The LandingAI [Agentic Document Extraction tool](https://va.landing.ai/demo/doc-
 
 This `agentic-doc` Python library wraps around the Agentic Document Extraction API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
 
-Learn more about the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
+For advanced users or for troubleshooting purposes, you can refer to the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
 
 ## Quick Start
 
