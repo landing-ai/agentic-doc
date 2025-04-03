@@ -2,7 +2,7 @@
 ![ci_status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci_cd.yml/badge.svg)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
-# Agentic Document Extraction Python SDK
+# Agentic Document Extraction Python Library
 
 The LandingAI [Agentic Document Extraction tool](https://va.landing.ai/demo/doc-extraction) extracts structured information from visually complex documents with text, tables, pictures, charts, and other information. The API returns the extracted data in a hierarchical format and pinpoints the exact location of each element.
 
@@ -61,7 +61,7 @@ result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_
 # result_paths: ["path/to/save/results/document1_20250313_070305.json", "path/to/save/results/document2_20250313_070408.json"]
 ```
 
-## Why Use the SDK?
+## Why Use the ?
 
 - **Simplified Setup:** No need to manage API keys or handle low-level REST calls.
 - **Automatic Large File Processing:** Splits large PDFs into manageable parts and processes them in parallel.
@@ -217,7 +217,7 @@ Represents a parsed content chunk with the following attributes:
 - **API Key Errors:**  
   Ensure your API key is correctly set as an environment variable.
 - **Rate Limits:**  
-  The SDK automatically retries requests if you hit the API rate limit. Adjust `BATCH_SIZE` or `MAX_WORKERS` if you encounter frequent rate limit errors.
+  The library automatically retries requests if you hit the API rate limit. Adjust `BATCH_SIZE` or `MAX_WORKERS` if you encounter frequent rate limit errors.
 - **Parsing Failures:**  
   If a document fails to parse, an error chunk will be included in the result, detailing the error message and page index.
 
