@@ -61,7 +61,7 @@ result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_
 # result_paths: ["path/to/save/results/document1_20250313_070305.json", "path/to/save/results/document2_20250313_070408.json"]
 ```
 
-## Why Use the ?
+## Why Use It?
 
 - **Simplified Setup:** No need to manage API keys or handle low-level REST calls.
 - **Automatic Large File Processing:** Splits large PDFs into manageable parts and processes them in parallel.
