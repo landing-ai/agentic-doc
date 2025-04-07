@@ -244,7 +244,7 @@ def viz_parsed_document(
     parsed_document: ParsedDocument,
     *,
     output_dir: Union[str, Path, None] = None,
-    viz_config: VisualizationConfig | None = None,
+    viz_config: Union[VisualizationConfig, None] = None,
 ) -> list[Image.Image]:
     if viz_config is None:
         viz_config = VisualizationConfig()
@@ -279,7 +279,7 @@ def viz_parsed_document(
 def viz_chunks(
     img: np.ndarray,
     chunks: list[Chunk],
-    viz_config: VisualizationConfig | None = None,
+    viz_config: Union[VisualizationConfig, None] = None,
 ) -> np.ndarray:
     if viz_config is None:
         viz_config = VisualizationConfig()

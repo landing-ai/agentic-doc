@@ -116,6 +116,61 @@ for chunk in results[0].chunks:
 
 This feature works with all parsing functions: `parse_documents`, `parse_and_save_documents`, and `parse_and_save_document`.
 
+### Visualize Parsing Result
+
+The library provides a visualization utility that creates annotated images showing where each chunk of content was extracted from the document. This is useful for:
+- Verifying the accuracy of the extraction
+- Debugging extraction issues
+
+Here's how to use the visualization feature:
+
+```python
+from agentic_doc.parse import parse_documents
+from agentic_doc.utils import viz_parsed_document
+from agentic_doc.config import VisualizationConfig
+
+# Parse a document
+results = parse_documents(["path/to/document.pdf"])
+parsed_doc = results[0]
+
+# Create visualizations with default settings
+images = viz_parsed_document(
+    "path/to/document.pdf",
+    parsed_doc,
+    output_dir="path/to/save/visualizations"
+)
+
+# Or customize the visualization appearance
+viz_config = VisualizationConfig(
+    thickness=2,  # Thicker bounding boxes
+    text_bg_opacity=0.8,  # More opaque text background
+    font_scale=0.7,  # Larger text
+    # Custom colors for different chunk types
+    color_map={
+        "title": (0, 0, 255),  # Red for titles
+        "text": (255, 0, 0),  # Blue for regular text
+        # ... other chunk types ...
+    }
+)
+
+images = viz_parsed_document(
+    "path/to/document.pdf",
+    parsed_doc,
+    output_dir="path/to/save/visualizations",
+    viz_config=viz_config
+)
+
+# The visualization images will be saved as:
+# path/to/save/visualizations/document_viz_page_X.png
+# Where X is the page number
+```
+
+The visualization shows:
+- Bounding boxes around each extracted chunk
+- Chunk type and index labels
+- Different colors for different types of content (titles, text, tables, etc.)
+- Semi-transparent text backgrounds for better readability
+
 ### Automatically Handle API Errors and Rate Limits with Retries
 
 The REST API endpoint imposes rate limits per API key. This library automatically handles the rate limit error or other intermittent HTTP errors with retries.
