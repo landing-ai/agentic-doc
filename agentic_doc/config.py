@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     retry_logging_style: Literal["none", "log_msg", "inline_block"] = Field(
         default="log_msg"
     )
+    pdf_to_image_dpi: int = Field(
+        default=96,
+        description="DPI for converting PDF pages to images",
+        ge=1,
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

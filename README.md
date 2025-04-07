@@ -85,6 +85,37 @@ You can parse multiple files in a single function call with this library. The li
 
 > **NOTE:** You can change the parallelism by setting the `batch_size` setting.
 
+### Save Groundings as Images
+
+The library can extract and save the visual regions (groundings) of the document where each chunk of content was found. This is useful for visualizing exactly what parts of the document were extracted and for debugging extraction issues.
+
+Each grounding represents a bounding box in the original document, and the library can save these regions as individual PNG images. The images are organized by page number and chunk ID.
+
+Here's how to use this feature:
+
+```python
+from agentic_doc.parse import parse_documents
+
+# Save groundings when parsing a document
+results = parse_documents(
+    ["path/to/document.pdf"],
+    grounding_save_dir="path/to/save/groundings"
+)
+
+# The grounding images will be saved to:
+# path/to/save/groundings/document_TIMESTAMP/page_X/CHUNK_ID_Y.png
+# Where X is the page number, CHUNK_ID is the unique ID of each chunk,
+# and Y is the index of the grounding within the chunk
+
+# Each chunk's grounding in the result will have the image_path set
+for chunk in results[0].chunks:
+    for grounding in chunk.grounding:
+        if grounding.image_path:
+            print(f"Grounding saved to: {grounding.image_path}")
+```
+
+This feature works with all parsing functions: `parse_documents`, `parse_and_save_documents`, and `parse_and_save_document`.
+
 ### Automatically Handle API Errors and Rate Limits with Retries
 
 The REST API endpoint imposes rate limits per API key. This library automatically handles the rate limit error or other intermittent HTTP errors with retries.
@@ -153,36 +184,39 @@ The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attemp
 
 ### Main Functions
 
-#### `parse_documents(file_paths: list[str | Path]) -> list[ParsedDocument]`
+#### `parse_documents(file_paths: list[str | Path], *, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
 
 Parse multiple documents and return their parsed results.
 
 - **Parameters:**
   - `file_paths`: List of paths to documents (PDFs or images)
+  - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - List of `ParsedDocument` objects containing parsed results
 - **Raises:**
   - `FileNotFoundError`: If any input file doesn't exist
 
-#### `parse_and_save_documents(file_paths: list[str | Path], *, result_save_dir: str | Path) -> list[Path]`
+#### `parse_and_save_documents(file_paths: list[str | Path], *, result_save_dir: str | Path, grounding_save_dir: str | Path | None = None) -> list[Path]`
 
 Parse multiple documents and save results to the specified directory.
 
 - **Parameters:**
   - `file_paths`: List of paths to documents
   - `result_save_dir`: Directory to save parsed results
+  - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - A list of JSON file paths to the saved results. The file paths are sorted by the order of the input file paths. The file name is the original file name with a timestamp appended. For example, the input file "document.pdf" could have this output file: "document_20250313_070305.json".
 - **Raises:**
   - `FileNotFoundError`: If any input file doesn't exist
 
-#### `parse_and_save_document(file_path: str | Path, *, result_save_dir: str | Path = None) -> Path | ParsedDocument`
+#### `parse_and_save_document(file_path: str | Path, *, result_save_dir: str | Path | None = None, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
 
 Parse a single document and optionally save results.
 
 - **Parameters:**
   - `file_path`: Path to document
   - `result_save_dir`: Optional directory to save results
+  - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - If `result_save_dir` provided: Path to saved result file  
   - If no `result_save_dir`: ParsedDocument object

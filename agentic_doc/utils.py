@@ -71,7 +71,7 @@ def save_groundings_as_images(
 
 
 def page_to_image(
-    pdf_doc: pymupdf.Document, page_idx: int, dpi: int = 96
+    pdf_doc: pymupdf.Document, page_idx: int, dpi: int = settings.pdf_to_image_dpi
 ) -> np.ndarray:
     """Convert a PDF page to an image. We specifically use pymupdf because it is self-contained and correctly renders annotations."""
     page = pdf_doc[page_idx]
@@ -162,9 +162,9 @@ def split_pdf(
     input_pdf_path = Path(input_pdf_path)
     assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
     assert input_pdf_path.suffix == ".pdf", "Input file must be a PDF"
-    assert (
-        0 < split_size <= 2
-    ), "split_size must be greater than 0 and less than or equal to 2"
+    assert 0 < split_size <= 2, (
+        "split_size must be greater than 0 and less than or equal to 2"
+    )
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_dir = str(output_dir)
