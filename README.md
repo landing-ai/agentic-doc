@@ -134,6 +134,7 @@ results = parse_documents(["path/to/document.pdf"])
 parsed_doc = results[0]
 
 # Create visualizations with default settings
+# The output images have a PIL.Image.Image type
 images = viz_parsed_document(
     "path/to/document.pdf",
     parsed_doc,
