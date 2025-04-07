@@ -1,15 +1,149 @@
+import math
 import os
+from collections import defaultdict
 from pathlib import Path
-from typing import Union
+from typing import Literal, Union
 
+import cv2
+import numpy as np
+import pymupdf
 import structlog
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
-from agentic_doc.common import Document
+from agentic_doc.common import Chunk, ChunkGroundingBox, ChunkType, Document
 from agentic_doc.config import settings
 
 _LOGGER = structlog.getLogger(__name__)
+
+
+def get_file_type(file_path: Path) -> Literal["pdf", "image"]:
+    """Get the file type of the input file."""
+    return "pdf" if file_path.suffix.lower() == ".pdf" else "image"
+
+
+def save_groundings_as_images(
+    file_path: Path,
+    chunks: list[Chunk],
+    save_dir: Path,
+    inplace: bool = True,
+) -> dict[str, list[Path]]:
+    """
+    Save the chunks as images based on the bounding box in each chunk.
+
+    Args:
+        file_path (Path): The path to the input document file.
+        chunks (list[Chunk]): The chunks to save or update.
+        chunk_save_dir (Path): The directory to save the images of the chunks.
+        inplace (bool): Whether to update the input chunks in place.
+
+    Returns:
+        dict[str, Path]: The dictionary of saved image paths. The key is the chunk id and the value is the path to the saved image.
+    """
+    file_type = get_file_type(file_path)
+    _LOGGER.info(
+        f"Saving {len(chunks)} chunks as images to '{save_dir}'",
+        file_path=file_path,
+        file_type=file_type,
+    )
+    result: dict[str, list[Path]] = {}
+    save_dir.mkdir(parents=True, exist_ok=True)
+    if file_type == "image":
+        img = cv2.imread(str(file_path))
+        return _crop_groundings(img, chunks, save_dir, inplace)
+
+    assert file_type == "pdf"
+    chunks_by_page_idx = defaultdict(list)
+    for chunk in chunks:
+        if chunk.chunk_type == ChunkType.error:
+            continue
+
+        page_idx = chunk.grounding[0].page
+        chunks_by_page_idx[page_idx].append(chunk)
+
+    with pymupdf.open(file_path) as pdf_doc:
+        for page_idx, chunks in sorted(chunks_by_page_idx.items()):
+            page_img = page_to_image(pdf_doc, page_idx)
+            page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
+            result.update(page_result)
+
+    return result
+
+
+def page_to_image(
+    pdf_doc: pymupdf.Document, page_idx: int, dpi: int = 96
+) -> np.ndarray:
+    """Convert a PDF page to an image. We specifically use pymupdf because it is self-contained and correctly renders annotations."""
+    page = pdf_doc[page_idx]
+    # Scale image and use RGB colorspace
+    pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB)
+    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, -1)
+    # Ensure the image has 3 channels (sometimes it may include an alpha channel)
+    if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
+        img = img[..., :3]
+    return img
+
+
+def _crop_groundings(
+    img: np.ndarray,
+    chunks: list[Chunk],
+    crop_save_dir: Path,
+    inplace: bool = True,
+) -> dict[str, list[Path]]:
+    result: dict[str, list[Path]] = defaultdict(list)
+    for c in chunks:
+        if c.chunk_type == ChunkType.error:
+            continue
+        for i, grounding in enumerate(c.grounding):
+            if grounding.box is None:
+                _LOGGER.error(
+                    "Grounding has no bounding box in non-error chunk",
+                    grounding=grounding,
+                    chunk=c,
+                )
+                continue
+
+            cropped = _crop_image(img, grounding.box)
+            # Convert the cropped image to PNG bytes
+            is_success, buffer = cv2.imencode(".png", cropped)
+            if not is_success:
+                _LOGGER.error(
+                    "Failed to encode cropped image as PNG",
+                    grounding=grounding,
+                )
+                continue
+
+            page = f"page_{grounding.page}"
+            crop_save_path = crop_save_dir / page / f"{c.chunk_id}_{i}.png"
+            crop_save_path.parent.mkdir(parents=True, exist_ok=True)
+            crop_save_path.write_bytes(buffer.tobytes())
+            assert c.chunk_id is not None
+            result[c.chunk_id].append(crop_save_path)
+            if inplace:
+                c.grounding[i].image_path = crop_save_path
+
+    return result
+
+
+def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
+    # Extract coordinates from the bounding box
+    xmin, ymin, xmax, ymax = bbox.l, bbox.t, bbox.r, bbox.b
+
+    # Convert normalized coordinates to absolute coordinates
+    height, width = image.shape[:2]
+    assert 0 <= xmin <= 1 and 0 <= ymin <= 1 and 0 <= xmax <= 1 and 0 <= ymax <= 1
+    xmin = math.floor(xmin * width)
+    xmax = math.ceil(xmax * width)
+    ymin = math.floor(ymin * height)
+    ymax = math.ceil(ymax * height)
+
+    # Ensure coordinates are valid
+    xmin = max(0, xmin)
+    ymin = max(0, ymin)
+    xmax = min(width, xmax)
+    ymax = min(height, ymax)
+
+    return image[ymin:ymax, xmin:xmax]
 
 
 def split_pdf(

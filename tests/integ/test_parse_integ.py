@@ -8,7 +8,11 @@ def test_parse_and_save_documents_single_image(sample_image_path, results_dir):
     input_file = sample_image_path
 
     # Act
-    result_paths = parse_and_save_documents([input_file], result_save_dir=results_dir)
+    result_paths = parse_and_save_documents(
+        [input_file],
+        result_save_dir=results_dir,
+        grounding_save_dir=results_dir,
+    )
 
     # Assert
     assert len(result_paths) == 1
@@ -32,7 +36,11 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
     input_file = sample_pdf_path
 
     # Act
-    result_paths = parse_and_save_documents([input_file], result_save_dir=results_dir)
+    result_paths = parse_and_save_documents(
+        [input_file],
+        result_save_dir=results_dir,
+        grounding_save_dir=results_dir,
+    )
 
     # Assert
     assert len(result_paths) == 1
@@ -56,3 +64,8 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
         assert (
             curr_page >= prev_page
         ), f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
+
+    # Verify that grounding images were saved
+    for chunk in parsed_doc.chunks:
+        for grounding in chunk.grounding:
+            assert grounding.image_path.exists()

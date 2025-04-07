@@ -19,19 +19,28 @@ from agentic_doc.common import (
     Timer,
 )
 from agentic_doc.config import settings
-from agentic_doc.utils import log_retry_failure, split_pdf
+from agentic_doc.utils import (
+    get_file_type,
+    log_retry_failure,
+    save_groundings_as_images,
+    split_pdf,
+)
 
 _LOGGER = structlog.getLogger(__name__)
 _ENDPOINT_URL = "https://api.va.landing.ai/v1/tools/agentic-document-analysis"
 
 
-def parse_documents(file_paths: list[Union[str, Path]]) -> list[ParsedDocument]:
+def parse_documents(
+    file_paths: list[Union[str, Path]],
+    *,
+    grounding_save_dir: Union[str, Path, None] = None,
+) -> list[ParsedDocument]:
     """
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
 
     Args:
         file_paths (list[str | Path]): The list of file paths to the documents to parse.
-
+        grounding_save_dir (str | Path): The local directory to save the grounding images.
     Returns:
         list[dict[str, Any]]: The list of parsed documents. The list is sorted by the order of the input file paths.
     """
@@ -40,13 +49,14 @@ def parse_documents(file_paths: list[Union[str, Path]]) -> list[ParsedDocument]:
             raise FileNotFoundError(f"File not found: {file_path}")
 
     _LOGGER.info(f"Parsing {len(file_paths)} documents")
+    _parse_func = partial(
+        parse_and_save_document,
+        grounding_save_dir=grounding_save_dir,
+    )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(
-                    parse_and_save_document,  # type: ignore [arg-type]
-                    file_paths,
-                ),
+                executor.map(_parse_func, file_paths),  # type: ignore [arg-type]
                 total=len(file_paths),
                 desc="Parsing documents",
             )
@@ -54,7 +64,10 @@ def parse_documents(file_paths: list[Union[str, Path]]) -> list[ParsedDocument]:
 
 
 def parse_and_save_documents(
-    file_paths: list[Union[str, Path]], *, result_save_dir: Union[str, Path]
+    file_paths: list[Union[str, Path]],
+    *,
+    result_save_dir: Union[str, Path],
+    grounding_save_dir: Union[str, Path, None] = None,
 ) -> list[Path]:
     """
     Parse a list of documents and save the results to a local directory.
@@ -62,7 +75,7 @@ def parse_and_save_documents(
     Args:
         file_paths (list[str | Path]): The list of file paths to the documents to parse.
         result_save_dir (str | Path): The local directory to save the results.
-
+        grounding_save_dir (str | Path): The local directory to save the grounding images.
     Returns:
         list[Path]: A list of json file paths to the saved results. The file paths are sorted by the order of the input file paths.
             The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_123456.json".
@@ -71,7 +84,11 @@ def parse_and_save_documents(
         if not Path(file_path).exists():
             raise FileNotFoundError(f"File not found: {file_path}")
     _LOGGER.info(f"Parsing {len(file_paths)} documents")
-    _parse_func = partial(parse_and_save_document, result_save_dir=result_save_dir)
+    _parse_func = partial(
+        parse_and_save_document,
+        result_save_dir=result_save_dir,
+        grounding_save_dir=grounding_save_dir,
+    )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
@@ -86,6 +103,7 @@ def parse_and_save_document(
     file_path: Union[str, Path],
     *,
     result_save_dir: Union[str, Path, None] = None,
+    grounding_save_dir: Union[str, Path, None] = None,
 ) -> Union[Path, ParsedDocument]:
     """
     Parse a document and save the results to a local directory.
@@ -98,7 +116,7 @@ def parse_and_save_document(
         Path | ParsedDocument: The file path to the saved result or the parsed document data.
     """
     file_path = Path(file_path)
-    file_type = "pdf" if file_path.suffix.lower() == ".pdf" else "image"
+    file_type = get_file_type(file_path)
 
     if file_type == "image":
         result = _parse_image(file_path)
@@ -107,13 +125,20 @@ def parse_and_save_document(
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    result_name = f"{Path(file_path).stem}_{ts}"
+    if grounding_save_dir:
+        grounding_save_dir = Path(grounding_save_dir) / result_name
+        save_groundings_as_images(
+            file_path, result.chunks, grounding_save_dir, inplace=True
+        )
+
     if not result_save_dir:
         return result
 
     result_save_dir = Path(result_save_dir)
     result_save_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = result_save_dir / f"{Path(file_path).stem}_{ts}.json"
+    save_path = result_save_dir / f"{result_name}.json"
     save_path.write_text(result.model_dump_json())
     _LOGGER.info(f"Saved the parsed result to '{save_path}'")
 

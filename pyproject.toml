@@ -28,6 +28,7 @@ pillow-heif = "^0.16.0"
 pypdf = "^5.3.1"
 structlog = "^25.2.0"
 httpx = "^0.28.1"
+pymupdf = "^1.25.5"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -47,6 +48,7 @@ mkdocstrings = {extras = ["python"], version = "^0.23.0"}
 mkdocs-material = "^9.4.2"
 pre-commit = "^3.8.0"
 flake8 = "^7.1.2"
+reportlab = "^4.3.1"
 
 [tool.pytest.ini_options]
 log_cli = true
@@ -84,4 +86,5 @@ show_error_codes = true
 ignore_missing_imports = true
 module = [
     "cv2.*",
+    "pymupdf.*",
 ]
