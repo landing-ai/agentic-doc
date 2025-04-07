@@ -33,6 +33,7 @@ export VISION_AGENT_API_KEY=<your-api-key>
 The library can extract data from:
 - PDFs (any length)
 - Images that are supported by OpenCV-Python (i.e. the `cv2` library)
+- URLs pointing to PDF or image files
 
 ### Basic Usage
 
@@ -42,10 +43,16 @@ Run the following script to extract data from one document and return the result
 ```python
 from agentic_doc.parse import parse_documents
 
+# Parse a local file
 results = parse_documents(["path/to/image.png"])
 parsed_doc = results[0]
 print(parsed_doc.markdown)  # Get the extracted data as markdown
 print(parsed_doc.chunks)  # Get the extracted data as structured chunks of content
+
+# Parse a document from a URL
+results = parse_documents(["https://example.com/document.pdf"])
+parsed_doc = results[0]
+print(parsed_doc.markdown)
 ```
 
 #### Extract Data from Multiple Documents and Save the Results to a Directory
@@ -54,11 +61,16 @@ Run the following script to extract data from multiple documents. The results wi
 ```python
 from agentic_doc.parse import parse_and_save_documents
 
+# Parse local files
 file_paths = ["path/to/your/document1.pdf", "path/to/another/document2.pdf"]
 result_save_dir = "path/to/save/results"
 
 result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_dir)
 # result_paths: ["path/to/save/results/document1_20250313_070305.json", "path/to/save/results/document2_20250313_070408.json"]
+
+# Parse documents from URLs
+urls = ["https://example.com/doc1.pdf", "https://example.com/doc2.pdf"]
+result_paths = parse_and_save_documents(urls, result_save_dir=result_save_dir)
 ```
 
 ## Why Use It?
@@ -240,37 +252,39 @@ The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attemp
 
 ### Main Functions
 
-#### `parse_documents(file_paths: list[str | Path], *, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
+#### `parse_documents(documents: list[str | Path | AnyHttpUrl], *, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
 
 Parse multiple documents and return their parsed results.
 
 - **Parameters:**
-  - `file_paths`: List of paths to documents (PDFs or images)
+  - `documents`: List of paths to documents (PDFs or images) or URLs pointing to documents
   - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - List of `ParsedDocument` objects containing parsed results
 - **Raises:**
   - `FileNotFoundError`: If any input file doesn't exist
+  - `ValueError`: If any URL is invalid or points to an unsupported file type
 
-#### `parse_and_save_documents(file_paths: list[str | Path], *, result_save_dir: str | Path, grounding_save_dir: str | Path | None = None) -> list[Path]`
+#### `parse_and_save_documents(documents: list[str | Path | AnyHttpUrl], *, result_save_dir: str | Path, grounding_save_dir: str | Path | None = None) -> list[Path]`
 
 Parse multiple documents and save results to the specified directory.
 
 - **Parameters:**
-  - `file_paths`: List of paths to documents
+  - `documents`: List of paths to documents or URLs pointing to documents
   - `result_save_dir`: Directory to save parsed results
   - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - A list of JSON file paths to the saved results. The file paths are sorted by the order of the input file paths. The file name is the original file name with a timestamp appended. For example, the input file "document.pdf" could have this output file: "document_20250313_070305.json".
 - **Raises:**
   - `FileNotFoundError`: If any input file doesn't exist
+  - `ValueError`: If any URL is invalid or points to an unsupported file type
 
-#### `parse_and_save_document(file_path: str | Path, *, result_save_dir: str | Path | None = None, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
+#### `parse_and_save_document(document: str | Path | AnyHttpUrl, *, result_save_dir: str | Path | None = None, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
 
 Parse a single document and optionally save results.
 
 - **Parameters:**
-  - `file_path`: Path to document
+  - `document`: Path to document or URL pointing to a document
   - `result_save_dir`: Optional directory to save results
   - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
@@ -278,7 +292,7 @@ Parse a single document and optionally save results.
   - If no `result_save_dir`: ParsedDocument object
 - **Raises:**
   - `FileNotFoundError`: If input file doesn't exist  
-  - `ValueError`: If file type is not supported
+  - `ValueError`: If file type is not supported or URL is invalid
 
 ## Result Schema
 
@@ -310,5 +324,7 @@ Represents a parsed content chunk with the following attributes:
   The library automatically retries requests if you hit the API rate limit. Adjust `BATCH_SIZE` or `MAX_WORKERS` if you encounter frequent rate limit errors.
 - **Parsing Failures:**  
   If a document fails to parse, an error chunk will be included in the result, detailing the error message and page index.
+- **URL Access Issues:**
+  If you're having trouble accessing documents from URLs, check that the URLs are publicly accessible and point to supported file types (PDF or images).
 
 ---

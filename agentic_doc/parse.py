@@ -1,14 +1,16 @@
 import copy
-from functools import partial
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Union, cast
 
 import httpx
 import structlog
 import tenacity
+from pydantic import AnyHttpUrl
+from pydantic_core import Url
 from tqdm import tqdm
 
 from agentic_doc.common import (
@@ -20,7 +22,9 @@ from agentic_doc.common import (
 )
 from agentic_doc.config import settings
 from agentic_doc.utils import (
+    download_file,
     get_file_type,
+    is_valid_httpurl,
     log_retry_failure,
     save_groundings_as_images,
     split_pdf,
@@ -31,7 +35,7 @@ _ENDPOINT_URL = "https://api.va.landing.ai/v1/tools/agentic-document-analysis"
 
 
 def parse_documents(
-    file_paths: list[Union[str, Path]],
+    documents: list[Union[str, Path, AnyHttpUrl]],
     *,
     grounding_save_dir: Union[str, Path, None] = None,
 ) -> list[ParsedDocument]:
@@ -39,16 +43,12 @@ def parse_documents(
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
 
     Args:
-        file_paths (list[str | Path]): The list of file paths to the documents to parse.
+        documents (list[str | Path | AnyHttpUrl]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `AnyHttpUrl` object.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
     Returns:
-        list[dict[str, Any]]: The list of parsed documents. The list is sorted by the order of the input file paths.
+        list[ParsedDocument]: The list of parsed documents. The list is sorted by the order of the input documents.
     """
-    for file_path in file_paths:
-        if not Path(file_path).exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-
-    _LOGGER.info(f"Parsing {len(file_paths)} documents")
+    _LOGGER.info(f"Parsing {len(documents)} documents")
     _parse_func = partial(
         parse_and_save_document,
         grounding_save_dir=grounding_save_dir,
@@ -56,15 +56,15 @@ def parse_documents(
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(_parse_func, file_paths),  # type: ignore [arg-type]
-                total=len(file_paths),
+                executor.map(_parse_func, documents),  # type: ignore [arg-type]
+                total=len(documents),
                 desc="Parsing documents",
             )
         )
 
 
 def parse_and_save_documents(
-    file_paths: list[Union[str, Path]],
+    documents: list[Union[str, Path, AnyHttpUrl]],
     *,
     result_save_dir: Union[str, Path],
     grounding_save_dir: Union[str, Path, None] = None,
@@ -73,17 +73,14 @@ def parse_and_save_documents(
     Parse a list of documents and save the results to a local directory.
 
     Args:
-        file_paths (list[str | Path]): The list of file paths to the documents to parse.
+        documents (list[str | Path | AnyHttpUrl]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `AnyHttpUrl` object.
         result_save_dir (str | Path): The local directory to save the results.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
     Returns:
         list[Path]: A list of json file paths to the saved results. The file paths are sorted by the order of the input file paths.
             The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_123456.json".
     """
-    for file_path in file_paths:
-        if not Path(file_path).exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-    _LOGGER.info(f"Parsing {len(file_paths)} documents")
+    _LOGGER.info(f"Parsing {len(documents)} documents")
     _parse_func = partial(
         parse_and_save_document,
         result_save_dir=result_save_dir,
@@ -92,15 +89,15 @@ def parse_and_save_documents(
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(_parse_func, file_paths),  # type: ignore [arg-type]
-                total=len(file_paths),
+                executor.map(_parse_func, documents),  # type: ignore [arg-type]
+                total=len(documents),
                 desc="Parsing documents",
             )
         )
 
 
 def parse_and_save_document(
-    file_path: Union[str, Path],
+    document: Union[str, Path, AnyHttpUrl],
     *,
     result_save_dir: Union[str, Path, None] = None,
     grounding_save_dir: Union[str, Path, None] = None,
@@ -109,40 +106,52 @@ def parse_and_save_document(
     Parse a document and save the results to a local directory.
 
     Args:
-        file_path (str | Path): The path to the document file.
+        document (str | Path | AnyHttpUrl): The document to parse. It can be a local file path, a URL string, or a Pydantic `AnyHttpUrl` object.
         result_save_dir (str | Path): The local directory to save the results. If None, the parsed document data is returned.
 
     Returns:
         Path | ParsedDocument: The file path to the saved result or the parsed document data.
     """
-    file_path = Path(file_path)
-    file_type = get_file_type(file_path)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if isinstance(document, str) and is_valid_httpurl(document):
+            document = AnyHttpUrl(document)
 
-    if file_type == "image":
-        result = _parse_image(file_path)
-    elif file_type == "pdf":
-        result = _parse_pdf(file_path)
-    else:
-        raise ValueError(f"Unsupported file type: {file_type}")
+        if isinstance(document, Url):
+            output_file_path = Path(temp_dir) / Path(str(document)).name
+            download_file(document, str(output_file_path))
+            document = output_file_path
+        else:
+            document = Path(document)
+            if isinstance(document, Path) and not document.exists():
+                raise FileNotFoundError(f"File not found: {document}")
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_name = f"{Path(file_path).stem}_{ts}"
-    if grounding_save_dir:
-        grounding_save_dir = Path(grounding_save_dir) / result_name
-        save_groundings_as_images(
-            file_path, result.chunks, grounding_save_dir, inplace=True
-        )
+        file_type = get_file_type(document)
 
-    if not result_save_dir:
-        return result
+        if file_type == "image":
+            result = _parse_image(document)
+        elif file_type == "pdf":
+            result = _parse_pdf(document)
+        else:
+            raise ValueError(f"Unsupported file type: {file_type}")
 
-    result_save_dir = Path(result_save_dir)
-    result_save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = result_save_dir / f"{result_name}.json"
-    save_path.write_text(result.model_dump_json())
-    _LOGGER.info(f"Saved the parsed result to '{save_path}'")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        result_name = f"{Path(document).stem}_{ts}"
+        if grounding_save_dir:
+            grounding_save_dir = Path(grounding_save_dir) / result_name
+            save_groundings_as_images(
+                document, result.chunks, grounding_save_dir, inplace=True
+            )
 
-    return save_path
+        if not result_save_dir:
+            return result
+
+        result_save_dir = Path(result_save_dir)
+        result_save_dir.mkdir(parents=True, exist_ok=True)
+        save_path = result_save_dir / f"{result_name}.json"
+        save_path.write_text(result.model_dump_json())
+        _LOGGER.info(f"Saved the parsed result to '{save_path}'")
+
+        return save_path
 
 
 def _parse_pdf(file_path: Union[str, Path]) -> ParsedDocument:

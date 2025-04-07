@@ -3,12 +3,15 @@ import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal, Union
+from urllib.parse import urlparse
 
 import cv2
+import httpx
 import numpy as np
 import pymupdf
 import structlog
 from PIL import Image
+from pydantic import AnyHttpUrl
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
@@ -386,3 +389,35 @@ def _read_img_rgb(img_path: str) -> np.ndarray:
     elif img.shape[-1] == 4:
         img = img[..., :3]
     return img
+
+
+def download_file(file_url: AnyHttpUrl, output_filepath: str) -> None:
+    """
+    Downloads a file from the given media URL to the specified local path.
+
+    Parameters:
+    media_url (AnyHttpUrl): The URL of the media file to download.
+    path (str): The local file system path where the file should be saved.
+
+    Raises:
+    Exception: If the download fails (non-200 status code).
+    """
+    _LOGGER.info(f"Downloading file from '{file_url}' to '{output_filepath}'")
+    with httpx.stream("GET", str(file_url), timeout=None) as response:
+        if response.status_code != 200:
+            raise Exception(
+                f"Download failed for '{file_url}'. Status code: {response.status_code} {response.text}"
+            )
+
+        with open(output_filepath, "wb") as f:
+            for chunk in response.iter_bytes(chunk_size=1024):
+                f.write(chunk)
+
+
+def is_valid_httpurl(url: str) -> bool:
+    """Check if the given URL is a valid HTTP URL."""
+    try:
+        parsed_url = urlparse(url)
+        return parsed_url.scheme in ["http", "https"]
+    except Exception:
+        return False
