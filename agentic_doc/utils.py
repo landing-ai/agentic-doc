@@ -80,7 +80,7 @@ def page_to_image(
     img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, -1)
     # Ensure the image has 3 channels (sometimes it may include an alpha channel)
     if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
-        img = img[..., :3]
+        img = img[..., :3]  # type: ignore [assignment]
     return img
 
 
@@ -143,7 +143,7 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
     xmax = min(width, xmax)
     ymax = min(height, ymax)
 
-    return image[ymin:ymax, xmin:xmax]
+    return image[ymin:ymax, xmin:xmax]  # type: ignore
 
 
 def split_pdf(
