@@ -77,10 +77,12 @@ def page_to_image(
     page = pdf_doc[page_idx]
     # Scale image and use RGB colorspace
     pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB)
-    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, -1)
+    img: np.ndarray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
+        pix.h, pix.w, -1
+    )
     # Ensure the image has 3 channels (sometimes it may include an alpha channel)
     if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
-        img = img[..., :3]  # type: ignore [assignment]
+        img = img[..., :3]
     return img
 
 
@@ -127,15 +129,17 @@ def _crop_groundings(
 
 def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
     # Extract coordinates from the bounding box
-    xmin, ymin, xmax, ymax = bbox.l, bbox.t, bbox.r, bbox.b
+    xmin_f, ymin_f, xmax_f, ymax_f = bbox.l, bbox.t, bbox.r, bbox.b
 
     # Convert normalized coordinates to absolute coordinates
     height, width = image.shape[:2]
-    assert 0 <= xmin <= 1 and 0 <= ymin <= 1 and 0 <= xmax <= 1 and 0 <= ymax <= 1
-    xmin = math.floor(xmin * width)
-    xmax = math.ceil(xmax * width)
-    ymin = math.floor(ymin * height)
-    ymax = math.ceil(ymax * height)
+    assert (
+        0 <= xmin_f <= 1 and 0 <= ymin_f <= 1 and 0 <= xmax_f <= 1 and 0 <= ymax_f <= 1
+    )
+    xmin = math.floor(xmin_f * width)
+    xmax = math.ceil(xmax_f * width)
+    ymin = math.floor(ymin_f * height)
+    ymax = math.ceil(ymax_f * height)
 
     # Ensure coordinates are valid
     xmin = max(0, xmin)
@@ -143,7 +147,8 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
     xmax = min(width, xmax)
     ymax = min(height, ymax)
 
-    return image[ymin:ymax, xmin:xmax]  # type: ignore
+    result: np.ndarray = image[ymin:ymax, xmin:xmax]
+    return result
 
 
 def split_pdf(
