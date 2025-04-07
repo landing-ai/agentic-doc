@@ -29,6 +29,7 @@ pypdf = "^5.3.1"
 structlog = "^25.2.0"
 httpx = "^0.28.1"
 pymupdf = "^1.25.5"
+opencv-python-headless = "^4.11.0.86"
 
 
 [tool.poetry.group.dev.dependencies]
