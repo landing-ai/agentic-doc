@@ -8,11 +8,18 @@ import cv2
 import numpy as np
 import pymupdf
 import structlog
+from PIL import Image
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
-from agentic_doc.common import Chunk, ChunkGroundingBox, ChunkType, Document
-from agentic_doc.config import settings
+from agentic_doc.common import (
+    Chunk,
+    ChunkGroundingBox,
+    ChunkType,
+    Document,
+    ParsedDocument,
+)
+from agentic_doc.config import VisualizationConfig, settings
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -83,6 +90,7 @@ def page_to_image(
     # Ensure the image has 3 channels (sometimes it may include an alpha channel)
     if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
         img = img[..., :3]
+
     return img
 
 
@@ -229,3 +237,152 @@ def log_retry_failure(retry_state: RetryCallState) -> None:
             raise ValueError(
                 f"Invalid retry logging style: {settings.retry_logging_style}"
             )
+
+
+def viz_parsed_document(
+    file_path: Union[str, Path],
+    parsed_document: ParsedDocument,
+    *,
+    output_dir: Union[str, Path, None] = None,
+    viz_config: VisualizationConfig | None = None,
+) -> list[Image.Image]:
+    if viz_config is None:
+        viz_config = VisualizationConfig()
+
+    viz_result_np: list[np.ndarray] = []
+    file_path = Path(file_path)
+    file_type = get_file_type(file_path)
+    _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
+    if file_type == "image":
+        img = _read_img_rgb(str(file_path))
+        viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
+        viz_result_np.append(viz_np)
+    else:
+        with pymupdf.open(file_path) as pdf_doc:
+            for page_idx in range(
+                parsed_document.start_page_idx, parsed_document.end_page_idx + 1
+            ):
+                img = page_to_image(pdf_doc, page_idx)
+                viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
+                viz_result_np.append(viz_np)
+
+    if output_dir:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        for i, viz_np in enumerate(viz_result_np):
+            viz_np = cv2.cvtColor(viz_np, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np)
+
+    return [Image.fromarray(viz_np) for viz_np in viz_result_np]
+
+
+def viz_chunks(
+    img: np.ndarray,
+    chunks: list[Chunk],
+    viz_config: VisualizationConfig | None = None,
+) -> np.ndarray:
+    if viz_config is None:
+        viz_config = VisualizationConfig()
+
+    viz = img.copy()
+    height, width = img.shape[:2]
+    for i, chunk in enumerate(chunks):
+        bboxes: list[tuple[int, int, int, int]] = []
+        for grounding in chunk.grounding:
+            assert grounding.box is not None
+            xmin, ymin, xmax, ymax = (
+                max(0, math.floor(grounding.box.l * width)),
+                max(0, math.floor(grounding.box.t * height)),
+                min(width, math.ceil(grounding.box.r * width)),
+                min(height, math.ceil(grounding.box.b * height)),
+            )
+            box = (xmin, ymin, xmax, ymax)
+            bboxes.append(box)
+
+        if not bboxes:
+            _LOGGER.warning(f"Chunk {i} has no valid bounding boxes")
+            continue
+
+        combined_box = _combine_boxes(bboxes)
+        _place_mark(
+            viz,
+            combined_box,
+            text=f"{i} {chunk.chunk_type}",
+            color_bgr=viz_config.color_map[chunk.chunk_type],
+            viz_config=viz_config,
+        )
+
+    viz = cv2.cvtColor(viz, cv2.COLOR_BGR2RGB)
+    return viz
+
+
+def _combine_boxes(
+    bboxes: list[tuple[int, int, int, int]],
+) -> tuple[int, int, int, int]:
+    xmin = min(box[0] for box in bboxes)
+    ymin = min(box[1] for box in bboxes)
+    xmax = max(box[2] for box in bboxes)
+    ymax = max(box[3] for box in bboxes)
+    return (xmin, ymin, xmax, ymax)
+
+
+def _place_mark(
+    img: np.ndarray,
+    box_xyxy: tuple[int, int, int, int],
+    text: str,
+    *,
+    color_bgr: tuple[int, int, int],
+    viz_config: VisualizationConfig,
+) -> None:
+    text_color = color_bgr
+    (text_width, text_height), baseline = cv2.getTextSize(
+        text, viz_config.font, viz_config.font_scale, viz_config.thickness
+    )
+    text_x = int((box_xyxy[0] + box_xyxy[2] - text_width) // 2)
+    text_y = int((box_xyxy[1] + box_xyxy[3] + text_height) // 2)
+
+    # Draw the text background with opacity
+    overlay = img.copy()
+    cv2.rectangle(
+        overlay,
+        (text_x - viz_config.padding, text_y - text_height - viz_config.padding),
+        (
+            text_x + text_width + viz_config.padding,
+            text_y + baseline + viz_config.padding,
+        ),
+        viz_config.text_bg_color,
+        -1,
+    )
+    cv2.addWeighted(
+        overlay, viz_config.text_bg_opacity, img, 1 - viz_config.text_bg_opacity, 0, img
+    )
+
+    # Draw the text on top
+    cv2.putText(
+        img,
+        text,
+        (text_x, text_y),
+        viz_config.font,
+        viz_config.font_scale,
+        text_color,
+        viz_config.thickness,
+        cv2.LINE_AA,
+    )
+    # Draw the bounding box
+    cv2.rectangle(img, box_xyxy[:2], box_xyxy[2:], color_bgr, viz_config.thickness)
+
+
+def _read_img_rgb(img_path: str) -> np.ndarray:
+    """
+    Read a image given its path.
+    Arguments:
+        img_path : image file path
+    Returns:
+        img (H, W, 3): a numpy array image in RGB format
+    """
+    img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
+    if img.shape[-1] == 1:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    elif img.shape[-1] == 4:
+        img = img[..., :3]
+    return img
