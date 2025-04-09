@@ -281,7 +281,10 @@ def _send_parsing_request(file_path: str) -> dict[str, Any]:
         # TODO: check if the file extension is a supported image type
         with open(file_path, "rb") as file:
             files = {file_type: file}
-            headers = {"Authorization": f"Basic {settings.vision_agent_api_key}"}
+            headers = {
+                "Authorization": f"Basic {settings.vision_agent_api_key}",
+                "runtime_tag": "agentic-doc",
+            }
             response = httpx.post(
                 _ENDPOINT_URL,
                 files=files,
