@@ -265,8 +265,15 @@ def viz_parsed_document(
             for page_idx in range(
                 parsed_document.start_page_idx, parsed_document.end_page_idx + 1
             ):
+                if page_idx > 1:
+                    break
                 img = page_to_image(pdf_doc, page_idx)
-                viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
+                chunks = [
+                    chunk
+                    for chunk in parsed_document.chunks
+                    if chunk.grounding[0].page == page_idx
+                ]
+                viz_np = viz_chunks(img, chunks, viz_config)
                 viz_result_np.append(viz_np)
 
     if output_dir:
@@ -290,8 +297,8 @@ def viz_chunks(
     viz = img.copy()
     height, width = img.shape[:2]
     for i, chunk in enumerate(chunks):
-        bboxes: list[tuple[int, int, int, int]] = []
-        for grounding in chunk.grounding:
+        show_grounding_idx = len(chunk.grounding) > 1
+        for j, grounding in enumerate(chunk.grounding):
             assert grounding.box is not None
             xmin, ymin, xmax, ymax = (
                 max(0, math.floor(grounding.box.l * width)),
@@ -300,33 +307,17 @@ def viz_chunks(
                 min(height, math.ceil(grounding.box.b * height)),
             )
             box = (xmin, ymin, xmax, ymax)
-            bboxes.append(box)
-
-        if not bboxes:
-            _LOGGER.warning(f"Chunk {i} has no valid bounding boxes")
-            continue
-
-        combined_box = _combine_boxes(bboxes)
-        _place_mark(
-            viz,
-            combined_box,
-            text=f"{i} {chunk.chunk_type}",
-            color_bgr=viz_config.color_map[chunk.chunk_type],
-            viz_config=viz_config,
-        )
+            idx = f"{i}-{j}" if show_grounding_idx else f"{i}"
+            _place_mark(
+                viz,
+                box,
+                text=f"{idx} {chunk.chunk_type}",
+                color_bgr=viz_config.color_map[chunk.chunk_type],
+                viz_config=viz_config,
+            )
 
     viz = cv2.cvtColor(viz, cv2.COLOR_BGR2RGB)
     return viz
-
-
-def _combine_boxes(
-    bboxes: list[tuple[int, int, int, int]],
-) -> tuple[int, int, int, int]:
-    xmin = min(box[0] for box in bboxes)
-    ymin = min(box[1] for box in bboxes)
-    xmax = max(box[2] for box in bboxes)
-    ymax = max(box[3] for box in bboxes)
-    return (xmin, ymin, xmax, ymax)
 
 
 def _place_mark(
