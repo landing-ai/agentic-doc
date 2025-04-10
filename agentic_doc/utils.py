@@ -295,6 +295,7 @@ def viz_chunks(
         viz_config = VisualizationConfig()
 
     viz = img.copy()
+    viz = cv2.cvtColor(viz, cv2.COLOR_RGB2BGR)
     height, width = img.shape[:2]
     for i, chunk in enumerate(chunks):
         show_grounding_idx = len(chunk.grounding) > 1
