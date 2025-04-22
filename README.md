@@ -6,7 +6,7 @@
 [![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/wPdN8RCYew)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
-**[WebApp](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.gg/wPdN8RCYew) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
+**[Web App](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.gg/wPdN8RCYew) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
 
 </div>
 
