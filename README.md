@@ -33,8 +33,6 @@ This Python library wraps that API to provide:
 - ⚙️ **config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
 - 🌐 **raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
 
-For advanced users or for troubleshooting purposes, you can refer to the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
-
 
 ## Quick Start
 
