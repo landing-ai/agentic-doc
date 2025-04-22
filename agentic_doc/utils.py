@@ -265,8 +265,6 @@ def viz_parsed_document(
             for page_idx in range(
                 parsed_document.start_page_idx, parsed_document.end_page_idx + 1
             ):
-                if page_idx > 1:
-                    break
                 img = page_to_image(pdf_doc, page_idx)
                 chunks = [
                     chunk
