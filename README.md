@@ -1,14 +1,40 @@
-[![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/wPdN8RCYew)
+<div align="center">
+
+# Agentic Document Extraction – Python Library
+
 ![ci_status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci_cd.yml/badge.svg)
+[![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/wPdN8RCYew)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
-# Agentic Document Extraction Python Library
+**[WebApp](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.gg/wPdN8RCYew) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/agentic-document-extraction)**
 
-The LandingAI [Agentic Document Extraction tool](https://va.landing.ai/demo/doc-extraction) extracts structured information from visually complex documents with text, tables, pictures, charts, and other information. The API returns the extracted data in a hierarchical format and pinpoints the exact location of each element.
+</div>
 
-This `agentic-doc` Python library wraps around the Agentic Document Extraction API to add more features and support to the document extraction process. For example, using this library allows you to process much longer documents.
+## Overview
+
+LandingAI’s **Agentic Document Extraction** API pulls structured data out of visually complex documents—think tables, pictures, and charts—and returns a hierarchical JSON with exact element locations.
+
+This Python library wraps that API to provide:
+
+* **Long‑document support** – process 100 + page PDFs in a single call  
+* **Auto‑retry / paging** – handles concurrency, time‑outs, and rate limits  
+* **Helper utilities** – bounding‑box snippets, visual debuggers, and more  
+
+### Features
+
+- 📦 **batteries‑included install:** `pip install agentic-doc` – nothing else needed → see [Installation](#installation)
+- 🗂️ **all file types:** parse PDFs of *any* length, single images, or URLs to either → see [Supported Files](#supported-files)
+- 📚 **long‑doc ready:** auto‑split & parallel‑process 1000 + page PDFs, then stitch results → see [Parse Large PDF Files](#parse-large-pdf-files)
+- 🧩 **structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
+- 👁️ **ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
+- 🏃 **batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
+- 🔄 **resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
+- 🛠️ **drop‑in helpers:** `parse_documents`, `parse_and_save_documents`, `parse_and_save_document` → see [Main Functions](#main-functions)
+- ⚙️ **config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
+- 🌐 **raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
 
 For advanced users or for troubleshooting purposes, you can refer to the Agentic Document Extraction API [here](https://support.landing.ai/docs/document-extraction).
+
 
 ## Quick Start
 
