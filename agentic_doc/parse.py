@@ -116,12 +116,12 @@ def parse_and_save_document(
         if isinstance(document, str) and is_valid_httpurl(document):
             document = AnyHttpUrl(document)
 
-        if isinstance(document, Url):
+        if isinstance(document, AnyHttpUrl):
             output_file_path = Path(temp_dir) / Path(str(document)).name
             download_file(document, str(output_file_path))
             document = output_file_path
         else:
-            document = Path(document)
+            document = Path(cast(Union[str, Path], document))
             if isinstance(document, Path) and not document.exists():
                 raise FileNotFoundError(f"File not found: {document}")
 
