@@ -27,7 +27,7 @@ This Python library wraps that API to provide:
 - 📚 **Long‑doc ready:** auto‑split & parallel‑process 1000+ page PDFs, then stitch results → see [Parse Large PDF Files](#parse-large-pdf-files)
 - 🧩 **structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
 - 👁️ **ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
-- 🏃 **batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
+- 🏃 **Batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
 - 🔄 **resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
 - 🛠️ **drop‑in helpers:** `parse_documents`, `parse_and_save_documents`, `parse_and_save_document` → see [Main Functions](#main-functions)
 - ⚙️ **config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
