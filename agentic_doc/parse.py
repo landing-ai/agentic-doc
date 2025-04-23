@@ -120,7 +120,7 @@ def parse_and_save_document(
             download_file(document, str(output_file_path))
             document = output_file_path
         else:
-            document = Path(cast(Union[str, Path], document))
+            document = Path(document)
             if isinstance(document, Path) and not document.exists():
                 raise FileNotFoundError(f"File not found: {document}")
 
