@@ -15,7 +15,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        python-version: [3.9, 3.11]
+        python-version: [3.9, 3.13]
         os: [ubuntu-22.04, windows-2022, macos-14]
     runs-on: ${{ matrix.os }}
     env:
