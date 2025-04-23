@@ -10,7 +10,6 @@ import httpx
 import structlog
 import tenacity
 from pydantic import AnyHttpUrl
-from pydantic_core import Url
 from tqdm import tqdm
 
 from agentic_doc.common import (
