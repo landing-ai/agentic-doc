@@ -3,10 +3,10 @@
 # Agentic Document Extraction – Python Library
 
 ![ci_status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci_cd.yml/badge.svg)
-[![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/wPdN8RCYew)
+[![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/RVcW3j9RgR)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
-**[Web App](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.gg/wPdN8RCYew) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
+**[Web App](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.com/invite/RVcW3j9RgR) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
 
 </div>
 
