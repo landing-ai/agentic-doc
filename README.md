@@ -12,7 +12,7 @@
 
 ## Overview
 
-LandingAI’s **Agentic Document Extraction** API pulls structured data out of visually complex documents—think tables, pictures, and charts—and returns a hierarchical JSON with exact element locations.
+The LandingAI **Agentic Document Extraction** API pulls structured data out of visually complex documents—think tables, pictures, and charts—and returns a hierarchical JSON with exact element locations.
 
 This Python library wraps that API to provide:
 
@@ -25,13 +25,13 @@ This Python library wraps that API to provide:
 - 📦 **Batteries‑included install:** `pip install agentic-doc` – nothing else needed → see [Installation](#installation)
 - 🗂️ **All file types:** parse PDFs of *any* length, single images, or URLs → see [Supported Files](#supported-files)
 - 📚 **Long‑doc ready:** auto‑split & parallel‑process 1000+ page PDFs, then stitch results → see [Parse Large PDF Files](#parse-large-pdf-files)
-- 🧩 **structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
-- 👁️ **ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
+- 🧩 **Structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
+- 👁️ **Ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
 - 🏃 **Batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
-- 🔄 **resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
-- 🛠️ **drop‑in helpers:** `parse_documents`, `parse_and_save_documents`, `parse_and_save_document` → see [Main Functions](#main-functions)
-- ⚙️ **config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
-- 🌐 **raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
+- 🔄 **Resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
+- 🛠️ **Drop‑in helpers:** `parse_documents`, `parse_and_save_documents`, `parse_and_save_document` → see [Main Functions](#main-functions)
+- ⚙️ **Config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
+- 🌐 **Raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
 
 
 ## Quick Start
