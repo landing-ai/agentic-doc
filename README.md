@@ -16,7 +16,7 @@ LandingAI’s **Agentic Document Extraction** API pulls structured data out of
 
 This Python library wraps that API to provide:
 
-* **Long‑document support** – process 100 + page PDFs in a single call  
+* **Long‑document support** – process 100+ page PDFs in a single call  
 * **Auto‑retry / paging** – handles concurrency, time‑outs, and rate limits  
 * **Helper utilities** – bounding‑box snippets, visual debuggers, and more  
 
