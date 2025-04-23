@@ -22,7 +22,7 @@ This Python library wraps that API to provide:
 
 ### Features
 
-- 📦 **batteries‑included install:** `pip install agentic-doc` – nothing else needed → see [Installation](#installation)
+- 📦 **Batteries‑included install:** `pip install agentic-doc` – nothing else needed → see [Installation](#installation)
 - 🗂️ **all file types:** parse PDFs of *any* length, single images, or URLs to either → see [Supported Files](#supported-files)
 - 📚 **long‑doc ready:** auto‑split & parallel‑process 1000 + page PDFs, then stitch results → see [Parse Large PDF Files](#parse-large-pdf-files)
 - 🧩 **structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
