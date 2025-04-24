@@ -276,7 +276,7 @@ The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attemp
 
 ### Main Functions
 
-#### `parse_documents(documents: list[str | Path | AnyHttpUrl], *, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
+#### `parse_documents(documents: list[str | Path | Url], *, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
 
 Parse multiple documents and return their parsed results.
 
@@ -289,7 +289,7 @@ Parse multiple documents and return their parsed results.
   - `FileNotFoundError`: If any input file doesn't exist
   - `ValueError`: If any URL is invalid or points to an unsupported file type
 
-#### `parse_and_save_documents(documents: list[str | Path | AnyHttpUrl], *, result_save_dir: str | Path, grounding_save_dir: str | Path | None = None) -> list[Path]`
+#### `parse_and_save_documents(documents: list[str | Path | Url], *, result_save_dir: str | Path, grounding_save_dir: str | Path | None = None) -> list[Path]`
 
 Parse multiple documents and save results to the specified directory.
 
@@ -303,7 +303,7 @@ Parse multiple documents and save results to the specified directory.
   - `FileNotFoundError`: If any input file doesn't exist
   - `ValueError`: If any URL is invalid or points to an unsupported file type
 
-#### `parse_and_save_document(document: str | Path | AnyHttpUrl, *, result_save_dir: str | Path | None = None, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
+#### `parse_and_save_document(document: str | Path | Url, *, result_save_dir: str | Path | None = None, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
 
 Parse a single document and optionally save results.
 

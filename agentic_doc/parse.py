@@ -9,7 +9,7 @@ from typing import Any, Union, cast
 import httpx
 import structlog
 import tenacity
-from pydantic import AnyHttpUrl
+from pydantic_core import Url
 from tqdm import tqdm
 
 from agentic_doc.common import (
@@ -34,7 +34,7 @@ _ENDPOINT_URL = "https://api.va.landing.ai/v1/tools/agentic-document-analysis"
 
 
 def parse_documents(
-    documents: list[Union[str, Path, AnyHttpUrl]],
+    documents: list[Union[str, Path, Url]],
     *,
     grounding_save_dir: Union[str, Path, None] = None,
 ) -> list[ParsedDocument]:
@@ -42,7 +42,7 @@ def parse_documents(
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
 
     Args:
-        documents (list[str | Path | AnyHttpUrl]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `AnyHttpUrl` object.
+        documents (list[str | Path | Url]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `Url` object.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
     Returns:
         list[ParsedDocument]: The list of parsed documents. The list is sorted by the order of the input documents.
@@ -63,7 +63,7 @@ def parse_documents(
 
 
 def parse_and_save_documents(
-    documents: list[Union[str, Path, AnyHttpUrl]],
+    documents: list[Union[str, Path, Url]],
     *,
     result_save_dir: Union[str, Path],
     grounding_save_dir: Union[str, Path, None] = None,
@@ -72,7 +72,7 @@ def parse_and_save_documents(
     Parse a list of documents and save the results to a local directory.
 
     Args:
-        documents (list[str | Path | AnyHttpUrl]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `AnyHttpUrl` object.
+        documents (list[str | Path | Url]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `Url` object.
         result_save_dir (str | Path): The local directory to save the results.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
     Returns:
@@ -96,7 +96,7 @@ def parse_and_save_documents(
 
 
 def parse_and_save_document(
-    document: Union[str, Path, AnyHttpUrl],
+    document: Union[str, Path, Url],
     *,
     result_save_dir: Union[str, Path, None] = None,
     grounding_save_dir: Union[str, Path, None] = None,
@@ -105,7 +105,7 @@ def parse_and_save_document(
     Parse a document and save the results to a local directory.
 
     Args:
-        document (str | Path | AnyHttpUrl): The document to parse. It can be a local file path, a URL string, or a Pydantic `AnyHttpUrl` object.
+        document (str | Path | Url): The document to parse. It can be a local file path, a URL string, or a Pydantic `Url` object.
         result_save_dir (str | Path): The local directory to save the results. If None, the parsed document data is returned.
 
     Returns:
@@ -113,9 +113,9 @@ def parse_and_save_document(
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         if isinstance(document, str) and is_valid_httpurl(document):
-            document = AnyHttpUrl(document)
+            document = Url(document)
 
-        if isinstance(document, AnyHttpUrl):
+        if isinstance(document, Url):
             output_file_path = Path(temp_dir) / Path(str(document)).name
             download_file(document, str(output_file_path))
             document = output_file_path

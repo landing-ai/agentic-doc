@@ -11,7 +11,7 @@ import numpy as np
 import pymupdf
 import structlog
 from PIL import Image
-from pydantic import AnyHttpUrl
+from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
@@ -28,8 +28,21 @@ _LOGGER = structlog.getLogger(__name__)
 
 
 def get_file_type(file_path: Path) -> Literal["pdf", "image"]:
-    """Get the file type of the input file."""
-    return "pdf" if file_path.suffix.lower() == ".pdf" else "image"
+    """Get the file type of the input file by checking its magic number.
+
+    PDF files start with '%PDF-' (25 50 44 46 2D in hex)
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            # Read the first 5 bytes to check for PDF magic number
+            header = f.read(5)
+            if header == b'%PDF-':
+                return "pdf"
+            return "image"
+    except Exception as e:
+        _LOGGER.warning(f"Error checking file type: {e}")
+        # Fallback to extension check if file reading fails
+        return "pdf" if file_path.suffix.lower() == ".pdf" else "image"
 
 
 def save_groundings_as_images(
@@ -177,7 +190,6 @@ def split_pdf(
     """
     input_pdf_path = Path(input_pdf_path)
     assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
-    assert input_pdf_path.suffix == ".pdf", "Input file must be a PDF"
     assert (
         0 < split_size <= 2
     ), "split_size must be greater than 0 and less than or equal to 2"
@@ -381,12 +393,12 @@ def _read_img_rgb(img_path: str) -> np.ndarray:
     return img
 
 
-def download_file(file_url: AnyHttpUrl, output_filepath: str) -> None:
+def download_file(file_url: Url, output_filepath: str) -> None:
     """
     Downloads a file from the given media URL to the specified local path.
 
     Parameters:
-    media_url (AnyHttpUrl): The URL of the media file to download.
+    media_url (Url): The URL of the media file to download.
     path (str): The local file system path where the file should be saved.
 
     Raises:
