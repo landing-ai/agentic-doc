@@ -32,7 +32,7 @@ def test_parse_and_save_documents_multiple_inputs(sample_image_path, results_dir
         assert parsed_doc.start_page_idx == 0
         assert parsed_doc.end_page_idx == 0
         for chunk in parsed_doc.chunks:
-            assert chunk.chunk_type != ChunkType.ERROR
+            assert chunk.chunk_type != ChunkType.error
 
 
 def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
@@ -71,6 +71,6 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
 
     # Verify that grounding images were saved
     for chunk in parsed_doc.chunks:
-        assert chunk.chunk_type != ChunkType.ERROR
+        assert chunk.chunk_type != ChunkType.error
         for grounding in chunk.grounding:
             assert grounding.image_path.exists()
