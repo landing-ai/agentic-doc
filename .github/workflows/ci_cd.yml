@@ -60,6 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUNTIME_TAG: ci_job
+      VISION_AGENT_API_KEY: ${{ secrets.VISION_AGENT_API_KEY }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
