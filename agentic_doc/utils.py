@@ -33,10 +33,10 @@ def get_file_type(file_path: Path) -> Literal["pdf", "image"]:
     PDF files start with '%PDF-' (25 50 44 46 2D in hex)
     """
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             # Read the first 5 bytes to check for PDF magic number
             header = f.read(5)
-            if header == b'%PDF-':
+            if header == b"%PDF-":
                 return "pdf"
             return "image"
     except Exception as e:
