@@ -55,6 +55,37 @@ jobs:
         run: |
           poetry run pytest -s -vvv tests/unit
 
+  integ_test:
+    name: Integ Test
+    runs-on: ubuntu-latest
+    env:
+      RUNTIME_TAG: ci_job
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+      - name: Install Python Poetry
+        uses: abatilo/actions-poetry@v2.1.0
+        with:
+          poetry-version: 1.4.2
+      - name: Configure poetry
+        shell: bash
+        run: poetry config virtualenvs.in-project true
+      - name: Print Python environment information
+        run: |
+          poetry env info
+          poetry --version
+          poetry run pip -V
+      - name: Install dependencies
+        run: |
+          # Install main dependencies first so we can see their size
+          poetry install --all-extras
+      - name: Integ Test with pytest
+        run: |
+          poetry run pytest -n auto -s -vvv tests/integ
+
+
   release:
     name: Release
     needs: unit_test

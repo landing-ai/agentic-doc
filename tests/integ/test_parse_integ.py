@@ -1,34 +1,38 @@
 import json
 from agentic_doc.parse import parse_and_save_documents
-from agentic_doc.common import ParsedDocument
+from agentic_doc.common import ChunkType, ParsedDocument
 
 
-def test_parse_and_save_documents_single_image(sample_image_path, results_dir):
+
+
+def test_parse_and_save_documents_multiple_inputs(sample_image_path, results_dir):
     # Arrange
     input_file = sample_image_path
 
     # Act
     result_paths = parse_and_save_documents(
-        [input_file],
+        [input_file, "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"],
         result_save_dir=results_dir,
         grounding_save_dir=results_dir,
     )
 
     # Assert
-    assert len(result_paths) == 1
-    result_path = result_paths[0]
-    assert result_path.exists()
+    assert len(result_paths) == 2
+    for result_path in result_paths:
+        result_path = result_paths[0]
+        assert result_path.exists()
 
-    # Verify the saved JSON can be loaded and has expected structure
-    with open(result_path) as f:
-        result_data = json.load(f)
+        # Verify the saved JSON can be loaded and has expected structure
+        with open(result_path) as f:
+            result_data = json.load(f)
 
-    parsed_doc = ParsedDocument.model_validate(result_data)
-    assert parsed_doc.markdown
-    assert len(parsed_doc.chunks) > 0
-    assert parsed_doc.start_page_idx == 0
-    assert parsed_doc.end_page_idx == 0
-    assert parsed_doc.doc_type == "image"
+        parsed_doc = ParsedDocument.model_validate(result_data)
+        assert parsed_doc.markdown
+        assert len(parsed_doc.chunks) > 0
+        assert parsed_doc.start_page_idx == 0
+        assert parsed_doc.end_page_idx == 0
+        for chunk in parsed_doc.chunks:
+            assert chunk.chunk_type != ChunkType.ERROR
 
 
 def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
@@ -67,5 +71,6 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
 
     # Verify that grounding images were saved
     for chunk in parsed_doc.chunks:
+        assert chunk.chunk_type != ChunkType.ERROR
         for grounding in chunk.grounding:
             assert grounding.image_path.exists()
