@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from agentic_doc.common import ChunkType
 
 _LOGGER = structlog.get_logger(__name__)
-_MAX_PARALLEL_TASKS = 100
+_MAX_PARALLEL_TASKS = 200
 # Colors in BGR format (OpenCV uses BGR)
 _COLOR_MAP = {
     ChunkType.title: (0, 0, 125),  # Dark red for titles

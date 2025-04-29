@@ -139,7 +139,7 @@ results = parse_documents(
 )
 
 # The grounding images will be saved to:
-# path/to/save/groundings/document_TIMESTAMP/page_X/CHUNK_ID_Y.png
+# path/to/save/groundings/document_TIMESTAMP/page_X/CHUNK_TYPE_CHUNK_ID_Y.png
 # Where X is the page number, CHUNK_ID is the unique ID of each chunk,
 # and Y is the index of the grounding within the chunk
 
