@@ -3,15 +3,16 @@ from agentic_doc.parse import parse_and_save_documents
 from agentic_doc.common import ChunkType, ParsedDocument
 
 
-
-
 def test_parse_and_save_documents_multiple_inputs(sample_image_path, results_dir):
     # Arrange
     input_file = sample_image_path
 
     # Act
     result_paths = parse_and_save_documents(
-        [input_file, "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"],
+        [
+            input_file,
+            "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+        ],
         result_save_dir=results_dir,
         grounding_save_dir=results_dir,
     )

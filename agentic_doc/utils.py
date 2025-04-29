@@ -140,7 +140,9 @@ def _crop_groundings(
                 continue
 
             page = f"page_{grounding.page}"
-            crop_save_path = crop_save_dir / page / f"{c.chunk_type}_{c.chunk_id}_{i}.png"
+            crop_save_path = (
+                crop_save_dir / page / f"{c.chunk_type}_{c.chunk_id}_{i}.png"
+            )
             crop_save_path.parent.mkdir(parents=True, exist_ok=True)
             crop_save_path.write_bytes(buffer.tobytes())
             assert c.chunk_id is not None
