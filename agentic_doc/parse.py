@@ -30,7 +30,7 @@ from agentic_doc.utils import (
 )
 
 _LOGGER = structlog.getLogger(__name__)
-_ENDPOINT_URL = "https://api.va.landing.ai/v1/tools/agentic-document-analysis"
+_ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
 
 
 def parse_documents(

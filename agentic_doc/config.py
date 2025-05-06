@@ -26,6 +26,10 @@ _COLOR_MAP = {
 
 
 class Settings(BaseSettings):
+    endpoint_host: str = Field(
+        default="https://api.va.landing.ai",
+        description="The host of the endpoint to use",
+    )
     vision_agent_api_key: str = Field(
         description="API key for the vision agent",
         default="",
