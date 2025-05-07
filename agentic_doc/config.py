@@ -64,7 +64,7 @@ class Settings(BaseSettings):
         ge=1,
     )
     split_size: int = Field(
-        default=2,
+        default=10,
         description="Pages per chunk for splitting the document",
         ge=1,
         le=50,
