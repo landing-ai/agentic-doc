@@ -63,7 +63,11 @@ class Settings(BaseSettings):
         description="DPI for converting PDF pages to images",
         ge=1,
     )
-
+    split_size: int = Field(
+        default=2,
+        description="Pages per chunk for splitting the document",
+        ge=1,
+    )
     model_config = SettingsConfigDict(
         env_file=".env",
         env_ignore_empty=True,
