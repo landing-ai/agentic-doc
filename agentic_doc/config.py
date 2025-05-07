@@ -67,6 +67,7 @@ class Settings(BaseSettings):
         default=2,
         description="Pages per chunk for splitting the document",
         ge=1,
+        le=50,
     )
     model_config = SettingsConfigDict(
         env_file=".env",
