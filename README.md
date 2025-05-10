@@ -276,12 +276,14 @@ The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attemp
 
 ### Main Functions
 
-#### `parse_documents(documents: list[str | Path | Url], *, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
+#### `parse_documents(documents: list[str | Path | Url], *, include_marginalia: bool = True, include_metadata_in_markdown: bool = True, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
 
 Parse multiple documents and return their parsed results.
 
 - **Parameters:**
   - `documents`: List of paths to documents (PDFs or images) or URLs pointing to documents
+  - `include_marginalia`: Whether to include marginalia (side notes, annotations, etc.) in the parsed output. Default: True.
+  - `include_metadata_in_markdown`: Whether to include metadata in the markdown output. Default: True.
   - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - List of `ParsedDocument` objects containing parsed results
@@ -289,13 +291,15 @@ Parse multiple documents and return their parsed results.
   - `FileNotFoundError`: If any input file doesn't exist
   - `ValueError`: If any URL is invalid or points to an unsupported file type
 
-#### `parse_and_save_documents(documents: list[str | Path | Url], *, result_save_dir: str | Path, grounding_save_dir: str | Path | None = None) -> list[Path]`
+#### `parse_and_save_documents(documents: list[str | Path | Url], *, result_save_dir: str | Path, include_marginalia: bool = True, include_metadata_in_markdown: bool = True, grounding_save_dir: str | Path | None = None) -> list[Path]`
 
 Parse multiple documents and save results to the specified directory.
 
 - **Parameters:**
   - `documents`: List of paths to documents or URLs pointing to documents
   - `result_save_dir`: Directory to save parsed results
+  - `include_marginalia`: Whether to include marginalia (side notes, annotations, etc.) in the parsed output. Default: True.
+  - `include_metadata_in_markdown`: Whether to include metadata in the markdown output. Default: True.
   - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - A list of JSON file paths to the saved results. The file paths are sorted by the order of the input file paths. The file name is the original file name with a timestamp appended. For example, the input file "document.pdf" could have this output file: "document_20250313_070305.json".
@@ -303,13 +307,15 @@ Parse multiple documents and save results to the specified directory.
   - `FileNotFoundError`: If any input file doesn't exist
   - `ValueError`: If any URL is invalid or points to an unsupported file type
 
-#### `parse_and_save_document(document: str | Path | Url, *, result_save_dir: str | Path | None = None, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
+#### `parse_and_save_document(document: str | Path | Url, *, result_save_dir: str | Path | None = None, include_marginalia: bool = True, include_metadata_in_markdown: bool = True, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
 
 Parse a single document and optionally save results.
 
 - **Parameters:**
   - `document`: Path to document or URL pointing to a document
   - `result_save_dir`: Optional directory to save results
+  - `include_marginalia`: Whether to include marginalia (side notes, annotations, etc.) in the parsed output. Default: True.
+  - `include_metadata_in_markdown`: Whether to include metadata in the markdown output. Default: True.
   - `grounding_save_dir`: Optional directory to save the grounding images
 - **Returns:**
   - If `result_save_dir` provided: Path to saved result file  
@@ -350,5 +356,24 @@ Represents a parsed content chunk with the following attributes:
   If a document fails to parse, an error chunk will be included in the result, detailing the error message and page index.
 - **URL Access Issues:**
   If you're having trouble accessing documents from URLs, check that the URLs are publicly accessible and point to supported file types (PDF or images).
+
+### Note on `include_marginalia` and `include_metadata_in_markdown`
+
+- `include_marginalia`: If True, the parser will attempt to extract and include marginalia (footer notes, page number, etc.) from the document in the output.
+- `include_metadata_in_markdown`: If True, the output markdown will include metadata.
+
+Both parameters default to True. You can set them to False to exclude these elements from the output.
+
+#### Example: Using the new parameters
+
+```python
+from agentic_doc.parse import parse_documents
+
+results = parse_documents(
+    ["path/to/document.pdf"],
+    include_marginalia=False,  # Exclude marginalia from output
+    include_metadata_in_markdown=False  # Exclude metadata from markdown
+)
+```
 
 ---

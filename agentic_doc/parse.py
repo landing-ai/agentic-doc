@@ -36,6 +36,8 @@ _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
 def parse_documents(
     documents: list[Union[str, Path, Url]],
     *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
     grounding_save_dir: Union[str, Path, None] = None,
 ) -> list[ParsedDocument]:
     """
@@ -50,6 +52,8 @@ def parse_documents(
     _LOGGER.info(f"Parsing {len(documents)} documents")
     _parse_func = partial(
         parse_and_save_document,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
         grounding_save_dir=grounding_save_dir,
     )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
@@ -67,6 +71,8 @@ def parse_and_save_documents(
     *,
     result_save_dir: Union[str, Path],
     grounding_save_dir: Union[str, Path, None] = None,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
 ) -> list[Path]:
     """
     Parse a list of documents and save the results to a local directory.
@@ -82,6 +88,8 @@ def parse_and_save_documents(
     _LOGGER.info(f"Parsing {len(documents)} documents")
     _parse_func = partial(
         parse_and_save_document,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
         result_save_dir=result_save_dir,
         grounding_save_dir=grounding_save_dir,
     )
@@ -98,6 +106,8 @@ def parse_and_save_documents(
 def parse_and_save_document(
     document: Union[str, Path, Url],
     *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
     result_save_dir: Union[str, Path, None] = None,
     grounding_save_dir: Union[str, Path, None] = None,
 ) -> Union[Path, ParsedDocument]:
@@ -127,9 +137,17 @@ def parse_and_save_document(
         file_type = get_file_type(document)
 
         if file_type == "image":
-            result = _parse_image(document)
+            result = _parse_image(
+                document,
+                include_marginalia=include_marginalia,
+                include_metadata_in_markdown=include_metadata_in_markdown,
+            )
         elif file_type == "pdf":
-            result = _parse_pdf(document)
+            result = _parse_pdf(
+                document,
+                include_marginalia=include_marginalia,
+                include_metadata_in_markdown=include_metadata_in_markdown,
+            )
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 
@@ -153,17 +171,36 @@ def parse_and_save_document(
         return save_path
 
 
-def _parse_pdf(file_path: Union[str, Path]) -> ParsedDocument:
+def _parse_pdf(
+    file_path: Union[str, Path],
+    *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
+) -> ParsedDocument:
     with tempfile.TemporaryDirectory() as temp_dir:
         parts = split_pdf(file_path, temp_dir, settings.split_size)
         file_path = Path(file_path)
-        part_results = _parse_doc_in_parallel(parts, doc_name=file_path.name)
+        part_results = _parse_doc_in_parallel(
+            parts,
+            doc_name=file_path.name,
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+        )
         return _merge_part_results(part_results)
 
 
-def _parse_image(file_path: Union[str, Path]) -> ParsedDocument:
+def _parse_image(
+    file_path: Union[str, Path],
+    *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
+) -> ParsedDocument:
     try:
-        result_raw = _send_parsing_request(str(file_path))
+        result_raw = _send_parsing_request(
+            str(file_path),
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+        )
         result_raw = {
             **result_raw["data"],
             "doc_type": "image",
@@ -216,22 +253,40 @@ def _merge_next_part(curr: ParsedDocument, next: ParsedDocument) -> None:
 
 
 def _parse_doc_in_parallel(
-    doc_parts: list[Document], *, doc_name: str
+    doc_parts: list[Document],
+    *,
+    doc_name: str,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
 ) -> list[ParsedDocument]:
+    _parse_func = partial(
+        _parse_doc_parts,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
+    )
     with ThreadPoolExecutor(max_workers=settings.max_workers) as executor:
         return list(
             tqdm(
-                executor.map(_parse_doc_parts, doc_parts),
+                executor.map(_parse_func, doc_parts),
                 total=len(doc_parts),
                 desc=f"Parsing document parts from '{doc_name}'",
             )
         )
 
 
-def _parse_doc_parts(doc: Document) -> ParsedDocument:
+def _parse_doc_parts(
+    doc: Document,
+    *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
+) -> ParsedDocument:
     try:
         _LOGGER.info(f"Start parsing document part: '{doc}'")
-        result = _send_parsing_request(str(doc.file_path))
+        result = _send_parsing_request(
+            str(doc.file_path),
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+        )
         _LOGGER.info(f"Successfully parsed document part: '{doc}'")
         return ParsedDocument.model_validate(
             {
@@ -265,12 +320,19 @@ def _parse_doc_parts(doc: Document) -> ParsedDocument:
     retry=tenacity.retry_if_exception_type(RetryableError),
     after=log_retry_failure,
 )
-def _send_parsing_request(file_path: str) -> dict[str, Any]:
+def _send_parsing_request(
+    file_path: str,
+    *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
+) -> dict[str, Any]:
     """
     Send a parsing request to the Landing AI Agentic Document Analysis API.
 
     Args:
         file_path (str): The path to the document file.
+        include_marginalia (bool, optional): Whether to include marginalia in the analysis. Defaults to True.
+        include_metadata_in_markdown (bool, optional): Whether to include metadata in the markdown output. Defaults to True.
 
     Returns:
         dict[str, Any]: The parsed document data.
@@ -280,6 +342,10 @@ def _send_parsing_request(file_path: str) -> dict[str, Any]:
         # TODO: check if the file extension is a supported image type
         with open(file_path, "rb") as file:
             files = {file_type: file}
+            data = {
+                "include_marginalia": include_marginalia,
+                "include_metadata_in_markdown": include_metadata_in_markdown,
+            }
             headers = {
                 "Authorization": f"Basic {settings.vision_agent_api_key}",
                 "runtime_tag": "agentic-doc",
@@ -287,6 +353,7 @@ def _send_parsing_request(file_path: str) -> dict[str, Any]:
             response = httpx.post(
                 _ENDPOINT_URL,
                 files=files,
+                data=data,
                 headers=headers,
                 timeout=None,
             )
