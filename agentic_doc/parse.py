@@ -15,6 +15,7 @@ from tqdm import tqdm
 from agentic_doc.common import (
     Chunk,
     Document,
+    PageError,
     ParsedDocument,
     RetryableError,
     Timer,
@@ -203,6 +204,7 @@ def _parse_image(
         )
         result_raw = {
             **result_raw["data"],
+            "errors": result_raw.get("errors", []),
             "doc_type": "image",
             "start_page_idx": 0,
             "end_page_idx": 0,
@@ -211,13 +213,13 @@ def _parse_image(
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing image '{file_path}' due to: {error_msg}")
-        chunks = [Chunk.error_chunk(error_msg, 0)]
         return ParsedDocument(
             markdown="",
-            chunks=chunks,
+            chunks=[],
             start_page_idx=0,
             end_page_idx=0,
             doc_type="image",
+            errors=[PageError(page_num=0, error=error_msg, error_code=-1)],
         )
 
 
@@ -250,6 +252,7 @@ def _merge_next_part(curr: ParsedDocument, next: ParsedDocument) -> None:
 
     curr.chunks.extend(next_chunks)
     curr.end_page_idx = next.end_page_idx
+    curr.errors.extend(next.errors)
 
 
 def _parse_doc_in_parallel(
@@ -291,6 +294,7 @@ def _parse_doc_parts(
         return ParsedDocument.model_validate(
             {
                 **result["data"],
+                "errors": result.get("errors", []),
                 "start_page_idx": doc.start_page_idx,
                 "end_page_idx": doc.end_page_idx,
                 "doc_type": "pdf",
@@ -299,16 +303,17 @@ def _parse_doc_parts(
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing document '{doc}' due to: {error_msg}")
-        chunks = [
-            Chunk.error_chunk(error_msg, doc.start_page_idx + i)
+        errors = [
+            PageError(page_num=i, error=error_msg, error_code=-1)
             for i in range(doc.start_page_idx, doc.end_page_idx + 1)
         ]
         return ParsedDocument(
             markdown="",
-            chunks=chunks,
+            chunks=[],
             start_page_idx=doc.start_page_idx,
             end_page_idx=doc.end_page_idx,
             doc_type="pdf",
+            errors=errors,
         )
 
 

@@ -8,16 +8,19 @@ from pydantic import BaseModel, Field
 
 
 class ChunkType(str, Enum):
+    form = "form"
+    table = "table"
+    figure = "figure"
+    text = "text"
+    marginalia = "marginalia"
+
+    # Below values are deprecated
+    error = "error"
     title = "title"  # type: ignore [assignment]
     page_header = "page_header"
     page_footer = "page_footer"
     page_number = "page_number"
     key_value = "key_value"
-    form = "form"
-    table = "table"
-    figure = "figure"
-    text = "text"
-    error = "error"
 
 
 class ChunkGroundingBox(BaseModel):
@@ -57,12 +60,19 @@ class Chunk(BaseModel):
         )
 
 
+class PageError(BaseModel):
+    page_num: int
+    error: str
+    error_code: int
+
+
 class ParsedDocument(BaseModel):
     markdown: str
     chunks: list[Chunk]
     start_page_idx: int
     end_page_idx: int
     doc_type: Literal["pdf", "image"]
+    errors: list[PageError] = Field(default_factory=list)
 
 
 class RetryableError(Exception):
