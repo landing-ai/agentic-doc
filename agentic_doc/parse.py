@@ -13,7 +13,6 @@ from pydantic_core import Url
 from tqdm import tqdm
 
 from agentic_doc.common import (
-    Chunk,
     Document,
     PageError,
     ParsedDocument,
