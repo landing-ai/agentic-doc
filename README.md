@@ -227,9 +227,8 @@ This library implements a retry mechanism for handling API failures:
 
 ### Parsing Errors
 
-If the REST API encounters an unrecoverable error during parsing, the library includes an [error chunk](./agentic_doc/common.py#L45) in the final result for the affected page.
-Each error chunk contains the error message and corresponding page index.
-Error chunks can be identified in the `ParsedDocument` by checking for `chunk_type=ChunkType.error`.
+If the REST API request encounters an unrecoverable error during parsing (either from client-side or server-side), the library includes an [errors](./agentic_doc/common.py#L75) field in the final result for the affected page(s).
+Each error contains the error message, error_code and corresponding page number.
 
 ## Configuration Options
 
@@ -272,78 +271,6 @@ The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attemp
 - `inline_block`: Print a yellow progress block ('█') on the same line. Each block represents one retry attempt. Choose this if you don't want to see the verbose retry logging message and still want to track the number of retries that have been made.
 - `none`: Do not log the retry attempts.
 
-## API Reference
-
-### Main Functions
-
-#### `parse_documents(documents: list[str | Path | Url], *, include_marginalia: bool = True, include_metadata_in_markdown: bool = True, grounding_save_dir: str | Path | None = None) -> list[ParsedDocument]`
-
-Parse multiple documents and return their parsed results.
-
-- **Parameters:**
-  - `documents`: List of paths to documents (PDFs or images) or URLs pointing to documents
-  - `include_marginalia`: Whether to include marginalia (side notes, annotations, etc.) in the parsed output. Default: True.
-  - `include_metadata_in_markdown`: Whether to include metadata in the markdown output. Default: True.
-  - `grounding_save_dir`: Optional directory to save the grounding images
-- **Returns:**
-  - List of `ParsedDocument` objects containing parsed results
-- **Raises:**
-  - `FileNotFoundError`: If any input file doesn't exist
-  - `ValueError`: If any URL is invalid or points to an unsupported file type
-
-#### `parse_and_save_documents(documents: list[str | Path | Url], *, result_save_dir: str | Path, include_marginalia: bool = True, include_metadata_in_markdown: bool = True, grounding_save_dir: str | Path | None = None) -> list[Path]`
-
-Parse multiple documents and save results to the specified directory.
-
-- **Parameters:**
-  - `documents`: List of paths to documents or URLs pointing to documents
-  - `result_save_dir`: Directory to save parsed results
-  - `include_marginalia`: Whether to include marginalia (side notes, annotations, etc.) in the parsed output. Default: True.
-  - `include_metadata_in_markdown`: Whether to include metadata in the markdown output. Default: True.
-  - `grounding_save_dir`: Optional directory to save the grounding images
-- **Returns:**
-  - A list of JSON file paths to the saved results. The file paths are sorted by the order of the input file paths. The file name is the original file name with a timestamp appended. For example, the input file "document.pdf" could have this output file: "document_20250313_070305.json".
-- **Raises:**
-  - `FileNotFoundError`: If any input file doesn't exist
-  - `ValueError`: If any URL is invalid or points to an unsupported file type
-
-#### `parse_and_save_document(document: str | Path | Url, *, result_save_dir: str | Path | None = None, include_marginalia: bool = True, include_metadata_in_markdown: bool = True, grounding_save_dir: str | Path | None = None) -> Path | ParsedDocument`
-
-Parse a single document and optionally save results.
-
-- **Parameters:**
-  - `document`: Path to document or URL pointing to a document
-  - `result_save_dir`: Optional directory to save results
-  - `include_marginalia`: Whether to include marginalia (side notes, annotations, etc.) in the parsed output. Default: True.
-  - `include_metadata_in_markdown`: Whether to include metadata in the markdown output. Default: True.
-  - `grounding_save_dir`: Optional directory to save the grounding images
-- **Returns:**
-  - If `result_save_dir` provided: Path to saved result file  
-  - If no `result_save_dir`: ParsedDocument object
-- **Raises:**
-  - `FileNotFoundError`: If input file doesn't exist  
-  - `ValueError`: If file type is not supported or URL is invalid
-
-## Result Schema
-
-#### ParsedDocument
-
-Represents a parsed document with the following attributes:
-
-- `markdown`: str - Markdown representation of the document
-- `chunks`: list[Chunk] - List of parsed content chunks, sorted by page index, then the layout of the content on the page
-- `start_page_idx`: Optional[int] - Starting page index for PDFs
-- `end_page_idx`: Optional[int] - Ending page index for PDFs
-- `doc_type`: Literal["pdf", "image"] - Type of document
-
-#### Chunk
-
-Represents a parsed content chunk with the following attributes:
-
-- `text`: str - Extracted text content
-- `grounding`: list[Grounding] - List of content locations in document
-- `chunk_type`: Literal["text", "error"] - Type of chunk
-- `chunk_id`: Optional[str] - ID of the chunk
 
 ## Troubleshooting & FAQ
 
