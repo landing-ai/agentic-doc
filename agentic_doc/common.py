@@ -32,8 +32,7 @@ class ChunkGroundingBox(BaseModel):
 
 class ChunkGrounding(BaseModel):
     page: int
-    # NOTE: could be None if error happens in parsing the chunk
-    box: Union[ChunkGroundingBox, None]
+    box: ChunkGroundingBox
     # NOTE: image_path doesn't come from the server API, so it's null by default
     image_path: Union[Path, None] = None
 
@@ -42,16 +41,7 @@ class Chunk(BaseModel):
     text: str
     grounding: list[ChunkGrounding]
     chunk_type: ChunkType
-    chunk_id: Union[str, None]
-
-    @staticmethod
-    def error_chunk(error_msg: str, page_idx: int) -> "Chunk":
-        return Chunk(
-            text=error_msg,
-            grounding=[ChunkGrounding(page=page_idx, box=None)],
-            chunk_type=ChunkType.error,
-            chunk_id=None,
-        )
+    chunk_id: str
 
 
 class PageError(BaseModel):

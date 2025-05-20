@@ -78,9 +78,6 @@ def save_groundings_as_images(
     assert file_type == "pdf"
     chunks_by_page_idx = defaultdict(list)
     for chunk in chunks:
-        if chunk.chunk_type == ChunkType.error:
-            continue
-
         page_idx = chunk.grounding[0].page
         chunks_by_page_idx[page_idx].append(chunk)
 
@@ -118,8 +115,6 @@ def _crop_groundings(
 ) -> dict[str, list[Path]]:
     result: dict[str, list[Path]] = defaultdict(list)
     for c in chunks:
-        if c.chunk_type == ChunkType.error:
-            continue
         for i, grounding in enumerate(c.grounding):
             if grounding.box is None:
                 _LOGGER.error(
