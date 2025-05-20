@@ -18,7 +18,6 @@ from tenacity import RetryCallState
 from agentic_doc.common import (
     Chunk,
     ChunkGroundingBox,
-    ChunkType,
     Document,
     ParsedDocument,
 )
