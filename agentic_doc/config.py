@@ -13,7 +13,6 @@ _LOGGER = structlog.get_logger(__name__)
 _MAX_PARALLEL_TASKS = 200
 # Colors in BGR format (OpenCV uses BGR)
 _COLOR_MAP = {
-    ChunkType.page_header: (0, 200, 200),  # Yellow-ish for headers
     ChunkType.marginalia: (128, 0, 255),  # Purple for marginalia
     ChunkType.table: (139, 69, 19),  # Brown for tables
     ChunkType.figure: (50, 205, 50),  # Lime green for figures
