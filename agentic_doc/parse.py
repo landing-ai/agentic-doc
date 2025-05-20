@@ -1,4 +1,5 @@
 import copy
+import importlib.metadata
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -31,6 +32,7 @@ from agentic_doc.utils import (
 
 _LOGGER = structlog.getLogger(__name__)
 _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
+_LIB_VERSION = importlib.metadata.version("agentic-doc")
 
 
 def parse_documents(
@@ -352,7 +354,7 @@ def _send_parsing_request(
             }
             headers = {
                 "Authorization": f"Basic {settings.vision_agent_api_key}",
-                "runtime_tag": "agentic-doc",
+                "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
             }
             response = httpx.post(
                 _ENDPOINT_URL,

@@ -8,19 +8,13 @@ from pydantic import BaseModel, Field
 
 
 class ChunkType(str, Enum):
-    form = "form"
     table = "table"
     figure = "figure"
     text = "text"
     marginalia = "marginalia"
 
     # Below values are deprecated
-    error = "error"
-    title = "title"  # type: ignore [assignment]
     page_header = "page_header"
-    page_footer = "page_footer"
-    page_number = "page_number"
-    key_value = "key_value"
 
 
 class ChunkGroundingBox(BaseModel):
