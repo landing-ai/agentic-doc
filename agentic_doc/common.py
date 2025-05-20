@@ -13,9 +13,6 @@ class ChunkType(str, Enum):
     text = "text"
     marginalia = "marginalia"
 
-    # Below values are deprecated
-    page_header = "page_header"
-
 
 class ChunkGroundingBox(BaseModel):
     """
