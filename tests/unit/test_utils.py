@@ -54,18 +54,18 @@ def test_download_file_failure(monkeypatch):
     mock_response = MagicMock()
     mock_response.status_code = 404
     mock_response.text = "Not Found"
-    
+
     # Create a context manager mock
     mock_context = MagicMock()
     mock_context.__enter__.return_value = mock_response
-    
+
     # Mock stream to return our context manager
     mock_stream = MagicMock(return_value=mock_context)
     monkeypatch.setattr(httpx, "stream", mock_stream)
-    
+
     with pytest.raises(Exception) as exc_info:
         download_file("https://example.com/nonexistent.pdf", "output.pdf")
-    
+
     # Just check that the error message contains "Download failed"
     assert "Download failed" in str(exc_info.value)
 
@@ -113,7 +113,7 @@ def test_is_valid_httpurl():
     assert is_valid_httpurl("http://example.com")
     assert is_valid_httpurl("https://example.com")
     assert is_valid_httpurl("https://example.com/path/to/file.pdf")
-    
+
     # Invalid URLs
     assert not is_valid_httpurl("ftp://example.com")
     assert not is_valid_httpurl("file:///path/to/file.pdf")
@@ -127,7 +127,7 @@ def test_get_file_type_pdf(temp_dir):
     pdf_path = temp_dir / "test.pdf"
     with open(pdf_path, "wb") as f:
         f.write(b"%PDF-1.7\n")
-    
+
     assert get_file_type(pdf_path) == "pdf"
 
 
@@ -136,7 +136,7 @@ def test_get_file_type_image(temp_dir):
     img_path = temp_dir / "test.jpg"
     with open(img_path, "wb") as f:
         f.write(b"JFIF")  # Some non-PDF content
-    
+
     assert get_file_type(img_path) == "image"
 
 
@@ -144,7 +144,7 @@ def test_get_file_type_fallback_to_extension(temp_dir):
     # File that can't be opened
     nonexistent_path = temp_dir / "nonexistent.pdf"
     assert get_file_type(nonexistent_path) == "pdf"
-    
+
     nonexistent_image = temp_dir / "nonexistent.jpg"
     assert get_file_type(nonexistent_image) == "image"
 
@@ -153,20 +153,20 @@ def test_split_pdf(multi_page_pdf, temp_dir):
     # Test splitting a multi-page PDF
     output_dir = temp_dir / "split_output"
     result = split_pdf(multi_page_pdf, output_dir, split_size=2)
-    
+
     # For a 5-page PDF with split_size=2, we should get 3 parts
     assert len(result) == 3
-    
+
     # Check that each Document object has the correct page ranges
     assert result[0].start_page_idx == 0
     assert result[0].end_page_idx == 1
-    
+
     assert result[1].start_page_idx == 2
     assert result[1].end_page_idx == 3
-    
+
     assert result[2].start_page_idx == 4
     assert result[2].end_page_idx == 4
-    
+
     # Check that the files were actually created
     for doc in result:
         assert Path(doc.file_path).exists()
@@ -174,11 +174,11 @@ def test_split_pdf(multi_page_pdf, temp_dir):
 
 def test_split_pdf_with_invalid_split_size(multi_page_pdf, temp_dir):
     output_dir = temp_dir / "split_output"
-    
+
     # Test with invalid split_size values
     with pytest.raises(AssertionError):
         split_pdf(multi_page_pdf, output_dir, split_size=0)
-    
+
     with pytest.raises(AssertionError):
         split_pdf(multi_page_pdf, output_dir, split_size=3)
 
@@ -195,10 +195,10 @@ def test_log_retry_failure_log_msg(monkeypatch):
     retry_state.outcome = outcome
     retry_state.fn = MagicMock()
     retry_state.fn.__name__ = "test_function"
-    
+
     # Set the retry logging style to log_msg
     monkeypatch.setattr("agentic_doc.config.settings.retry_logging_style", "log_msg")
-    
+
     # Call the function - just verify it doesn't raise an exception
     log_retry_failure(retry_state)
 
@@ -211,13 +211,15 @@ def test_log_retry_failure_inline_block(monkeypatch, capsys):
     outcome.failed = True
     outcome.exception.return_value = Exception("Test error")
     retry_state.outcome = outcome
-    
+
     # Set the retry logging style to inline_block
-    monkeypatch.setattr("agentic_doc.config.settings.retry_logging_style", "inline_block")
-    
+    monkeypatch.setattr(
+        "agentic_doc.config.settings.retry_logging_style", "inline_block"
+    )
+
     # Call the function
     log_retry_failure(retry_state)
-    
+
     # Check that the progress block was printed
     captured = capsys.readouterr()
     assert "███" in captured.out
@@ -231,13 +233,13 @@ def test_log_retry_failure_none(monkeypatch, capsys, caplog):
     outcome.failed = True
     outcome.exception.return_value = Exception("Test error")
     retry_state.outcome = outcome
-    
+
     # Set the retry logging style to none
     monkeypatch.setattr("agentic_doc.config.settings.retry_logging_style", "none")
-    
+
     # Call the function
     log_retry_failure(retry_state)
-    
+
     # Check that nothing was printed or logged
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -252,14 +254,14 @@ def test_log_retry_failure_invalid_style(monkeypatch):
     outcome.failed = True
     outcome.exception.return_value = Exception("Test error")
     retry_state.outcome = outcome
-    
+
     # Set an invalid retry logging style
     monkeypatch.setattr("agentic_doc.config.settings.retry_logging_style", "invalid")
-    
+
     # Call the function and check that it raises a ValueError
     with pytest.raises(ValueError) as exc_info:
         log_retry_failure(retry_state)
-    
+
     assert "Invalid retry logging style" in str(exc_info.value)
 
 
@@ -268,22 +270,24 @@ def test_viz_parsed_document_image(temp_dir, mock_parsed_document):
     img_path = temp_dir / "test_image.png"
     img = Image.new("RGB", (200, 200), color=(255, 255, 255))
     img.save(img_path)
-    
+
     # Test visualization without saving
     with patch("agentic_doc.utils.get_file_type", return_value="image"):
         images = viz_parsed_document(img_path, mock_parsed_document)
-        
+
         # Check that we got an image back
         assert len(images) == 1
         assert isinstance(images[0], Image.Image)
         assert images[0].width == 200
         assert images[0].height == 200
-    
+
     # Test visualization with saving
     output_dir = temp_dir / "viz_output"
     with patch("agentic_doc.utils.get_file_type", return_value="image"):
-        images = viz_parsed_document(img_path, mock_parsed_document, output_dir=output_dir)
-        
+        images = viz_parsed_document(
+            img_path, mock_parsed_document, output_dir=output_dir
+        )
+
         # Check that the image was saved
         assert (output_dir / f"{img_path.stem}_viz_page_0.png").exists()
 
@@ -291,20 +295,22 @@ def test_viz_parsed_document_image(temp_dir, mock_parsed_document):
 def test_viz_parsed_document_pdf(temp_dir, mock_multi_page_parsed_document):
     # Mock pymupdf.open and page_to_image to avoid needing a real PDF
     mock_page_image = np.zeros((200, 200, 3), dtype=np.uint8)
-    
-    with patch("agentic_doc.utils.pymupdf.open"), \
-         patch("agentic_doc.utils.page_to_image", return_value=mock_page_image), \
-         patch("agentic_doc.utils.get_file_type", return_value="pdf"):
-        
+
+    with patch("agentic_doc.utils.pymupdf.open"), patch(
+        "agentic_doc.utils.page_to_image", return_value=mock_page_image
+    ), patch("agentic_doc.utils.get_file_type", return_value="pdf"):
+
         pdf_path = temp_dir / "test.pdf"
         output_dir = temp_dir / "viz_output"
-        
+
         # Test visualization with saving
-        images = viz_parsed_document(pdf_path, mock_multi_page_parsed_document, output_dir=output_dir)
-        
+        images = viz_parsed_document(
+            pdf_path, mock_multi_page_parsed_document, output_dir=output_dir
+        )
+
         # Check that we got the right number of images back
         assert len(images) == 3  # 3 pages in mock_multi_page_parsed_document
-        
+
         # Check that the images were saved
         for i in range(3):
             assert (output_dir / f"{pdf_path.stem}_viz_page_{i}.png").exists()
@@ -313,7 +319,7 @@ def test_viz_parsed_document_pdf(temp_dir, mock_multi_page_parsed_document):
 def test_viz_chunks():
     # Create a test image
     img = np.zeros((200, 200, 3), dtype=np.uint8)
-    
+
     # Create some test chunks
     chunks = [
         Chunk(
@@ -322,10 +328,9 @@ def test_viz_chunks():
             chunk_id="1",
             grounding=[
                 ChunkGrounding(
-                    page=0,
-                    box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
                 )
-            ]
+            ],
         ),
         Chunk(
             text="Test Text",
@@ -333,18 +338,17 @@ def test_viz_chunks():
             chunk_id="2",
             grounding=[
                 ChunkGrounding(
-                    page=0,
-                    box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
                 )
-            ]
-        )
+            ],
+        ),
     ]
-    
+
     # Test with default visualization config
     result = viz_chunks(img, chunks)
     assert isinstance(result, np.ndarray)
     assert result.shape == (200, 200, 3)
-    
+
     # Test with custom visualization config
     viz_config = VisualizationConfig(thickness=2, font_scale=0.7)
     result = viz_chunks(img, chunks, viz_config)
@@ -360,19 +364,19 @@ def test_crop_image():
     img[0:50, 50:100] = [0, 255, 0]  # Top-right quadrant: green
     img[50:100, 0:50] = [0, 0, 255]  # Bottom-left quadrant: blue
     img[50:100, 50:100] = [255, 255, 0]  # Bottom-right quadrant: yellow
-    
+
     # Test crop with normalized coordinates
     bbox = ChunkGroundingBox(l=0.25, t=0.25, r=0.75, b=0.75)
     crop = _crop_image(img, bbox)
-    
+
     # The crop should be a 50x50 region from the center of the image
     assert crop.shape == (50, 50, 3)
-    
+
     # Test with coordinates at the boundaries
     bbox = ChunkGroundingBox(l=0.0, t=0.0, r=1.0, b=1.0)
     crop = _crop_image(img, bbox)
     assert crop.shape == (100, 100, 3)  # Should be the full image
-    
+
     # Since the utils._crop_image function has an assertion that coordinates must be
     # within [0,1], we can't test with values outside this range
 
@@ -380,10 +384,10 @@ def test_crop_image():
 def test_crop_groundings(temp_dir):
     # Create a test image
     img = np.zeros((100, 100, 3), dtype=np.uint8)
-    
+
     # Create a directory to save the crops
     crop_save_dir = temp_dir / "crops"
-    
+
     # Create test chunks
     chunks = [
         Chunk(
@@ -392,10 +396,9 @@ def test_crop_groundings(temp_dir):
             chunk_id="11111",
             grounding=[
                 ChunkGrounding(
-                    page=0, 
-                    box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
                 )
-            ]
+            ],
         ),
         Chunk(
             text="This is a test document.",
@@ -403,42 +406,42 @@ def test_crop_groundings(temp_dir):
             chunk_id="22222",
             grounding=[
                 ChunkGrounding(
-                    page=0, 
-                    box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
                 )
-            ]
-        )
+            ],
+        ),
     ]
-    
+
     # Mock cv2.imencode to make it return a valid result
     mock_buffer = MagicMock()
     mock_buffer.tobytes.return_value = b"mock_png_data"
-    
-    with patch("cv2.imencode", return_value=(True, mock_buffer)), \
-         patch("pathlib.Path.write_bytes") as mock_write:
-        
+
+    with patch("cv2.imencode", return_value=(True, mock_buffer)), patch(
+        "pathlib.Path.write_bytes"
+    ) as mock_write:
+
         # Test without inplace modification
         result = _crop_groundings(img, chunks, crop_save_dir, inplace=False)
-        
+
         # Check that the result contains the chunk_id as keys
         assert "11111" in result
         assert "22222" in result
-        
+
         # Check that write_bytes was called for each chunk
         assert mock_write.call_count >= 2
-        
+
         # Verify the grounding image_path is still None (since inplace=False)
         assert chunks[0].grounding[0].image_path is None
-        
+
         # Reset the mock for the next test
         mock_write.reset_mock()
-        
+
         # Test with inplace modification
         result = _crop_groundings(img, chunks, crop_save_dir, inplace=True)
-        
+
         # Check that write_bytes was called for each chunk
         assert mock_write.call_count >= 2
-        
+
         # Check that the image_path was set in the chunks when inplace=True
         assert chunks[0].grounding[0].image_path is not None
         assert chunks[1].grounding[0].image_path is not None
@@ -449,10 +452,10 @@ def test_save_groundings_as_images_image(temp_dir):
     img_path = temp_dir / "test.jpg"
     img = Image.new("RGB", (100, 100), color=(255, 255, 255))
     img.save(img_path)
-    
+
     # Create a directory to save the groundings
     save_dir = temp_dir / "groundings"
-    
+
     # Create custom chunks with known types
     chunks = [
         Chunk(
@@ -461,10 +464,9 @@ def test_save_groundings_as_images_image(temp_dir):
             chunk_id="11111",
             grounding=[
                 ChunkGrounding(
-                    page=0, 
-                    box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
                 )
-            ]
+            ],
         ),
         Chunk(
             text="This is a test document.",
@@ -472,29 +474,31 @@ def test_save_groundings_as_images_image(temp_dir):
             chunk_id="22222",
             grounding=[
                 ChunkGrounding(
-                    page=0, 
-                    box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
                 )
-            ]
-        )
+            ],
+        ),
     ]
-    
+
     # Mock the required functions to avoid filesystem operations
     mock_buffer = MagicMock()
     mock_buffer.tobytes.return_value = b"mock_png_data"
-    
-    with patch("agentic_doc.utils.get_file_type", return_value="image"), \
-         patch("agentic_doc.utils.cv2.imread", return_value=np.zeros((100, 100, 3), dtype=np.uint8)), \
-         patch("cv2.imencode", return_value=(True, mock_buffer)), \
-         patch("pathlib.Path.write_bytes") as mock_write, \
-         patch("pathlib.Path.mkdir", return_value=None):
-        
+
+    with patch("agentic_doc.utils.get_file_type", return_value="image"), patch(
+        "agentic_doc.utils.cv2.imread",
+        return_value=np.zeros((100, 100, 3), dtype=np.uint8),
+    ), patch("cv2.imencode", return_value=(True, mock_buffer)), patch(
+        "pathlib.Path.write_bytes"
+    ) as mock_write, patch(
+        "pathlib.Path.mkdir", return_value=None
+    ):
+
         result = save_groundings_as_images(img_path, chunks, save_dir)
-        
+
         # Check that the result contains the chunk_id as keys
         assert "11111" in result
         assert "22222" in result
-        
+
         # Check that write_bytes was called (twice, once for each chunk)
         assert mock_write.call_count == 2
 
@@ -504,10 +508,10 @@ def test_save_groundings_as_images_pdf(temp_dir):
     pdf_path = temp_dir / "test.pdf"
     with open(pdf_path, "wb") as f:
         f.write(b"%PDF-1.7\n")
-    
+
     # Create a directory to save the groundings
     save_dir = temp_dir / "groundings"
-    
+
     # Create custom chunks with different page indices
     chunks = [
         Chunk(
@@ -516,10 +520,9 @@ def test_save_groundings_as_images_pdf(temp_dir):
             chunk_id="11111",
             grounding=[
                 ChunkGrounding(
-                    page=0, 
-                    box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
                 )
-            ]
+            ],
         ),
         Chunk(
             text="Page content",
@@ -527,10 +530,9 @@ def test_save_groundings_as_images_pdf(temp_dir):
             chunk_id="22222",
             grounding=[
                 ChunkGrounding(
-                    page=0, 
-                    box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
                 )
-            ]
+            ],
         ),
         Chunk(
             text="Header",
@@ -538,64 +540,81 @@ def test_save_groundings_as_images_pdf(temp_dir):
             chunk_id="33333",
             grounding=[
                 ChunkGrounding(
-                    page=1, 
-                    box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    page=1, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
                 )
-            ]
-        )
+            ],
+        ),
     ]
-    
+
     # Mock the required functions to avoid filesystem operations
     mock_buffer = MagicMock()
     mock_buffer.tobytes.return_value = b"mock_png_data"
-    
-    with patch("agentic_doc.utils.get_file_type", return_value="pdf"), \
-         patch("agentic_doc.utils.pymupdf.open") as mock_pymupdf_open, \
-         patch("agentic_doc.utils.page_to_image", return_value=np.zeros((100, 100, 3), dtype=np.uint8)), \
-         patch("cv2.imencode", return_value=(True, mock_buffer)), \
-         patch("pathlib.Path.write_bytes") as mock_write, \
-         patch("pathlib.Path.mkdir", return_value=None):
-        
+
+    with patch("agentic_doc.utils.get_file_type", return_value="pdf"), patch(
+        "agentic_doc.utils.pymupdf.open"
+    ) as mock_pymupdf_open, patch(
+        "agentic_doc.utils.page_to_image",
+        return_value=np.zeros((100, 100, 3), dtype=np.uint8),
+    ), patch(
+        "cv2.imencode", return_value=(True, mock_buffer)
+    ), patch(
+        "pathlib.Path.write_bytes"
+    ) as mock_write, patch(
+        "pathlib.Path.mkdir", return_value=None
+    ):
+
         # Mock the context manager returned by pymupdf.open
         mock_pdf_doc = MagicMock()
         mock_pymupdf_open.return_value.__enter__.return_value = mock_pdf_doc
-        
+
         # Call the function
         result = save_groundings_as_images(pdf_path, chunks, save_dir)
-        
+
         # Check that the result contains the chunk_ids
         assert "11111" in result
         assert "22222" in result
         assert "33333" in result
-        
+
         # Check that write_bytes was called for each chunk
         assert mock_write.call_count == 3
 
 
 def test_read_img_rgb():
     # Create a mock for cv2.imread and cv2.cvtColor
-    with patch("agentic_doc.utils.cv2.imread", return_value=np.zeros((100, 100, 3), dtype=np.uint8)), \
-         patch("agentic_doc.utils.cv2.cvtColor", return_value=np.zeros((100, 100, 3), dtype=np.uint8)):
-        
+    with patch(
+        "agentic_doc.utils.cv2.imread",
+        return_value=np.zeros((100, 100, 3), dtype=np.uint8),
+    ), patch(
+        "agentic_doc.utils.cv2.cvtColor",
+        return_value=np.zeros((100, 100, 3), dtype=np.uint8),
+    ):
+
         # Test with a regular RGB image
         result = _read_img_rgb("test.jpg")
         assert result.shape == (100, 100, 3)
-    
+
     # Test with a grayscale image
-    with patch("agentic_doc.utils.cv2.imread", return_value=np.zeros((100, 100, 1), dtype=np.uint8)), \
-         patch("agentic_doc.utils.cv2.cvtColor") as mock_cvtColor:
-        
+    with patch(
+        "agentic_doc.utils.cv2.imread",
+        return_value=np.zeros((100, 100, 1), dtype=np.uint8),
+    ), patch("agentic_doc.utils.cv2.cvtColor") as mock_cvtColor:
+
         # Set return value directly instead of using side_effect
         mock_cvtColor.return_value = np.zeros((100, 100, 3), dtype=np.uint8)
-        
+
         result = _read_img_rgb("test.jpg")
         assert result.shape == (100, 100, 3)
         # Check that cvtColor was called at least once
         assert mock_cvtColor.call_count >= 1
-    
+
     # Test with an RGBA image
-    with patch("agentic_doc.utils.cv2.imread", return_value=np.zeros((100, 100, 4), dtype=np.uint8)), \
-         patch("agentic_doc.utils.cv2.cvtColor", return_value=np.zeros((100, 100, 4), dtype=np.uint8)):
-        
+    with patch(
+        "agentic_doc.utils.cv2.imread",
+        return_value=np.zeros((100, 100, 4), dtype=np.uint8),
+    ), patch(
+        "agentic_doc.utils.cv2.cvtColor",
+        return_value=np.zeros((100, 100, 4), dtype=np.uint8),
+    ):
+
         result = _read_img_rgb("test.png")
         assert result.shape == (100, 100, 3)  # Should drop the alpha channel
