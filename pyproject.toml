@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "agentic-doc"
-version = "0.0.23"
+version = "0.2.2"
 description = "A Python library that wraps around VisionAgent document extraction REST API to make documents extraction easy."
 authors = ["Landing AI <dev@landing.ai>"]
 readme = "README.md"
@@ -22,7 +22,7 @@ tqdm = ">=4.64.0,<5.0.0"
 typing_extensions = "4.*"
 pydantic = ">=2.8.0"
 pydantic-settings = "^2.2.1"
-tenacity = "^8.3.0"
+tenacity = ">=8.0.0"
 pillow = ">=10.0.0"
 pillow-heif = ">=0.17.0"
 pypdf = "^5.3.1"

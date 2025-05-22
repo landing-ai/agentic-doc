@@ -8,16 +8,10 @@ from pydantic import BaseModel, Field
 
 
 class ChunkType(str, Enum):
-    title = "title"  # type: ignore [assignment]
-    page_header = "page_header"
-    page_footer = "page_footer"
-    page_number = "page_number"
-    key_value = "key_value"
-    form = "form"
     table = "table"
     figure = "figure"
     text = "text"
-    error = "error"
+    marginalia = "marginalia"
 
 
 class ChunkGroundingBox(BaseModel):
@@ -35,8 +29,7 @@ class ChunkGroundingBox(BaseModel):
 
 class ChunkGrounding(BaseModel):
     page: int
-    # NOTE: could be None if error happens in parsing the chunk
-    box: Union[ChunkGroundingBox, None]
+    box: ChunkGroundingBox
     # NOTE: image_path doesn't come from the server API, so it's null by default
     image_path: Union[Path, None] = None
 
@@ -45,16 +38,13 @@ class Chunk(BaseModel):
     text: str
     grounding: list[ChunkGrounding]
     chunk_type: ChunkType
-    chunk_id: Union[str, None]
+    chunk_id: str
 
-    @staticmethod
-    def error_chunk(error_msg: str, page_idx: int) -> "Chunk":
-        return Chunk(
-            text=error_msg,
-            grounding=[ChunkGrounding(page=page_idx, box=None)],
-            chunk_type=ChunkType.error,
-            chunk_id=None,
-        )
+
+class PageError(BaseModel):
+    page_num: int
+    error: str
+    error_code: int
 
 
 class ParsedDocument(BaseModel):
@@ -63,6 +53,7 @@ class ParsedDocument(BaseModel):
     start_page_idx: int
     end_page_idx: int
     doc_type: Literal["pdf", "image"]
+    errors: list[PageError] = Field(default_factory=list)
 
 
 class RetryableError(Exception):

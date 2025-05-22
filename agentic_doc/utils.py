@@ -18,7 +18,6 @@ from tenacity import RetryCallState
 from agentic_doc.common import (
     Chunk,
     ChunkGroundingBox,
-    ChunkType,
     Document,
     ParsedDocument,
 )
@@ -78,9 +77,6 @@ def save_groundings_as_images(
     assert file_type == "pdf"
     chunks_by_page_idx = defaultdict(list)
     for chunk in chunks:
-        if chunk.chunk_type == ChunkType.error:
-            continue
-
         page_idx = chunk.grounding[0].page
         chunks_by_page_idx[page_idx].append(chunk)
 
@@ -118,8 +114,6 @@ def _crop_groundings(
 ) -> dict[str, list[Path]]:
     result: dict[str, list[Path]] = defaultdict(list)
     for c in chunks:
-        if c.chunk_type == ChunkType.error:
-            continue
         for i, grounding in enumerate(c.grounding):
             if grounding.box is None:
                 _LOGGER.error(
@@ -180,7 +174,7 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
 def split_pdf(
     input_pdf_path: Union[str, Path],
     output_dir: Union[str, Path],
-    split_size: int = 2,
+    split_size: int = 10,
 ) -> list[Document]:
     """
     Splits a PDF file into smaller PDFs, each with at most max_pages pages.
@@ -188,13 +182,13 @@ def split_pdf(
     Args:
         input_pdf_path (str | Path): Path to the input PDF file.
         output_dir (str | Path): Directory where mini PDF files will be saved.
-        split_size (int): Maximum number of pages per mini PDF file (default is 2, which is the server endpoint's limit).
+        split_size (int): Maximum number of pages per mini PDF file (default is 10).
     """
     input_pdf_path = Path(input_pdf_path)
     assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
     assert (
-        0 < split_size <= 2
-    ), "split_size must be greater than 0 and less than or equal to 2"
+        0 < split_size <= 50
+    ), "split_size must be greater than 0 and less than or equal to 50"
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_dir = str(output_dir)
