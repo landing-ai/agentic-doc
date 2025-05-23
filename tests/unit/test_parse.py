@@ -757,9 +757,9 @@ class TestParseFunctionConsolidated:
 
         grounding_dir = temp_dir / "groundings"
 
-        with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document), patch(
-            "agentic_doc.parse.save_groundings_as_images"
-        ) as mock_save_groundings:
+        with patch(
+            "agentic_doc.parse._parse_pdf", return_value=mock_parsed_document
+        ), patch("agentic_doc.parse.save_groundings_as_images") as mock_save_groundings:
             result = parse(test_file, grounding_save_dir=grounding_dir)
 
             assert isinstance(result, ParsedDocument)
