@@ -115,28 +115,9 @@ class TestLocalConnector:
 class TestGoogleDriveConnector:
     """Test GoogleDriveConnector functionality."""
 
-    def test_init_with_service_account_file(self):
-        """Test initialization with service account file."""
-        config = GoogleDriveConnectorConfig(
-            service_account_file="/path/to/service-account.json"
-        )
-        connector = GoogleDriveConnector(config)
-
-        assert connector.config.service_account_file == "/path/to/service-account.json"
-
-    def test_init_with_credentials_json(self):
-        """Test initialization with credentials JSON."""
-        credentials = {"type": "service_account", "project_id": "test"}
-        config = GoogleDriveConnectorConfig(credentials_json=credentials)
-        connector = GoogleDriveConnector(config)
-
-        assert connector.config.credentials_json == credentials
-
     def test_missing_dependencies(self):
         """Test that GoogleDriveConnector raises ImportError when dependencies are missing."""
-        config = GoogleDriveConnectorConfig(
-            credentials_json={"type": "service_account"}
-        )
+        config = GoogleDriveConnectorConfig()
         connector = GoogleDriveConnector(config)
 
         with patch("builtins.__import__", side_effect=ImportError):
@@ -217,7 +198,7 @@ class TestConnectorFactory:
     def test_create_google_drive_connector(self):
         """Test creating a Google Drive connector."""
         config = GoogleDriveConnectorConfig(
-            credentials_json={"type": "service_account"}
+            client_secret_file="test"
         )
         connector = create_connector(config)
 
@@ -258,8 +239,6 @@ class TestConnectorConfigs:
         """Test GoogleDriveConnectorConfig defaults."""
         config = GoogleDriveConnectorConfig()
         assert config.connector_type == "google_drive"
-        assert config.service_account_file is None
-        assert config.credentials_json is None
         assert config.folder_id is None
 
     def test_s3_connector_config_defaults(self):
