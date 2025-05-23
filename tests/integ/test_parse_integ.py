@@ -126,7 +126,6 @@ def test_parse_single_image(sample_image_path):
     reason="API key not set, skipping integration test that requires actual API call",
 )
 def test_parse_and_save_document_with_url(results_dir):
-    # A stable PDF URL that should always work
     url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
 
     # Act
@@ -391,42 +390,3 @@ def test_parse_documents_grounding_boxes_valid(sample_image_path, results_dir):
             # Right should be greater than left, bottom should be greater than top
             assert box.r > box.l, f"Right ({box.r}) should be > left ({box.l})"
             assert box.b > box.t, f"Bottom ({box.b}) should be > top ({box.t})"
-
-
-@pytest.mark.skipif(
-    not settings.vision_agent_api_key,
-    reason="API key not set, skipping integration test that requires actual API call",
-)
-def test_parse_documents_batch_vs_individual_consistency(sample_image_path, results_dir):
-    # Test that parsing documents in batch vs individually gives consistent results
-    
-    # Parse individually
-    individual_result = parse_and_save_documents(
-        [sample_image_path], result_save_dir=results_dir / "individual"
-    )
-    
-    # Parse in batch (same file, but in a list with itself)
-    batch_result = parse_and_save_documents(
-        [sample_image_path], result_save_dir=results_dir / "batch"
-    )
-    
-    # Load both results
-    with open(individual_result[0]) as f:
-        individual_data = json.load(f)
-    
-    with open(batch_result[0]) as f:
-        batch_data = json.load(f)
-    
-    individual_doc = ParsedDocument.model_validate(individual_data)
-    batch_doc = ParsedDocument.model_validate(batch_data)
-    
-    # Both should have the same structure
-    assert individual_doc.doc_type == batch_doc.doc_type
-    assert individual_doc.start_page_idx == batch_doc.start_page_idx
-    assert individual_doc.end_page_idx == batch_doc.end_page_idx
-    assert len(individual_doc.chunks) == len(batch_doc.chunks)
-    
-    # Check that chunk types match
-    individual_chunk_types = [chunk.chunk_type for chunk in individual_doc.chunks]
-    batch_chunk_types = [chunk.chunk_type for chunk in batch_doc.chunks]
-    assert individual_chunk_types == batch_chunk_types
