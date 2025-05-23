@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Type
 import structlog
 from pydantic import BaseModel
 import os
+import sys
 
 try:
     from typing import TYPE_CHECKING
@@ -346,9 +347,7 @@ class S3Connector(BaseConnector):
     def _get_client(self) -> S3Client:
         """Initialize S3 client if not already done."""
         if self._client is None:
-            try:
-                import boto3
-            except ImportError:
+            if 'boto3' not in sys.modules:
                 raise ImportError(
                     "S3 connector requires boto3. Install with: pip install boto3"
                 )
