@@ -65,36 +65,116 @@ The library can extract data from:
 Run the following script to extract data from one document and return the results in both markdown and structured chunks.
 
 ```python
-from agentic_doc.parse import parse_documents
+from agentic_doc.parse import parse
 
 # Parse a local file
-results = parse_documents(["path/to/image.png"])
-parsed_doc = results[0]
-print(parsed_doc.markdown)  # Get the extracted data as markdown
-print(parsed_doc.chunks)  # Get the extracted data as structured chunks of content
+result = parse("path/to/image.png")
+print(result.markdown)  # Get the extracted data as markdown
+print(result.chunks)  # Get the extracted data as structured chunks of content
 
 # Parse a document from a URL
-results = parse_documents(["https://example.com/document.pdf"])
+result = parse("https://example.com/document.pdf")
+print(result.markdown)
+
+# Legacy approach (still supported)
+from agentic_doc.parse import parse_documents
+results = parse_documents(["path/to/image.png"])
 parsed_doc = results[0]
-print(parsed_doc.markdown)
 ```
 
-#### Extract Data from Multiple Documents and Save the Results to a Directory
-Run the following script to extract data from multiple documents. The results will be saved as structured chunks in JSON files in the specified directory.
+#### Extract Data from Multiple Documents
+Run the following script to extract data from multiple documents.
 
 ```python
-from agentic_doc.parse import parse_and_save_documents
+from agentic_doc.parse import parse
 
-# Parse local files
+# Parse multiple local files
 file_paths = ["path/to/your/document1.pdf", "path/to/another/document2.pdf"]
-result_save_dir = "path/to/save/results"
+results = parse(file_paths)
+for result in results:
+    print(result.markdown)
 
-result_paths = parse_and_save_documents(file_paths, result_save_dir=result_save_dir)
-# result_paths: ["path/to/save/results/document1_20250313_070305.json", "path/to/save/results/document2_20250313_070408.json"]
+# Parse and save results to a directory
+result_paths = parse(file_paths, result_save_dir="path/to/save/results")
+# result_paths: ["path/to/save/results/document1_20250313_070305.json", ...]
+```
 
-# Parse documents from URLs
-urls = ["https://example.com/doc1.pdf", "https://example.com/doc2.pdf"]
-result_paths = parse_and_save_documents(urls, result_save_dir=result_save_dir)
+#### Extract Data Using Connectors
+The library now supports various connectors to easily access documents from different sources:
+
+##### Google Drive Connector
+
+**Prerequisites: Follow the [Google Drive API Python Quickstart](https://developers.google.com/workspace/drive/api/quickstart/python) tutorial first to set up your credentials.**
+
+The Google Drive API quickstart will guide you through:
+1. Creating a Google Cloud project
+2. Enabling the Google Drive API
+3. Setting up OAuth 2.0 credentials
+
+After completing the quickstart tutorial, you can use the Google Drive connector as follows:
+
+```python
+from agentic_doc.parse import parse
+from agentic_doc.connectors import GoogleDriveConnectorConfig
+
+# Using OAuth credentials file (from quickstart tutorial)
+config = GoogleDriveConnectorConfig(
+    client_secret_file="path/to/credentials.json",
+    folder_id="your-google-drive-folder-id"  # Optional
+)
+
+# Parse all documents in the folder
+results = parse(config)
+
+# Parse with filtering
+results = parse(config, connector_pattern="*.pdf")
+```
+
+##### Amazon S3 Connector
+```python
+from agentic_doc.parse import parse
+from agentic_doc.connectors import S3ConnectorConfig
+
+config = S3ConnectorConfig(
+    bucket_name="your-bucket-name",
+    aws_access_key_id="your-access-key",  # Optional if using IAM roles
+    aws_secret_access_key="your-secret-key",  # Optional if using IAM roles
+    region_name="us-east-1"
+)
+
+# Parse all documents in the bucket
+results = parse(config)
+
+# Parse documents in a specific prefix/folder
+results = parse(config, connector_path="documents/")
+```
+
+##### Local Directory Connector
+```python
+from agentic_doc.parse import parse
+from agentic_doc.connectors import LocalConnectorConfig
+
+config = LocalConnectorConfig()
+
+# Parse all supported documents in a directory
+results = parse(config, connector_path="/path/to/documents")
+
+# Parse with pattern filtering
+results = parse(config, connector_path="/path/to/documents", connector_pattern="*.pdf")
+```
+
+##### URL Connector
+```python
+from agentic_doc.parse import parse
+from agentic_doc.connectors import URLConnectorConfig
+
+config = URLConnectorConfig(
+    headers={"Authorization": "Bearer your-token"},  # Optional
+    timeout=60  # Optional
+)
+
+# Parse document from URL
+results = parse(config, connector_path="https://example.com/document.pdf")
 ```
 
 ## Why Use It?
@@ -161,12 +241,12 @@ The library provides a visualization utility that creates annotated images showi
 Here's how to use the visualization feature:
 
 ```python
-from agentic_doc.parse import parse_documents
+from agentic_doc.parse import parse
 from agentic_doc.utils import viz_parsed_document
 from agentic_doc.config import VisualizationConfig
 
 # Parse a document
-results = parse_documents(["path/to/document.pdf"])
+results = parse("path/to/document.pdf")
 parsed_doc = results[0]
 
 # Create visualizations with default settings
@@ -294,10 +374,10 @@ Both parameters default to True. You can set them to False to exclude these elem
 #### Example: Using the new parameters
 
 ```python
-from agentic_doc.parse import parse_documents
+from agentic_doc.parse import parse
 
-results = parse_documents(
-    ["path/to/document.pdf"],
+results = parse(
+    "path/to/document.pdf",
     include_marginalia=False,  # Exclude marginalia from output
     include_metadata_in_markdown=False  # Exclude metadata from markdown
 )

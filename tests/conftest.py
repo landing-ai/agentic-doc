@@ -149,7 +149,7 @@ def mock_parsed_document():
         chunks=[
             Chunk(
                 text="Test Document",
-                chunk_type=ChunkType.title,
+                chunk_type=ChunkType.text,
                 chunk_id="11111",
                 grounding=[
                     ChunkGrounding(
@@ -182,7 +182,7 @@ def mock_multi_page_parsed_document():
         chunks=[
             Chunk(
                 text="Multi-page Document",
-                chunk_type=ChunkType.title,
+                chunk_type=ChunkType.text,
                 chunk_id="11111",
                 grounding=[
                     ChunkGrounding(
@@ -202,7 +202,7 @@ def mock_multi_page_parsed_document():
             ),
             Chunk(
                 text="Page 2",
-                chunk_type=ChunkType.page_header,
+                chunk_type=ChunkType.text,
                 chunk_id="33333",
                 grounding=[
                     ChunkGrounding(
@@ -222,7 +222,7 @@ def mock_multi_page_parsed_document():
             ),
             Chunk(
                 text="Page 3 content.",
-                chunk_type=ChunkType.page_footer,
+                chunk_type=ChunkType.text,
                 chunk_id="55555",
                 grounding=[
                     ChunkGrounding(

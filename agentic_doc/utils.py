@@ -15,12 +15,7 @@ from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
-from agentic_doc.common import (
-    Chunk,
-    ChunkGroundingBox,
-    Document,
-    ParsedDocument,
-)
+from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
 from agentic_doc.config import VisualizationConfig, settings
 
 _LOGGER = structlog.getLogger(__name__)
