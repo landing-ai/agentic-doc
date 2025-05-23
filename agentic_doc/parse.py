@@ -105,7 +105,7 @@ def parse(
 
         # Parse the downloaded files
         return _parse_document_list(
-            local_paths,
+            cast(List[Union[str, Path, Url]], local_paths),
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
             result_save_dir=result_save_dir,
@@ -130,7 +130,7 @@ def parse(
                 include_metadata_in_markdown=include_metadata_in_markdown,
                 grounding_save_dir=grounding_save_dir,
             )
-            return result
+            return cast(ParsedDocument, result)
 
     # Handle list of documents
     elif isinstance(documents, list):

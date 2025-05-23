@@ -1,7 +1,7 @@
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import structlog
 from pydantic import BaseModel
@@ -14,13 +14,14 @@ except ImportError:
 
 if TYPE_CHECKING:
     try:
-        from googleapiclient.discovery import Resource
-        from googleapiclient.http import MediaIoBaseDownload as MediaDownload
+        from googleapiclient.discovery import Resource  # type: ignore
+        from googleapiclient.http import MediaIoBaseDownload as MediaDownload  # type: ignore
     except ImportError:
         Resource = Any
         MediaDownload = Any
 
-        S3Client = Any
+    try:
+        import boto3  # type: ignore
     except ImportError:
         S3Client = Any
 else:
@@ -47,9 +48,7 @@ class GoogleDriveConnectorConfig(ConnectorConfig):
     """Configuration for Google Drive connector."""
 
     connector_type: str = "google_drive"
-    service_account_file: Optional[str] = None
     client_secret_file: Optional[str] = None
-    credentials_json: Optional[Dict[str, Any]] = None
     folder_id: Optional[str] = None
 
 
@@ -194,7 +193,7 @@ class GoogleDriveConnector(BaseConnector):
         if self._service is None:
             try:
                 from google.auth.transport.requests import Request
-                from google_auth_oauthlib.flow import InstalledAppFlow
+                from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
                 from google.oauth2.credentials import Credentials
                 from googleapiclient.discovery import build
             except ImportError:
@@ -215,22 +214,14 @@ class GoogleDriveConnector(BaseConnector):
                 if creds and creds.expired and creds.refresh_token:
                     creds.refresh(Request())
                 else:
-                    if self.config.service_account_file:
-                        creds = Credentials.from_service_account_file(
-                            self.config.service_account_file, scopes=scopes
-                        )
-                    elif self.config.credentials_json:
-                        creds = Credentials.from_service_account_info(
-                            self.config.credentials_json, scopes=scopes
-                        )
-                    elif self.config.client_secret_file:
+                    if self.config.client_secret_file:
                         flow = InstalledAppFlow.from_client_secrets_file(
                             self.config.client_secret_file, scopes=scopes
                         )
                         creds = flow.run_local_server(port=0)
                     else:
                         raise ValueError(
-                            "Either service_account_file, credentials_json, or client_secret_file must be provided"
+                            "client_secret_file must be provided"
                         )
 
                 # Save credentials for next time
@@ -294,7 +285,7 @@ class GoogleDriveConnector(BaseConnector):
             # Create local path if not provided
             if local_path is None:
                 temp_dir = tempfile.mkdtemp()
-                local_path_obj = Path(temp_dir) / file_name
+                local_path_obj: Path = Path(temp_dir) / file_name
             else:
                 local_path_obj = Path(local_path)
                 local_path_obj.parent.mkdir(parents=True, exist_ok=True)
@@ -541,7 +532,7 @@ class URLConnector(BaseConnector):
 
 def create_connector(config: ConnectorConfig) -> BaseConnector:
     """Factory function to create appropriate connector based on config type."""
-    connector_map = {
+    connector_map: Dict[str, Type[BaseConnector]] = {
         "local": LocalConnector,
         "google_drive": GoogleDriveConnector,
         "s3": S3Connector,
