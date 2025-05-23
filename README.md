@@ -42,18 +42,6 @@ This Python library wraps that API to provide:
 pip install agentic-doc
 ```
 
-#### Optional Dependencies for Connectors
-
-For Google Drive connector:
-```bash
-pip install google-api-python-client google-auth
-```
-
-For Amazon S3 connector:
-```bash
-pip install boto3
-```
-
 ### Requirements
 - Python version 3.9, 3.10, 3.11 or 3.12
 - LandingAI agentic AI API key (get the key [here](https://va.landing.ai/account/api-key))
@@ -115,13 +103,23 @@ result_paths = parse(file_paths, result_save_dir="path/to/save/results")
 The library now supports various connectors to easily access documents from different sources:
 
 ##### Google Drive Connector
+
+**Prerequisites: Follow the [Google Drive API Python Quickstart](https://developers.google.com/workspace/drive/api/quickstart/python) tutorial first to set up your credentials.**
+
+The Google Drive API quickstart will guide you through:
+1. Creating a Google Cloud project
+2. Enabling the Google Drive API
+3. Setting up OAuth 2.0 credentials
+
+After completing the quickstart tutorial, you can use the Google Drive connector as follows:
+
 ```python
 from agentic_doc.parse import parse
 from agentic_doc.connectors import GoogleDriveConnectorConfig
 
-# Using service account file
+# Using OAuth credentials file (from quickstart tutorial)
 config = GoogleDriveConnectorConfig(
-    service_account_file="path/to/service-account.json",
+    client_secret_file="path/to/credentials.json",
     folder_id="your-google-drive-folder-id"  # Optional
 )
 
@@ -243,12 +241,12 @@ The library provides a visualization utility that creates annotated images showi
 Here's how to use the visualization feature:
 
 ```python
-from agentic_doc.parse import parse_documents
+from agentic_doc.parse import parse
 from agentic_doc.utils import viz_parsed_document
 from agentic_doc.config import VisualizationConfig
 
 # Parse a document
-results = parse_documents(["path/to/document.pdf"])
+results = parse("path/to/document.pdf")
 parsed_doc = results[0]
 
 # Create visualizations with default settings
@@ -376,10 +374,10 @@ Both parameters default to True. You can set them to False to exclude these elem
 #### Example: Using the new parameters
 
 ```python
-from agentic_doc.parse import parse_documents
+from agentic_doc.parse import parse
 
-results = parse_documents(
-    ["path/to/document.pdf"],
+results = parse(
+    "path/to/document.pdf",
     include_marginalia=False,  # Exclude marginalia from output
     include_metadata_in_markdown=False  # Exclude metadata from markdown
 )

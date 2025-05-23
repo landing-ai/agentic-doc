@@ -30,6 +30,10 @@ structlog = "^25.2.0"
 httpx = "^0.28.1"
 pymupdf = "^1.25.5"
 opencv-python-headless = "^4.11.0.86"
+google-api-python-client = "^2.170.0"
+google-auth-oauthlib = "^1.2.2"
+google-auth = "^2.40.2"
+boto3 = "^1.38.23"
 
 
 [tool.poetry.group.dev.dependencies]

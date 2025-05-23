@@ -193,7 +193,8 @@ class GoogleDriveConnector(BaseConnector):
                 from google.oauth2.credentials import Credentials
                 from googleapiclient.discovery import build
             except ImportError:
-                raise ImportError("Required Google libraries not installed...")
+                raise ImportError("Google Drive connector requires google-api-python-client, google_auth_oauthlib, and google-auth.\n"
+                    "Install with: pip install google-api-python-client google-auth google_auth_oauthlib.")
 
             scopes = ["https://www.googleapis.com/auth/drive.readonly"]
             creds = None
