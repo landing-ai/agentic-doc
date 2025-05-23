@@ -124,8 +124,7 @@ def test_visualization_config_defaults():
     assert viz_config.font == cv2.FONT_HERSHEY_SIMPLEX
 
     # Check that the color map contains all relevant chunk types
-    # Note: The default color map doesn't include ChunkType.error
-    expected_chunk_types = set(ChunkType) - {ChunkType.error}
+    expected_chunk_types = set(ChunkType)
     for chunk_type in expected_chunk_types:
         assert chunk_type in viz_config.color_map, f"Missing chunk type: {chunk_type}"
 
@@ -138,7 +137,7 @@ def test_visualization_config_custom():
         padding=3,
         font_scale=0.8,
         font=cv2.FONT_HERSHEY_PLAIN,
-        color_map={ChunkType.title: (255, 0, 0), ChunkType.text: (0, 255, 0)},
+        color_map={ChunkType.text: (255, 0, 0), ChunkType.table: (0, 255, 0)},
     )
 
     # Check custom values
@@ -149,8 +148,8 @@ def test_visualization_config_custom():
     assert custom_viz_config.font == cv2.FONT_HERSHEY_PLAIN
 
     # Check that the custom color map contains only the specified chunk types
-    assert custom_viz_config.color_map[ChunkType.title] == (255, 0, 0)
-    assert custom_viz_config.color_map[ChunkType.text] == (0, 255, 0)
+    assert custom_viz_config.color_map[ChunkType.text] == (255, 0, 0)
+    assert custom_viz_config.color_map[ChunkType.table] == (0, 255, 0)
 
 
 def test_visualization_config_validation():

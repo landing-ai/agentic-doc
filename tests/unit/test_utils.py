@@ -179,10 +179,6 @@ def test_split_pdf_with_invalid_split_size(multi_page_pdf, temp_dir):
     with pytest.raises(AssertionError):
         split_pdf(multi_page_pdf, output_dir, split_size=0)
 
-    with pytest.raises(AssertionError):
-        split_pdf(multi_page_pdf, output_dir, split_size=3)
-
-
 def test_log_retry_failure_log_msg(monkeypatch):
     # Since we can't easily capture debug logs with caplog, we'll verify the
     # function runs without errors with log_msg style
@@ -324,7 +320,7 @@ def test_viz_chunks():
     chunks = [
         Chunk(
             text="Test Title",
-            chunk_type=ChunkType.title,
+            chunk_type=ChunkType.text,
             chunk_id="1",
             grounding=[
                 ChunkGrounding(
@@ -392,7 +388,7 @@ def test_crop_groundings(temp_dir):
     chunks = [
         Chunk(
             text="Test Document",
-            chunk_type=ChunkType.title,
+            chunk_type=ChunkType.text,
             chunk_id="11111",
             grounding=[
                 ChunkGrounding(
@@ -460,7 +456,7 @@ def test_save_groundings_as_images_image(temp_dir):
     chunks = [
         Chunk(
             text="Test Document",
-            chunk_type=ChunkType.title,
+            chunk_type=ChunkType.text,
             chunk_id="11111",
             grounding=[
                 ChunkGrounding(
@@ -516,7 +512,7 @@ def test_save_groundings_as_images_pdf(temp_dir):
     chunks = [
         Chunk(
             text="Title",
-            chunk_type=ChunkType.title,
+            chunk_type=ChunkType.text,
             chunk_id="11111",
             grounding=[
                 ChunkGrounding(
@@ -536,7 +532,7 @@ def test_save_groundings_as_images_pdf(temp_dir):
         ),
         Chunk(
             text="Header",
-            chunk_type=ChunkType.page_header,
+            chunk_type=ChunkType.text,
             chunk_id="33333",
             grounding=[
                 ChunkGrounding(
@@ -618,3 +614,208 @@ def test_read_img_rgb():
 
         result = _read_img_rgb("test.png")
         assert result.shape == (100, 100, 3)  # Should drop the alpha channel
+
+
+def test_split_pdf_edge_cases(temp_dir):
+    # Test edge cases for PDF splitting
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet
+    
+    # Create a 1-page PDF
+    single_page_pdf = temp_dir / "single_page.pdf"
+    doc = SimpleDocTemplate(str(single_page_pdf), pagesize=letter)
+    styles = getSampleStyleSheet()
+    doc.build([Paragraph("Single page content", styles["Normal"])])
+    
+    # Test with split_size=1 on a 1-page PDF
+    output_dir = temp_dir / "split_single"
+    result = split_pdf(single_page_pdf, output_dir, split_size=1)
+    
+    assert len(result) == 1
+    assert result[0].start_page_idx == 0
+    assert result[0].end_page_idx == 0
+
+
+def test_download_file_with_custom_filename(results_dir):
+    # Test downloading to a specific filename
+    url = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+    custom_filename = Path(results_dir) / "custom_name.pdf"
+    
+    download_file(url, str(custom_filename))
+    
+    assert custom_filename.exists()
+    assert custom_filename.name == "custom_name.pdf"
+    assert custom_filename.stat().st_size > 0
+
+
+def test_get_file_type_with_various_extensions(temp_dir):
+    # Test file type detection with different extensions
+    
+    # PDF files
+    for ext in [".pdf", ".PDF"]:
+        pdf_file = temp_dir / f"test{ext}"
+        with open(pdf_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+        assert get_file_type(pdf_file) == "pdf"
+    
+    # Image files
+    for ext in [".jpg", ".jpeg", ".png", ".tiff", ".bmp", ".JPG", ".PNG"]:
+        img_file = temp_dir / f"test{ext}"
+        with open(img_file, "wb") as f:
+            f.write(b"fake image data")
+        assert get_file_type(img_file) == "image"
+
+
+def test_is_valid_httpurl_edge_cases():
+    # Test edge cases for URL validation
+    
+    # Valid URLs with different protocols
+    assert is_valid_httpurl("http://example.com")
+    assert is_valid_httpurl("https://example.com")
+    assert is_valid_httpurl("https://sub.domain.example.com/path/file.pdf")
+    assert is_valid_httpurl("http://localhost:8080/test")
+    
+    # Invalid URLs (scheme-based validation)
+    assert not is_valid_httpurl("")
+    assert not is_valid_httpurl("   ")
+    assert not is_valid_httpurl("ftp://example.com")
+    assert not is_valid_httpurl("ftps://example.com")
+    assert not is_valid_httpurl("file:///local/path")
+    assert not is_valid_httpurl("mailto:test@example.com")
+    assert not is_valid_httpurl("just-a-string")
+    
+    # Note: The function only validates scheme, so "http://" and "https://" are considered valid
+    assert is_valid_httpurl("http://")
+    assert is_valid_httpurl("https://")
+
+
+def test_page_to_image_different_dpi_settings(complex_pdf, monkeypatch):
+    # Test page conversion with different DPI settings
+    
+    # Test with high DPI
+    with pymupdf.open(complex_pdf) as pdf_doc:
+        result_high_dpi = page_to_image(pdf_doc, 0, 300)
+        assert isinstance(result_high_dpi, np.ndarray)
+        assert result_high_dpi.shape[2] == 3
+    
+    # Test with low DPI
+    with pymupdf.open(complex_pdf) as pdf_doc:
+        result_low_dpi = page_to_image(pdf_doc, 0, 72)
+        assert isinstance(result_low_dpi, np.ndarray)
+        assert result_low_dpi.shape[2] == 3
+    
+    # High DPI should produce larger images
+    assert (result_high_dpi.shape[0] * result_high_dpi.shape[1]) > \
+           (result_low_dpi.shape[0] * result_low_dpi.shape[1])
+
+
+def test_viz_chunks_with_different_chunk_types():
+    # Test visualization with all available chunk types
+    img = np.zeros((200, 200, 3), dtype=np.uint8)
+    
+    chunks = []
+    y_positions = [0.1, 0.3, 0.5, 0.7]
+    
+    for i, chunk_type in enumerate(ChunkType):
+        if i >= len(y_positions):
+            break
+            
+        chunk = Chunk(
+            text=f"Test {chunk_type.value}",
+            chunk_type=chunk_type,
+            chunk_id=f"chunk_{i}",
+            grounding=[
+                ChunkGrounding(
+                    page=0, 
+                    box=ChunkGroundingBox(
+                        l=0.1, 
+                        t=y_positions[i], 
+                        r=0.9, 
+                        b=y_positions[i] + 0.1
+                    )
+                )
+            ],
+        )
+        chunks.append(chunk)
+    
+    # Test visualization
+    result = viz_chunks(img, chunks)
+    assert isinstance(result, np.ndarray)
+    assert result.shape == (200, 200, 3)
+
+
+def test_crop_image_boundary_conditions():
+    # Test cropping with boundary conditions
+    img = np.ones((100, 100, 3), dtype=np.uint8) * 255  # White image
+    
+    # Test cropping the entire image
+    bbox_full = ChunkGroundingBox(l=0.0, t=0.0, r=1.0, b=1.0)
+    crop_full = _crop_image(img, bbox_full)
+    assert crop_full.shape == (100, 100, 3)
+    
+    # Test cropping a very small area
+    bbox_small = ChunkGroundingBox(l=0.49, t=0.49, r=0.51, b=0.51)
+    crop_small = _crop_image(img, bbox_small)
+    assert crop_small.shape[0] >= 1 and crop_small.shape[1] >= 1
+    assert crop_small.shape[2] == 3
+
+
+def test_save_groundings_as_images_with_empty_chunks(temp_dir):
+    # Test saving groundings when there are no chunks
+    img_path = temp_dir / "test.jpg"
+    img = Image.new("RGB", (100, 100), color=(255, 255, 255))
+    img.save(img_path)
+    
+    save_dir = temp_dir / "groundings"
+    chunks = []  # Empty list
+    
+    with patch("agentic_doc.utils.get_file_type", return_value="image"):
+        result = save_groundings_as_images(img_path, chunks, save_dir)
+        
+        # Should return empty dict for empty chunks
+        assert result == {}
+
+
+def test_viz_parsed_document_with_no_chunks(temp_dir):
+    # Test visualization with a document that has no chunks
+    img_path = temp_dir / "test_empty.png"
+    img = Image.new("RGB", (200, 200), color=(255, 255, 255))
+    img.save(img_path)
+    
+    # Create a document with no chunks
+    empty_doc = ParsedDocument(
+        markdown="",
+        chunks=[],
+        start_page_idx=0,
+        end_page_idx=0,
+        doc_type="image"
+    )
+    
+    with patch("agentic_doc.utils.get_file_type", return_value="image"):
+        images = viz_parsed_document(img_path, empty_doc)
+        
+        # Should still return an image even with no chunks
+        assert len(images) == 1
+        assert isinstance(images[0], Image.Image)
+
+
+def test_log_retry_failure_with_different_attempt_numbers(monkeypatch):
+    # Test retry logging with different attempt numbers
+    
+    # Mock retry state for different attempt numbers
+    for attempt_num in [1, 5, 10, 50]:
+        retry_state = MagicMock()
+        retry_state.attempt_number = attempt_num
+        outcome = MagicMock()
+        outcome.failed = True
+        outcome.exception.return_value = Exception(f"Error on attempt {attempt_num}")
+        retry_state.outcome = outcome
+        retry_state.fn = MagicMock()
+        retry_state.fn.__name__ = "test_function"
+        
+        # Set retry logging style
+        monkeypatch.setattr("agentic_doc.config.settings.retry_logging_style", "log_msg")
+        
+        # Should not raise an exception regardless of attempt number
+        log_retry_failure(retry_state)

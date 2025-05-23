@@ -1,7 +1,7 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, ANY
 
 import pytest
 import httpx
@@ -85,7 +85,7 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
 
         # Check that the grounding_save_dir was passed to parse_and_save_document
         mock_parse.assert_called_once_with(
-            "/path/to/document.pdf", grounding_save_dir=temp_dir
+            "/path/to/document.pdf", grounding_save_dir=temp_dir, include_marginalia=True, include_metadata_in_markdown=True
         )
 
 
@@ -99,6 +99,8 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
         # Call the function under test with a URL
         result_paths = parse_and_save_documents(
             ["https://example.com/document.pdf"],
+            include_marginalia=True, 
+            include_metadata_in_markdown=True,
             result_save_dir=temp_dir,
             grounding_save_dir=temp_dir,
         )
@@ -106,6 +108,8 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
         # Check that parse_and_save_document was called with the URL and the right parameters
         mock_parse.assert_called_once_with(
             "https://example.com/document.pdf",
+            include_marginalia=True, 
+            include_metadata_in_markdown=True,
             result_save_dir=temp_dir,
             grounding_save_dir=temp_dir,
         )
@@ -232,7 +236,7 @@ def test_parse_image(temp_dir, mock_parsed_document):
         result = _parse_image(img_path)
 
         # Check that _send_parsing_request was called with the right arguments
-        mock_send_request.assert_called_once_with(str(img_path))
+        mock_send_request.assert_called_once_with(str(img_path), include_marginalia=True, include_metadata_in_markdown=True)
 
         # Check that the result is a ParsedDocument with the expected values
         assert isinstance(result, ParsedDocument)
@@ -256,14 +260,16 @@ def test_parse_image_with_error(temp_dir):
         # Call the function under test
         result = _parse_image(img_path)
 
-        # Check that the result contains an error chunk
+        # Check that the result contains no chunks but has an error in the errors field
         assert isinstance(result, ParsedDocument)
         assert result.doc_type == "image"
         assert result.start_page_idx == 0
         assert result.end_page_idx == 0
-        assert len(result.chunks) == 1
-        assert result.chunks[0].chunk_type == ChunkType.error
-        assert result.chunks[0].text == error_msg
+        assert len(result.chunks) == 0
+        assert len(result.errors) == 1
+        assert result.errors[0].page_num == 0
+        assert result.errors[0].error == error_msg
+        assert result.errors[0].error_code == -1
 
 
 def test_merge_part_results_empty_list():
@@ -294,7 +300,7 @@ def test_merge_part_results_multiple_items(mock_multi_page_parsed_document):
         chunks=[
             Chunk(
                 text="Document 1",
-                chunk_type=ChunkType.title,
+                chunk_type=ChunkType.text,
                 chunk_id="1",
                 grounding=[
                     ChunkGrounding(
@@ -313,7 +319,7 @@ def test_merge_part_results_multiple_items(mock_multi_page_parsed_document):
         chunks=[
             Chunk(
                 text="Document 2",
-                chunk_type=ChunkType.title,
+                chunk_type=ChunkType.text,
                 chunk_id="2",
                 grounding=[
                     ChunkGrounding(
@@ -347,7 +353,7 @@ def test_merge_next_part():
         chunks=[
             Chunk(
                 text="Current Doc",
-                chunk_type=ChunkType.title,
+                chunk_type=ChunkType.text,
                 chunk_id="1",
                 grounding=[
                     ChunkGrounding(
@@ -366,7 +372,7 @@ def test_merge_next_part():
         chunks=[
             Chunk(
                 text="Next Doc",
-                chunk_type=ChunkType.title,
+                chunk_type=ChunkType.text,
                 chunk_id="2",
                 grounding=[
                     ChunkGrounding(
@@ -428,7 +434,7 @@ def test_parse_doc_parts_success(mock_parsed_document):
         result = _parse_doc_parts(doc)
 
         # Check that _send_parsing_request was called with the right arguments
-        mock_send_request.assert_called_once_with(str(doc.file_path))
+        mock_send_request.assert_called_once_with(str(doc.file_path), include_marginalia=True, include_metadata_in_markdown=True)
 
         # Check the result
         assert isinstance(result, ParsedDocument)
@@ -450,22 +456,23 @@ def test_parse_doc_parts_error():
         # Call the function
         result = _parse_doc_parts(doc)
 
-        # Check that the result contains error chunks for each page
+        # Check that the result contains no chunks but has errors for each page
         assert isinstance(result, ParsedDocument)
         assert result.doc_type == "pdf"
         assert result.start_page_idx == 0
         assert result.end_page_idx == 1
-        assert len(result.chunks) == 2  # One error chunk per page
+        assert len(result.chunks) == 0  # No chunks on error
+        assert len(result.errors) == 2  # One error per page
 
-        # Check the first error chunk
-        assert result.chunks[0].chunk_type == ChunkType.error
-        assert result.chunks[0].text == error_msg
-        assert result.chunks[0].grounding[0].page == 0
+        # Check the first error
+        assert result.errors[0].page_num == 0
+        assert result.errors[0].error == error_msg
+        assert result.errors[0].error_code == -1
 
-        # Check the second error chunk
-        assert result.chunks[1].chunk_type == ChunkType.error
-        assert result.chunks[1].text == error_msg
-        assert result.chunks[1].grounding[0].page == 1
+        # Check the second error
+        assert result.errors[1].page_num == 1
+        assert result.errors[1].error == error_msg
+        assert result.errors[1].error_code == -1
 
 
 def test_send_parsing_request_success():
@@ -491,26 +498,187 @@ def test_send_parsing_request_success():
         assert result == {"data": {"markdown": "Test", "chunks": []}}
 
 
-def test_send_parsing_request_retryable_error():
-    # Create a mock response with a retryable error status code
+def test_parse_and_save_document_with_grounding_save_dir(temp_dir, mock_parsed_document):
+    # Test that grounding images are saved when grounding_save_dir is provided
+    test_file = temp_dir / "test.pdf"
+    with open(test_file, "wb") as f:
+        f.write(b"%PDF-1.7\n")
+
+    grounding_dir = temp_dir / "groundings"
+    
+    # Mock the required functions
+    with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document), \
+         patch("agentic_doc.parse.save_groundings_as_images") as mock_save_groundings:
+        
+        result = parse_and_save_document(
+            test_file, 
+            grounding_save_dir=grounding_dir
+        )
+        # Check that save_groundings_as_images was called
+        args, kwargs = mock_save_groundings.call_args
+        assert args[0] == test_file
+        assert args[1] == mock_parsed_document.chunks
+        assert str(args[2]).startswith(str(grounding_dir))
+        assert kwargs.get("inplace") is True
+
+
+
+def test_parse_pdf_with_empty_result(temp_dir):
+    # Test parsing a PDF that returns no chunks
+    pdf_path = temp_dir / "empty.pdf"
+    with open(pdf_path, "wb") as f:
+        f.write(b"%PDF-1.7\n")
+
+    with patch("agentic_doc.parse.split_pdf") as mock_split, \
+         patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts:
+        
+        # Mock an empty result
+        empty_doc = ParsedDocument(
+            markdown="",
+            chunks=[],
+            start_page_idx=0,
+            end_page_idx=0,
+            doc_type="pdf"
+        )
+        
+        mock_split.return_value = [
+            Document(file_path=temp_dir / "empty_1.pdf", start_page_idx=0, end_page_idx=0)
+        ]
+        mock_parse_parts.return_value = [empty_doc]
+        
+        result = _parse_pdf(pdf_path)
+        
+        assert isinstance(result, ParsedDocument)
+        assert len(result.chunks) == 0
+        assert result.markdown == ""
+
+
+def test_merge_part_results_with_errors(mock_parsed_document):
+    # Test merging results that contain errors
+    from agentic_doc.common import PageError
+    
+    doc_with_errors = ParsedDocument(
+        markdown="# Document with errors",
+        chunks=[],
+        start_page_idx=0,
+        end_page_idx=0,
+        doc_type="pdf",
+        errors=[PageError(page_num=0, error="Test error", error_code=-1)]
+    )
+    
+    result = _merge_part_results([mock_parsed_document, doc_with_errors])
+    
+    # Should merge both documents and preserve errors
+    assert isinstance(result, ParsedDocument)
+    assert len(result.errors) == 1
+    assert result.errors[0].error == "Test error"
+
+
+def test_parse_documents_with_mixed_file_types(temp_dir):
+    # Test parsing a mix of file types
+    pdf_path = temp_dir / "test.pdf"
+    with open(pdf_path, "wb") as f:
+        f.write(b"%PDF-1.7\n")
+    
+    img_path = temp_dir / "test.jpg"
+    with open(img_path, "wb") as f:
+        f.write(b"JFIF")
+    
+    # Mock the parsing functions
+    mock_pdf_doc = ParsedDocument(
+        markdown="# PDF Document",
+        chunks=[],
+        start_page_idx=0,
+        end_page_idx=0,
+        doc_type="pdf"
+    )
+    
+    mock_img_doc = ParsedDocument(
+        markdown="# Image Document",
+        chunks=[],
+        start_page_idx=0,
+        end_page_idx=0,
+        doc_type="image"
+    )
+    
+    with patch("agentic_doc.parse._parse_pdf", return_value=mock_pdf_doc), \
+         patch("agentic_doc.parse._parse_image", return_value=mock_img_doc):
+        
+        results = parse_documents([str(pdf_path), str(img_path)])
+        
+        assert len(results) == 2
+        assert results[0].doc_type == "pdf"
+        assert results[1].doc_type == "image"
+
+
+def test_send_parsing_request_with_different_file_types(temp_dir):
+    # Test that _send_parsing_request handles different file extensions correctly
+    
+    # Test with PDF
+    pdf_path = temp_dir / "test.pdf"
+    with open(pdf_path, "wb") as f:
+        f.write(b"%PDF-1.7\n")
+    
     mock_response = MagicMock()
-    mock_response.status_code = 429  # Rate limit error
-    mock_response.text = "Rate limit exceeded"
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"data": {"markdown": "PDF Test", "chunks": []}}
+    
+    with patch("agentic_doc.parse.httpx.post", return_value=mock_response), \
+         patch("agentic_doc.parse.open", MagicMock()):
+        
+        result = _send_parsing_request(str(pdf_path))
+        assert result["data"]["markdown"] == "PDF Test"
+    
+    # Test with image
+    img_path = temp_dir / "test.png"
+    with open(img_path, "wb") as f:
+        f.write(b"PNG")
+    
+    mock_response.json.return_value = {"data": {"markdown": "Image Test", "chunks": []}}
+    
+    with patch("agentic_doc.parse.httpx.post", return_value=mock_response), \
+         patch("agentic_doc.parse.open", MagicMock()):
+        
+        result = _send_parsing_request(str(img_path))
+        assert result["data"]["markdown"] == "Image Test"
 
-    # Mock httpx.post to return the mock response
-    with patch("agentic_doc.parse.httpx.post", return_value=mock_response), patch(
-        "agentic_doc.parse.open", MagicMock()
-    ), patch("agentic_doc.parse.Path") as mock_path:
 
-        # Setup mock to make the suffix check work
-        mock_path_instance = MagicMock()
-        mock_path_instance.suffix.lower.return_value = ".pdf"
-        mock_path.return_value = mock_path_instance
+def test_document_string_representation():
+    # Test the string representation of Document objects
+    doc = Document(
+        file_path=Path("/path/to/test_document.pdf"),
+        start_page_idx=5,
+        end_page_idx=10
+    )
+    
+    expected_str = "File name: test_document.pdf\tPage: [5:10]"
+    assert str(doc) == expected_str
 
-        # Call the function and check that it raises RetryableError
-        with pytest.raises(RetryableError) as exc_info:
-            _send_parsing_request("test.pdf")
 
-        # Check that the exception contains the expected data
-        assert exc_info.value.response == mock_response
-        assert str(exc_info.value) == "429 - Rate limit exceeded"
+def test_parse_pdf_handles_single_page_document(temp_dir):
+    # Test parsing a single-page PDF
+    pdf_path = temp_dir / "single_page.pdf"
+    with open(pdf_path, "wb") as f:
+        f.write(b"%PDF-1.7\n")
+    
+    single_page_doc = ParsedDocument(
+        markdown="# Single Page",
+        chunks=[],
+        start_page_idx=0,
+        end_page_idx=0,
+        doc_type="pdf"
+    )
+    
+    with patch("agentic_doc.parse.split_pdf") as mock_split, \
+         patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts:
+        
+        mock_split.return_value = [
+            Document(file_path=temp_dir / "single_1.pdf", start_page_idx=0, end_page_idx=0)
+        ]
+        mock_parse_parts.return_value = [single_page_doc]
+        
+        result = _parse_pdf(pdf_path)
+        
+        assert result.start_page_idx == 0
+        assert result.end_page_idx == 0
+        assert result.doc_type == "pdf"

@@ -19,16 +19,10 @@ from agentic_doc.common import (
 
 def test_chunk_type_enum():
     # Test all the enumeration values
-    assert ChunkType.title == "title"
-    assert ChunkType.page_header == "page_header"
-    assert ChunkType.page_footer == "page_footer"
-    assert ChunkType.page_number == "page_number"
-    assert ChunkType.key_value == "key_value"
-    assert ChunkType.form == "form"
     assert ChunkType.table == "table"
     assert ChunkType.figure == "figure"
     assert ChunkType.text == "text"
-    assert ChunkType.error == "error"
+    assert ChunkType.marginalia == "marginalia"
 
 
 def test_chunk_grounding_box():
@@ -65,9 +59,7 @@ def test_chunk_grounding():
     grounding_with_image = ChunkGrounding(page=0, box=box, image_path=image_path)
     assert grounding_with_image.image_path == image_path
 
-    # Test with None box
-    grounding_no_box = ChunkGrounding(page=0, box=None)
-    assert grounding_no_box.box is None
+    # Note: box field is required in ChunkGrounding, so we can't test with None box
 
     # Test serialization/deserialization
     grounding_dict = grounding.model_dump()
@@ -84,7 +76,7 @@ def test_chunk():
     chunk = Chunk(
         text="Test Text",
         grounding=[grounding],
-        chunk_type=ChunkType.title,
+        chunk_type=ChunkType.text,
         chunk_id="123",
     )
 
@@ -92,7 +84,7 @@ def test_chunk():
     assert chunk.text == "Test Text"
     assert len(chunk.grounding) == 1
     assert chunk.grounding[0] == grounding
-    assert chunk.chunk_type == ChunkType.title
+    assert chunk.chunk_type == ChunkType.text
     assert chunk.chunk_id == "123"
 
     # Test creating a Chunk with multiple groundings
@@ -105,11 +97,7 @@ def test_chunk():
     )
     assert len(chunk_multi.grounding) == 2
 
-    # Test creating a Chunk with no chunk_id
-    chunk_no_id = Chunk(
-        text="No ID", grounding=[grounding], chunk_type=ChunkType.text, chunk_id=None
-    )
-    assert chunk_no_id.chunk_id is None
+    # Note: chunk_id is required in the Chunk model, so we can't test with None
 
     # Test serialization/deserialization
     chunk_dict = chunk.model_dump()
@@ -120,20 +108,20 @@ def test_chunk():
     assert len(chunk2.grounding) == len(chunk.grounding)
 
 
-def test_error_chunk():
-    # Test creating an error chunk
+def test_page_error():
+    # Test creating a PageError
+    from agentic_doc.common import PageError
+    
     error_msg = "Test error message"
-    page_idx = 42
+    page_num = 42
+    error_code = -1
 
-    error_chunk = Chunk.error_chunk(error_msg, page_idx)
+    page_error = PageError(page_num=page_num, error=error_msg, error_code=error_code)
 
-    # Check the error chunk
-    assert error_chunk.text == error_msg
-    assert error_chunk.chunk_type == ChunkType.error
-    assert error_chunk.chunk_id is None
-    assert len(error_chunk.grounding) == 1
-    assert error_chunk.grounding[0].page == page_idx
-    assert error_chunk.grounding[0].box is None
+    # Check the error
+    assert page_error.page_num == page_num
+    assert page_error.error == error_msg
+    assert page_error.error_code == error_code
 
 
 def test_parsed_document():
@@ -143,7 +131,7 @@ def test_parsed_document():
     grounding2 = ChunkGrounding(page=1, box=box)
 
     chunk1 = Chunk(
-        text="Title", grounding=[grounding1], chunk_type=ChunkType.title, chunk_id="1"
+        text="Title", grounding=[grounding1], chunk_type=ChunkType.text, chunk_id="1"
     )
 
     chunk2 = Chunk(
