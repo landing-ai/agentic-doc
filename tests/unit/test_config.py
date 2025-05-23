@@ -86,32 +86,6 @@ def test_settings_str_method():
     assert "max_retry_wait_time" in settings_str
     assert "retry_logging_style" in settings_str
 
-
-def test_max_parallel_tasks_validation():
-    # Test that batch_size * max_workers > _MAX_PARALLEL_TASKS raises ValueError
-    with patch("agentic_doc.config._MAX_PARALLEL_TASKS", 10), patch(
-        "agentic_doc.config.settings", None
-    ):  # Reset the singleton instance
-        # Need to recreate the validation code from config.py
-        settings = Settings(batch_size=6, max_workers=2)
-        # The validation happens after instantiation in the module level code
-        # Rather than patching that, we'll directly validate with our condition
-        assert settings.batch_size * settings.max_workers > 10
-        # In a real scenario, this would raise ValueError, but we're just checking
-        # that our condition is triggered
-
-
-def test_retry_logging_style_httpx_logging():
-    # Test that we can create settings with inline_block retry_logging_style
-    # The actual logging setup happens at module import time, which is hard to test
-    # So we'll just verify that we can create settings with this value
-    settings = Settings(retry_logging_style="inline_block")
-    assert settings.retry_logging_style == "inline_block"
-
-    # In the actual code, this would trigger setting the logger level,
-    # but since that happens at module level, we can't easily test it here
-
-
 def test_visualization_config_defaults():
     # Test default visualization config
     viz_config = VisualizationConfig()

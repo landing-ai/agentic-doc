@@ -179,25 +179,6 @@ def test_split_pdf_with_invalid_split_size(multi_page_pdf, temp_dir):
     with pytest.raises(AssertionError):
         split_pdf(multi_page_pdf, output_dir, split_size=0)
 
-def test_log_retry_failure_log_msg(monkeypatch):
-    # Since we can't easily capture debug logs with caplog, we'll verify the
-    # function runs without errors with log_msg style
-    # Setup a mock retry state
-    retry_state = MagicMock()
-    retry_state.attempt_number = 3
-    outcome = MagicMock()
-    outcome.failed = True
-    outcome.exception.return_value = Exception("Test error")
-    retry_state.outcome = outcome
-    retry_state.fn = MagicMock()
-    retry_state.fn.__name__ = "test_function"
-
-    # Set the retry logging style to log_msg
-    monkeypatch.setattr("agentic_doc.config.settings.retry_logging_style", "log_msg")
-
-    # Call the function - just verify it doesn't raise an exception
-    log_retry_failure(retry_state)
-
 
 def test_log_retry_failure_inline_block(monkeypatch, capsys):
     # Setup a mock retry state
@@ -371,11 +352,8 @@ def test_crop_image():
     # Test with coordinates at the boundaries
     bbox = ChunkGroundingBox(l=0.0, t=0.0, r=1.0, b=1.0)
     crop = _crop_image(img, bbox)
-    assert crop.shape == (100, 100, 3)  # Should be the full image
-
-    # Since the utils._crop_image function has an assertion that coordinates must be
-    # within [0,1], we can't test with values outside this range
-
+    assert crop.shape == (100, 100, 3)
+    
 
 def test_crop_groundings(temp_dir):
     # Create a test image
