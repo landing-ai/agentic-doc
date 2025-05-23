@@ -1,18 +1,18 @@
 import json
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from pydantic_core import Url
-import httpx
 
-from agentic_doc.parse import (
-    parse_and_save_documents,
-    parse_documents,
-    parse_and_save_document,
-)
 from agentic_doc.common import ChunkType, ParsedDocument
 from agentic_doc.config import settings
+from agentic_doc.parse import (
+    parse_and_save_document,
+    parse_and_save_documents,
+    parse_documents,
+)
 
 
 def test_parse_and_save_documents_multiple_inputs(sample_image_path, results_dir):
@@ -77,9 +77,9 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
     for i in range(1, len(parsed_doc.chunks)):
         prev_page = parsed_doc.chunks[i - 1].grounding[0].page
         curr_page = parsed_doc.chunks[i].grounding[0].page
-        assert curr_page >= prev_page, (
-            f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
-        )
+        assert (
+            curr_page >= prev_page
+        ), f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
 
     # Verify that there were no errors
     assert len(parsed_doc.errors) == 0
@@ -178,9 +178,7 @@ def test_parse_multipage_pdf(multi_page_pdf, results_dir):
 
     # Check that there are chunks from multiple pages
     page_indices = set(
-        grounding.page
-        for chunk in parsed_doc.chunks
-        for grounding in chunk.grounding
+        grounding.page for chunk in parsed_doc.chunks for grounding in chunk.grounding
     )
 
     # There should be at least 2 pages with content
@@ -224,7 +222,7 @@ def test_parse_complex_pdf_with_table_and_image(complex_pdf, results_dir):
 
     # Check that there are multiple text chunks (since the PDF has multiple text sections)
     assert type_counts.get(ChunkType.text, 0) >= 1, "Expected at least one text chunk"
-    
+
     # Check that there is at least one table chunk
     assert type_counts.get(ChunkType.table, 0) >= 1, "Expected at least one table chunk"
 
@@ -270,9 +268,7 @@ def test_parse_multiple_documents_batch(
         assert len(parsed_doc.chunks) > 0
 
         # Check for non-error chunks
-        non_error_chunks = [
-            c for c in parsed_doc.chunks
-        ]
+        non_error_chunks = [c for c in parsed_doc.chunks]
         assert len(non_error_chunks) > 0, f"Document {i} has only error chunks"
 
     # Make sure we got the expected mix of document types
@@ -280,7 +276,9 @@ def test_parse_multiple_documents_batch(
     assert "image" in file_types
 
 
-def test_parse_documents_error_handling_mixed_valid_invalid(sample_image_path, results_dir):
+def test_parse_documents_error_handling_mixed_valid_invalid(
+    sample_image_path, results_dir
+):
     # Test parsing a mix of valid and invalid document paths
     input_files = [
         sample_image_path,  # Valid image
@@ -305,13 +303,13 @@ def test_parse_pdf_chunks_have_sequential_pages(sample_pdf_path, results_dir):
         data = json.load(f)
 
     parsed_doc = ParsedDocument.model_validate(data)
-    
+
     # Collect all page numbers from chunks
     all_page_numbers = []
     for chunk in parsed_doc.chunks:
         for grounding in chunk.grounding:
             all_page_numbers.append(grounding.page)
-    
+
     # Pages should be in order and start from 0
     unique_pages = sorted(set(all_page_numbers))
     assert unique_pages[0] == 0
@@ -331,7 +329,7 @@ def test_parse_documents_markdown_not_empty(sample_image_path, results_dir):
         data = json.load(f)
 
     parsed_doc = ParsedDocument.model_validate(data)
-    
+
     # Markdown should not be empty for a valid document
     assert parsed_doc.markdown.strip() != ""
     assert len(parsed_doc.markdown) > 0
@@ -350,13 +348,13 @@ def test_parse_documents_chunk_ids_unique(multi_page_pdf, results_dir):
         data = json.load(f)
 
     parsed_doc = ParsedDocument.model_validate(data)
-    
+
     # Collect all chunk IDs
     chunk_ids = [chunk.chunk_id for chunk in parsed_doc.chunks]
-    
+
     # All chunk IDs should be unique
     assert len(chunk_ids) == len(set(chunk_ids)), "Found duplicate chunk IDs"
-    
+
     # All chunk IDs should be non-empty strings
     for chunk_id in chunk_ids:
         assert isinstance(chunk_id, str)
@@ -376,17 +374,17 @@ def test_parse_documents_grounding_boxes_valid(sample_image_path, results_dir):
         data = json.load(f)
 
     parsed_doc = ParsedDocument.model_validate(data)
-    
+
     for chunk in parsed_doc.chunks:
         for grounding in chunk.grounding:
             box = grounding.box
-            
+
             # All coordinates should be between 0 and 1
             assert 0 <= box.l <= 1, f"Invalid left coordinate: {box.l}"
             assert 0 <= box.t <= 1, f"Invalid top coordinate: {box.t}"
             assert 0 <= box.r <= 1, f"Invalid right coordinate: {box.r}"
             assert 0 <= box.b <= 1, f"Invalid bottom coordinate: {box.b}"
-            
+
             # Right should be greater than left, bottom should be greater than top
             assert box.r > box.l, f"Right ({box.r}) should be > left ({box.l})"
             assert box.b > box.t, f"Bottom ({box.b}) should be > top ({box.t})"

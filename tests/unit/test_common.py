@@ -1,18 +1,18 @@
 import time
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-import pytest
 import httpx
+import pytest
 
 from agentic_doc.common import (
-    ChunkType,
-    ChunkGroundingBox,
-    ChunkGrounding,
     Chunk,
+    ChunkGrounding,
+    ChunkGroundingBox,
+    ChunkType,
+    Document,
     ParsedDocument,
     RetryableError,
-    Document,
     Timer,
 )
 
@@ -111,7 +111,7 @@ def test_chunk():
 def test_page_error():
     # Test creating a PageError
     from agentic_doc.common import PageError
-    
+
     error_msg = "Test error message"
     page_num = 42
     error_code = -1

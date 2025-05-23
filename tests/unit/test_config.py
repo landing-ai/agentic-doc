@@ -1,17 +1,17 @@
-import os
 import json
-from unittest.mock import patch, MagicMock
+import os
+from unittest.mock import MagicMock, patch
 
-import pytest
 import cv2
+import pytest
 
+from agentic_doc.common import ChunkType
 from agentic_doc.config import (
-    Settings,
-    VisualizationConfig,
     _COLOR_MAP,
     _MAX_PARALLEL_TASKS,
+    Settings,
+    VisualizationConfig,
 )
-from agentic_doc.common import ChunkType
 
 
 def test_default_config():
@@ -85,6 +85,7 @@ def test_settings_str_method():
     assert "max_retries" in settings_str
     assert "max_retry_wait_time" in settings_str
     assert "retry_logging_style" in settings_str
+
 
 def test_visualization_config_defaults():
     # Test default visualization config

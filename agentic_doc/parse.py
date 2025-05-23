@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Union, cast
+from typing import Any, List, Optional, Union, cast
 
 import httpx
 import structlog
@@ -21,6 +21,15 @@ from agentic_doc.common import (
     Timer,
 )
 from agentic_doc.config import settings
+from agentic_doc.connectors import (
+    BaseConnector,
+    ConnectorConfig,
+    GoogleDriveConnectorConfig,
+    LocalConnectorConfig,
+    S3ConnectorConfig,
+    URLConnectorConfig,
+    create_connector,
+)
 from agentic_doc.utils import (
     download_file,
     get_file_type,
@@ -33,6 +42,138 @@ from agentic_doc.utils import (
 _LOGGER = structlog.getLogger(__name__)
 _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
+
+
+def parse(
+    documents: Union[
+        str, Path, Url, List[Union[str, Path, Url]], BaseConnector, ConnectorConfig
+    ],
+    *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
+    result_save_dir: Optional[Union[str, Path]] = None,
+    grounding_save_dir: Optional[Union[str, Path]] = None,
+    connector_path: Optional[str] = None,
+    connector_pattern: Optional[str] = None,
+) -> Union[ParsedDocument, List[ParsedDocument], List[Path]]:
+    """
+    Universal parse function that can handle single documents, lists of documents,
+    or documents from various connectors.
+
+    Args:
+        documents: Can be:
+            - Single document path/URL (str, Path, Url)
+            - List of document paths/URLs
+            - Connector instance (BaseConnector)
+            - Connector configuration (ConnectorConfig)
+        include_marginalia: Whether to include marginalia in the analysis
+        include_metadata_in_markdown: Whether to include metadata in markdown output
+        result_save_dir: Directory to save results (if provided, returns file paths)
+        grounding_save_dir: Directory to save grounding images
+        connector_path: Path for connector to search (when using connectors)
+        connector_pattern: Pattern to filter files (when using connectors)
+
+    Returns:
+        - Single ParsedDocument (if single document and no result_save_dir)
+        - List[ParsedDocument] (if multiple documents and no result_save_dir)
+        - List[Path] (if result_save_dir is provided)
+    """
+    # Handle connector-based parsing
+    if isinstance(documents, (BaseConnector, ConnectorConfig)):
+        connector = (
+            documents
+            if isinstance(documents, BaseConnector)
+            else create_connector(documents)
+        )
+
+        # Get list of files from connector
+        file_list = connector.list_files(connector_path, connector_pattern)
+
+        if not file_list:
+            _LOGGER.warning("No files found with the specified connector")
+            return [] if result_save_dir else []
+
+        # Download files and get local paths
+        local_paths = []
+        for file_id in file_list:
+            try:
+                local_path = connector.download_file(file_id)
+                local_paths.append(local_path)
+            except Exception as e:
+                _LOGGER.error(f"Failed to download file {file_id}: {e}")
+                continue
+
+        if not local_paths:
+            _LOGGER.warning("No files were successfully downloaded")
+            return [] if result_save_dir else []
+
+        # Parse the downloaded files
+        return _parse_document_list(
+            local_paths,
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+            result_save_dir=result_save_dir,
+            grounding_save_dir=grounding_save_dir,
+        )
+
+    # Handle single document
+    elif isinstance(documents, (str, Path, Url)):
+        if result_save_dir:
+            result = parse_and_save_document(
+                documents,
+                include_marginalia=include_marginalia,
+                include_metadata_in_markdown=include_metadata_in_markdown,
+                result_save_dir=result_save_dir,
+                grounding_save_dir=grounding_save_dir,
+            )
+            return [result] if isinstance(result, Path) else result
+        else:
+            result = parse_and_save_document(
+                documents,
+                include_marginalia=include_marginalia,
+                include_metadata_in_markdown=include_metadata_in_markdown,
+                grounding_save_dir=grounding_save_dir,
+            )
+            return result
+
+    # Handle list of documents
+    elif isinstance(documents, list):
+        return _parse_document_list(
+            documents,
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+            result_save_dir=result_save_dir,
+            grounding_save_dir=grounding_save_dir,
+        )
+
+    else:
+        raise ValueError(f"Unsupported documents type: {type(documents)}")
+
+
+def _parse_document_list(
+    documents: List[Union[str, Path, Url]],
+    *,
+    include_marginalia: bool = True,
+    include_metadata_in_markdown: bool = True,
+    result_save_dir: Optional[Union[str, Path]] = None,
+    grounding_save_dir: Optional[Union[str, Path]] = None,
+) -> Union[List[ParsedDocument], List[Path]]:
+    """Helper function to parse a list of documents."""
+    if result_save_dir:
+        return parse_and_save_documents(
+            documents,
+            result_save_dir=result_save_dir,
+            grounding_save_dir=grounding_save_dir,
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+        )
+    else:
+        return parse_documents(
+            documents,
+            include_marginalia=include_marginalia,
+            include_metadata_in_markdown=include_metadata_in_markdown,
+            grounding_save_dir=grounding_save_dir,
+        )
 
 
 def parse_documents(
@@ -160,7 +301,6 @@ def parse_and_save_document(
             save_groundings_as_images(
                 document, result.chunks, grounding_save_dir, inplace=True
             )
-
         if not result_save_dir:
             return result
 
