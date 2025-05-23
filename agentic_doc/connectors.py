@@ -221,9 +221,7 @@ class GoogleDriveConnector(BaseConnector):
                         )
                         creds = flow.run_local_server(port=0)
                     else:
-                        raise ValueError(
-                            "client_secret_file must be provided"
-                        )
+                        raise ValueError("client_secret_file must be provided")
 
                 # Save credentials for next time
                 with open("token.json", "w") as token:
@@ -347,7 +345,7 @@ class S3Connector(BaseConnector):
     def _get_client(self) -> S3Client:
         """Initialize S3 client if not already done."""
         if self._client is None:
-            if 'boto3' not in sys.modules:
+            if "boto3" not in sys.modules:
                 raise ImportError(
                     "S3 connector requires boto3. Install with: pip install boto3"
                 )
