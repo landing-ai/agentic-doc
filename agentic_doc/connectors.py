@@ -20,9 +20,6 @@ if TYPE_CHECKING:
         Resource = Any
         MediaDownload = Any
 
-    try:
-        import boto3
-
         S3Client = Any
     except ImportError:
         S3Client = Any
@@ -146,15 +143,7 @@ class LocalConnector(BaseConnector):
         if pattern:
             files = list(search_path.glob(pattern))
         else:
-            patterns = [
-                "*.pdf",
-                "*.png",
-                "*.jpg",
-                "*.jpeg",
-                "*.gif",
-                "*.bmp",
-                "*.tiff",
-            ]  # TODO: Find all supported patterns
+            patterns = ["*.pdf", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.tiff"] # TODO: Find all supported patterns
             files = []
             for pat in patterns:
                 files.extend(search_path.glob(pat))
@@ -191,7 +180,7 @@ class GoogleDriveConnector(BaseConnector):
         super().__init__(config)
         self.config: GoogleDriveConnectorConfig = config
         self._service: Optional[Resource] = None
-
+            
     def _get_service(self) -> Resource:
         """Initialize Google Drive service with user-friendly OAuth."""
         if self._service is None:
@@ -201,18 +190,16 @@ class GoogleDriveConnector(BaseConnector):
                 from google.oauth2.credentials import Credentials
                 from googleapiclient.discovery import build
             except ImportError:
-                raise ImportError(
-                    "Google Drive connector requires google-api-python-client, google_auth_oauthlib, and google-auth.\n"
-                    "Install with: pip install google-api-python-client google-auth google_auth_oauthlib."
-                )
+                raise ImportError("Google Drive connector requires google-api-python-client, google-auth-oauthlib, and google-auth.\n"
+                    "Install with: pip install google-api-python-client google-auth google-auth-oauthlib.")
 
             scopes = ["https://www.googleapis.com/auth/drive.readonly"]
             creds = None
-
+            
             # Check if we have stored credentials
-            if os.path.exists("token.json"):
-                creds = Credentials.from_authorized_user_file("token.json", scopes)
-
+            if os.path.exists('token.json'):
+                creds = Credentials.from_authorized_user_file('token.json', scopes)
+            
             # If there are no (valid) credentials available, let the user log in
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
@@ -235,12 +222,12 @@ class GoogleDriveConnector(BaseConnector):
                         raise ValueError(
                             "Either service_account_file, credentials_json, or client_secret_file must be provided"
                         )
-
+                    
                 # Save credentials for next time
-                with open("token.json", "w") as token:
+                with open('token.json', 'w') as token:
                     token.write(creds.to_json())
 
-            self._service = build("drive", "v3", credentials=creds)
+            self._service = build('drive', 'v3', credentials=creds)
         return self._service
 
     def list_files(

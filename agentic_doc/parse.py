@@ -24,10 +24,6 @@ from agentic_doc.config import settings
 from agentic_doc.connectors import (
     BaseConnector,
     ConnectorConfig,
-    GoogleDriveConnectorConfig,
-    LocalConnectorConfig,
-    S3ConnectorConfig,
-    URLConnectorConfig,
     create_connector,
 )
 from agentic_doc.utils import (
