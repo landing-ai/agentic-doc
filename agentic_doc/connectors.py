@@ -119,14 +119,14 @@ class BaseConnector(ABC):
         self, path: Optional[str] = None, pattern: Optional[str] = None
     ) -> List[str]:
         """
-        List files available through this connector.
+        List available files from the connector.
 
         Args:
-            path: Optional path to list files from
-            pattern: Optional pattern to filter files (pathlib-like glob pattern, works for all connectors except URLs)
+            path: Optional base path to list files from.
+            pattern: Optional glob-style pattern to filter results (ignored for URL connectors).
 
         Returns:
-            List of file identifiers/paths
+            A list of file identifiers or paths.
         """
         pass
 
