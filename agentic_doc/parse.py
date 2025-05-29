@@ -388,7 +388,7 @@ def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
             start_page_idx=0,
             end_page_idx=0,
             doc_type="pdf",
-            result_path=Path(),
+            result_path=None,
         )
 
     init_result = copy.deepcopy(results[0])
