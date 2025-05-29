@@ -53,6 +53,47 @@ class TestLocalConnector:
         assert len(files) == 2
         assert all(f.endswith(".pdf") for f in files)
 
+    def test_list_files_recursive(self, temp_dir):
+        """Test listing files with a pattern."""
+        (temp_dir / "doc1.pdf").touch()
+        (temp_dir / "doc2.pdf").touch()
+        (temp_dir / "image1.png").touch()
+        (temp_dir / "subdir1").mkdir()
+        (temp_dir / "subdir1" / "doc3.pdf").touch()
+        (temp_dir / "subdir1" / "doc4.pdf").touch()
+        (temp_dir / "subdir1" / "image2.png").touch()
+        (temp_dir / "subdir1" / "subdir2").mkdir()
+        (temp_dir / "subdir1" / "subdir2" / "image3.png").touch()
+        (temp_dir / "subdir1" / "subdir2" / "doc5.pdf").touch()
+
+        config = LocalConnectorConfig(recursive=True)
+        connector = LocalConnector(config)
+
+        files = connector.list_files(str(temp_dir))
+
+        assert len(files) == 8
+
+    def test_list_files_recursive_with_pattern(self, temp_dir):
+        """Test listing files with a pattern."""
+        (temp_dir / "doc1.pdf").touch()
+        (temp_dir / "doc2.pdf").touch()
+        (temp_dir / "image1.png").touch()
+        (temp_dir / "subdir1").mkdir()
+        (temp_dir / "subdir1" / "doc3.pdf").touch()
+        (temp_dir / "subdir1" / "doc4.pdf").touch()
+        (temp_dir / "subdir1" / "image2.png").touch()
+        (temp_dir / "subdir1" / "subdir2").mkdir()
+        (temp_dir / "subdir1" / "subdir2" / "image3.png").touch()
+        (temp_dir / "subdir1" / "subdir2" / "doc5.pdf").touch()
+
+        config = LocalConnectorConfig(recursive=True)
+        connector = LocalConnector(config)
+
+        files = connector.list_files(str(temp_dir), "*.pdf")
+
+        assert len(files) == 5
+        assert all(f.endswith(".pdf") for f in files)
+
     def test_list_files_single_file(self, temp_dir):
         """Test listing a single file."""
         test_file = temp_dir / "test.pdf"

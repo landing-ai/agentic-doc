@@ -184,15 +184,14 @@ class LocalConnector(BaseConnector):
         if search_path.is_file():
             return [str(search_path)]
 
+        globber = (
+            search_path.rglob
+            if self.config.recursive
+            else search_path.glob
+        )
         if pattern:
-            files = list(search_path.glob(pattern))
+            files = list(globber(pattern))
         else:
-            globber = (
-                Path(search_path).rglob
-                if self.config.recursive
-                else Path(search_path).glob
-            )
-
             files = [
                 f
                 for f in globber("*")

@@ -161,6 +161,10 @@ results = parse(config, connector_path="/path/to/documents")
 
 # Parse with pattern filtering
 results = parse(config, connector_path="/path/to/documents", connector_pattern="*.pdf")
+
+# Parse all supported documents in a directory recursively (search subdirectories as well)
+config = LocalConnectorConfig(recursive=True)
+results = parse(config, connector_path="/path/to/documents")
 ```
 
 ##### URL Connector
