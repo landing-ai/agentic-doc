@@ -282,7 +282,16 @@ def parse_and_save_document(
 
         if isinstance(document, Url):
             output_file_path = Path(temp_dir) / Path(str(document)).name
-            download_file(document, str(output_file_path))
+            try:
+                download_file(document, str(output_file_path))
+            except Exception as e:
+                _LOGGER.error(
+                    f"Failed to download file from URL: {document} due to: {e}"
+                )
+                raise RuntimeError(
+                    f"Could not download file from URL: {document}"
+                ) from e
+
             document = output_file_path
         else:
             document = Path(document)
@@ -518,6 +527,10 @@ def _send_parsing_request(
                 headers=headers,
                 timeout=None,
             )
+            if response.status_code == 401:
+                raise RuntimeError(
+                    "Please confirm that the API key is generated and set correctly"
+                )
             if response.status_code in [408, 429, 502, 503, 504]:
                 raise RetryableError(response)
 
