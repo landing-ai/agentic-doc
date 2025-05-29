@@ -36,19 +36,6 @@ from agentic_doc.parse import (
     parse_documents,
 )
 
-
-def test_parse_and_save_documents_with_invalid_file(sample_pdf_path, results_dir):
-    # Arrange
-    input_files = [
-        sample_pdf_path.parent / "invalid.pdf",  # Non-existent file
-        sample_pdf_path,
-    ]
-
-    # Act & Assert
-    with pytest.raises(FileNotFoundError):
-        parse_and_save_documents(input_files, result_save_dir=results_dir)
-
-
 def test_parse_and_save_documents_empty_list(results_dir):
     # Act
     result_paths = parse_and_save_documents([], result_save_dir=results_dir)
@@ -714,8 +701,8 @@ class TestParseFunctionConsolidated:
         with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
             result = parse(test_file)
 
-            assert isinstance(result, ParsedDocument)
-            assert result == mock_parsed_document
+            assert all(isinstance(res, ParsedDocument) for res in result)
+            assert result == [mock_parsed_document]
 
     def test_parse_single_document_with_save_dir(self, temp_dir, mock_parsed_document):
         """Test parsing a single document with save directory."""
@@ -730,7 +717,7 @@ class TestParseFunctionConsolidated:
 
             assert isinstance(result, list)
             assert len(result) == 1
-            assert isinstance(result[0], Path)
+            assert isinstance(result[0], ParsedDocument)
 
     def test_parse_multiple_documents(self, temp_dir, mock_parsed_document):
         """Test parsing multiple documents."""
@@ -762,7 +749,9 @@ class TestParseFunctionConsolidated:
         ), patch("agentic_doc.parse.save_groundings_as_images") as mock_save_groundings:
             result = parse(test_file, grounding_save_dir=grounding_dir)
 
-            assert isinstance(result, ParsedDocument)
+            assert isinstance(result, list)
+            assert len(result) == 1
+            assert isinstance(result[0], ParsedDocument)
             # Verify that save_groundings_as_images was called
             mock_save_groundings.assert_called_once()
 
@@ -902,15 +891,20 @@ class TestParseFunctionConsolidated:
     def test_parse_list_with_save_dir(self, temp_dir, mock_parsed_document):
         """Test parsing list of documents with save directory."""
         test_files = [temp_dir / "test1.pdf", temp_dir / "test2.pdf"]
+        test_save_files = [temp_dir / "result1.json", temp_dir / "result2.json"]
         for f in test_files:
             with open(f, "wb") as file:
                 file.write(b"%PDF-1.7\n")
+
+        for f in test_save_files:
+            with open(f, "w") as file:
+                file.write("{\"markdown\": \"\", \"chunks\": [], \"start_page_idx\": 0, \"end_page_idx\": 0, \"doc_type\": \"pdf\"}")
 
         result_dir = temp_dir / "results"
 
         with patch(
             "agentic_doc.parse.parse_and_save_documents",
-            return_value=[Path("result1.json"), Path("result2.json")],
+            return_value=[Path(test_save_files[0]), Path(test_save_files[1])],
         ) as mock_parse:
             result = parse([str(f) for f in test_files], result_save_dir=result_dir)
 
@@ -928,7 +922,7 @@ class TestParseFunctionConsolidated:
         ) as mock_parse:
             result = parse(url)
 
-            assert isinstance(result, ParsedDocument)
+            assert all(isinstance(res, ParsedDocument) for res in result)
             mock_parse.assert_called_once_with(
                 url,
                 include_marginalia=True,

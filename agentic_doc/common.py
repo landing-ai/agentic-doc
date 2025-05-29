@@ -1,8 +1,7 @@
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, Union
-
+from typing import Any, Literal, Union, Optional
 import httpx
 from pydantic import BaseModel, Field
 
@@ -53,6 +52,7 @@ class ParsedDocument(BaseModel):
     start_page_idx: int
     end_page_idx: int
     doc_type: Literal["pdf", "image"]
+    result_path: Optional[Path] = None
     errors: list[PageError] = Field(default_factory=list)
 
 

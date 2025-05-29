@@ -115,16 +115,6 @@ class TestLocalConnector:
 class TestGoogleDriveConnector:
     """Test GoogleDriveConnector functionality."""
 
-    def test_missing_dependencies(self):
-        """Test that GoogleDriveConnector raises ImportError when dependencies are missing."""
-        config = GoogleDriveConnectorConfig()
-        connector = GoogleDriveConnector(config)
-
-        with patch("builtins.__import__", side_effect=ImportError):
-            with pytest.raises(ImportError, match="Google Drive connector requires"):
-                connector._get_service()
-
-
 class TestS3Connector:
     """Test S3Connector functionality."""
 
@@ -141,16 +131,6 @@ class TestS3Connector:
         assert connector.config.bucket_name == "test-bucket"
         assert connector.config.aws_access_key_id == "test-key"
         assert connector.config.region_name == "us-west-2"
-
-    def test_missing_dependencies(self):
-        """Test that S3Connector raises ImportError when boto3 is missing."""
-        config = S3ConnectorConfig(bucket_name="test-bucket")
-        connector = S3Connector(config)
-
-        with patch("builtins.__import__", side_effect=ImportError):
-            with pytest.raises(ImportError, match="S3 connector requires boto3"):
-                connector._get_client()
-
 
 class TestURLConnector:
     """Test URLConnector functionality."""
@@ -174,16 +154,6 @@ class TestURLConnector:
 
         assert len(files) == 1
         assert files[0] == "https://example.com/document.pdf"
-
-    def test_missing_dependencies(self):
-        """Test that URLConnector raises ImportError when httpx is missing."""
-        config = URLConnectorConfig()
-        connector = URLConnector(config)
-
-        with patch("builtins.__import__", side_effect=ImportError):
-            with pytest.raises(ImportError, match="URL connector requires httpx"):
-                connector.download_file("https://example.com/document.pdf")
-
 
 class TestConnectorFactory:
     """Test the connector factory function."""

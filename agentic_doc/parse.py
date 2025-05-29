@@ -1,11 +1,12 @@
 import copy
 import importlib.metadata
 import tempfile
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, List, Optional, Union, cast
+from typing import Any, List, Optional, Sequence, Union
 
 import httpx
 import structlog
@@ -51,7 +52,7 @@ def parse(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     connector_path: Optional[str] = None,
     connector_pattern: Optional[str] = None,
-) -> Union[ParsedDocument, List[ParsedDocument], List[Path]]:
+) -> List[ParsedDocument]:
     """
     Universal parse function that can handle single documents, lists of documents,
     or documents from various connectors.
@@ -64,90 +65,104 @@ def parse(
             - Connector configuration (ConnectorConfig)
         include_marginalia: Whether to include marginalia in the analysis
         include_metadata_in_markdown: Whether to include metadata in markdown output
-        result_save_dir: Directory to save results (if provided, returns file paths)
+        result_save_dir: Directory to save results
         grounding_save_dir: Directory to save grounding images
         connector_path: Path for connector to search (when using connectors)
         connector_pattern: Pattern to filter files (when using connectors)
 
     Returns:
-        - Single ParsedDocument (if single document and no result_save_dir)
-        - List[ParsedDocument] (if multiple documents and no result_save_dir)
-        - List[Path] (if result_save_dir is provided)
+        List[ParsedDocument]
     """
-    # Handle connector-based parsing
+    # Convert input to list of document paths
+    doc_paths = _get_document_paths(documents, connector_path, connector_pattern)
+
+    if not doc_paths:
+        _LOGGER.warning("No documents to parse")
+        return []
+
+    # Parse all documents
+    parse_results = _parse_document_list(
+        doc_paths,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
+        result_save_dir=result_save_dir,
+        grounding_save_dir=grounding_save_dir,
+    )
+
+    # Convert results to ParsedDocument objects
+    return _convert_to_parsed_documents(parse_results, result_save_dir)
+
+
+def _get_document_paths(
+    documents: Union[
+        str, Path, Url, List[Union[str, Path, Url]], BaseConnector, ConnectorConfig
+    ],
+    connector_path: Optional[str] = None,
+    connector_pattern: Optional[str] = None,
+) -> Sequence[Union[str, Path, Url]]:
+    """Convert various input types to a list of document paths."""
     if isinstance(documents, (BaseConnector, ConnectorConfig)):
-        connector = (
-            documents
-            if isinstance(documents, BaseConnector)
-            else create_connector(documents)
-        )
-
-        # Get list of files from connector
-        file_list = connector.list_files(connector_path, connector_pattern)
-
-        if not file_list:
-            _LOGGER.warning("No files found with the specified connector")
-            return [] if result_save_dir else []
-
-        # Download files and get local paths
-        local_paths = []
-        for file_id in file_list:
-            try:
-                local_path = connector.download_file(file_id)
-                local_paths.append(local_path)
-            except Exception as e:
-                _LOGGER.error(f"Failed to download file {file_id}: {e}")
-                continue
-
-        if not local_paths:
-            _LOGGER.warning("No files were successfully downloaded")
-            return [] if result_save_dir else []
-
-        # Parse the downloaded files
-        return _parse_document_list(
-            cast(List[Union[str, Path, Url]], local_paths),
-            include_marginalia=include_marginalia,
-            include_metadata_in_markdown=include_metadata_in_markdown,
-            result_save_dir=result_save_dir,
-            grounding_save_dir=grounding_save_dir,
-        )
-
-    # Handle single document
+        return _get_paths_from_connector(documents, connector_path, connector_pattern)
     elif isinstance(documents, (str, Path, Url)):
-        if result_save_dir:
-            result = parse_and_save_document(
-                documents,
-                include_marginalia=include_marginalia,
-                include_metadata_in_markdown=include_metadata_in_markdown,
-                result_save_dir=result_save_dir,
-                grounding_save_dir=grounding_save_dir,
-            )
-            return [result] if isinstance(result, Path) else result
-        else:
-            result = parse_and_save_document(
-                documents,
-                include_marginalia=include_marginalia,
-                include_metadata_in_markdown=include_metadata_in_markdown,
-                grounding_save_dir=grounding_save_dir,
-            )
-            return cast(ParsedDocument, result)
-
-    # Handle list of documents
+        return [documents]
     elif isinstance(documents, list):
-        return _parse_document_list(
-            documents,
-            include_marginalia=include_marginalia,
-            include_metadata_in_markdown=include_metadata_in_markdown,
-            result_save_dir=result_save_dir,
-            grounding_save_dir=grounding_save_dir,
-        )
-
+        return documents
     else:
         raise ValueError(f"Unsupported documents type: {type(documents)}")
 
 
+def _get_paths_from_connector(
+    connector_or_config: Union[BaseConnector, ConnectorConfig],
+    connector_path: Optional[str],
+    connector_pattern: Optional[str],
+) -> List[Path]:
+    """Download files from connector and return local paths."""
+    connector = (
+        connector_or_config
+        if isinstance(connector_or_config, BaseConnector)
+        else create_connector(connector_or_config)
+    )
+
+    file_list = connector.list_files(connector_path, connector_pattern)
+    if not file_list:
+        return []
+
+    local_paths = []
+    for file_id in file_list:
+        try:
+            local_path = connector.download_file(file_id)
+            local_paths.append(local_path)
+        except Exception as e:
+            _LOGGER.error(f"Failed to download file {file_id}: {e}")
+
+    return local_paths
+
+
+def _convert_to_parsed_documents(
+    parse_results: Union[List[ParsedDocument], List[Path]],
+    result_save_dir: Optional[Union[str, Path]],
+) -> List[ParsedDocument]:
+    """Convert parse results to ParsedDocument objects."""
+    parsed_docs = []
+
+    for result in parse_results:
+        if isinstance(result, ParsedDocument):
+            parsed_docs.append(result)
+        elif isinstance(result, Path):
+            with open(result) as f:
+                data = json.load(f)
+            parsed_doc = ParsedDocument.model_validate(data)
+            if result_save_dir:
+                parsed_doc.result_path = result
+            parsed_docs.append(parsed_doc)
+        else:
+            raise ValueError(f"Unexpected result type: {type(result)}")
+
+    return parsed_docs
+
+
 def _parse_document_list(
-    documents: List[Union[str, Path, Url]],
+    documents: Sequence[Union[str, Path, Url]],
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
@@ -155,9 +170,10 @@ def _parse_document_list(
     grounding_save_dir: Optional[Union[str, Path]] = None,
 ) -> Union[List[ParsedDocument], List[Path]]:
     """Helper function to parse a list of documents."""
+    documents_list = list(documents)
     if result_save_dir:
         return parse_and_save_documents(
-            documents,
+            documents_list,
             result_save_dir=result_save_dir,
             grounding_save_dir=grounding_save_dir,
             include_marginalia=include_marginalia,
@@ -165,7 +181,7 @@ def _parse_document_list(
         )
     else:
         return parse_documents(
-            documents,
+            documents_list,
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
             grounding_save_dir=grounding_save_dir,
@@ -356,6 +372,7 @@ def _parse_image(
             start_page_idx=0,
             end_page_idx=0,
             doc_type="image",
+            result_path=None,
             errors=[PageError(page_num=0, error=error_msg, error_code=-1)],
         )
 
@@ -371,6 +388,7 @@ def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
             start_page_idx=0,
             end_page_idx=0,
             doc_type="pdf",
+            result_path=Path(),
         )
 
     init_result = copy.deepcopy(results[0])
@@ -450,6 +468,7 @@ def _parse_doc_parts(
             start_page_idx=doc.start_page_idx,
             end_page_idx=doc.end_page_idx,
             doc_type="pdf",
+            result_path=Path(doc.file_path),
             errors=errors,
         )
 
@@ -507,5 +526,5 @@ def _send_parsing_request(
     _LOGGER.info(
         f"Time taken to successfully parse a document chunk: {timer.elapsed:.2f} seconds"
     )
-    result = cast(dict[str, Any], response.json())
+    result: dict[str, Any] = response.json()
     return result

@@ -6,29 +6,23 @@ from typing import Any, Dict, List, Optional, Type
 import structlog
 from pydantic import BaseModel
 import os
-import sys
+import fnmatch
+import httpx
 
 try:
     from typing import TYPE_CHECKING
 except ImportError:
     TYPE_CHECKING = False
 
-if TYPE_CHECKING:
-    try:
-        from googleapiclient.discovery import Resource  # type: ignore
-        from googleapiclient.http import MediaIoBaseDownload as MediaDownload  # type: ignore
-    except ImportError:
-        Resource = Any
-        MediaDownload = Any
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build  # type: ignore
+from googleapiclient.discovery import Resource
+from googleapiclient.http import MediaIoBaseDownload  # type: ignore
+import boto3  # type: ignore
+from botocore.client import ClientCreator  # type: ignore
 
-    try:
-        import boto3  # type: ignore
-    except ImportError:
-        S3Client = Any
-else:
-    Resource = Any
-    MediaDownload = Any
-    S3Client = Any
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -43,6 +37,7 @@ class LocalConnectorConfig(ConnectorConfig):
     """Configuration for local file connector."""
 
     connector_type: str = "local"
+    recursive: bool = False
 
 
 class GoogleDriveConnectorConfig(ConnectorConfig):
@@ -75,6 +70,47 @@ class URLConnectorConfig(ConnectorConfig):
 class BaseConnector(ABC):
     """Abstract base class for document connectors."""
 
+    _VALID_EXTENSIONS = [
+        ".bmp",
+        ".dib",
+        ".dcx",
+        ".eps",
+        ".ps",
+        ".gif",
+        ".icns",
+        ".ico",
+        ".im",
+        ".jpeg",
+        ".jpg",
+        ".jpe",
+        ".pcd",
+        ".pcx",
+        ".png",
+        ".pbm",
+        ".pgm",
+        ".ppm",
+        ".pnm",
+        ".sgi",
+        ".rgb",
+        ".rgba",
+        ".bw",
+        ".spider",
+        ".tga",
+        ".targa",
+        ".tif",
+        ".tiff",
+        ".webp",
+        ".xbm",
+        ".jp2",
+        ".j2k",
+        ".jpf",
+        ".jpx",
+        ".j2c",
+        ".pdf",
+        ".heif",
+        ".heic",
+    ]
+
     def __init__(self, config: ConnectorConfig):
         self.config = config
 
@@ -87,7 +123,7 @@ class BaseConnector(ABC):
 
         Args:
             path: Optional path to list files from
-            pattern: Optional pattern to filter files
+            pattern: Optional pattern to filter files (pathlib-like glob pattern, works for all connectors except URLs)
 
         Returns:
             List of file identifiers/paths
@@ -100,11 +136,18 @@ class BaseConnector(ABC):
         Download a file to local storage.
 
         Args:
-            file_id: Identifier for the file to download
+            file_id: Identifier for the file to download. Format varies by connector:
+                - Local: File system path (e.g., "/path/to/file.pdf")
+                - Google Drive: Google Drive file ID (e.g., "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms")
+                - S3: S3 object key/path (e.g., "documents/report.pdf")
+                - URL: Complete HTTP/HTTPS URL (e.g., "https://example.com/file.pdf")
             local_path: Optional local path to save to
 
         Returns:
             Path to the downloaded file
+
+        Note:
+            Use list_files() to get valid file_id values for each connector type.
         """
         pass
 
@@ -127,6 +170,7 @@ class LocalConnector(BaseConnector):
 
     def __init__(self, config: LocalConnectorConfig):
         super().__init__(config)
+        self.config: LocalConnectorConfig = config
 
     def list_files(
         self, path: Optional[str] = None, pattern: Optional[str] = None
@@ -143,18 +187,17 @@ class LocalConnector(BaseConnector):
         if pattern:
             files = list(search_path.glob(pattern))
         else:
-            patterns = [
-                "*.pdf",
-                "*.png",
-                "*.jpg",
-                "*.jpeg",
-                "*.gif",
-                "*.bmp",
-                "*.tiff",
-            ]  # TODO: Include all supported patterns
-            files = []
-            for pat in patterns:
-                files.extend(search_path.glob(pat))
+            globber = (
+                Path(search_path).rglob
+                if self.config.recursive
+                else Path(search_path).glob
+            )
+
+            files = [
+                f
+                for f in globber("*")
+                if f.is_file() and f.suffix.lower() in LocalConnector._VALID_EXTENSIONS
+            ]
 
         return [str(f) for f in files if f.is_file()]
 
@@ -192,17 +235,6 @@ class GoogleDriveConnector(BaseConnector):
     def _get_service(self) -> Resource:
         """Initialize Google Drive service with user-friendly OAuth."""
         if self._service is None:
-            try:
-                from google.auth.transport.requests import Request
-                from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
-                from google.oauth2.credentials import Credentials
-                from googleapiclient.discovery import build
-            except ImportError:
-                raise ImportError(
-                    "Google Drive connector requires google-api-python-client, google-auth-oauthlib, and google-auth. "
-                    "Install with: pip install google-api-python-client google-auth google-auth-oauthlib."
-                )
-
             scopes = ["https://www.googleapis.com/auth/drive.readonly"]
             creds = None
 
@@ -233,28 +265,19 @@ class GoogleDriveConnector(BaseConnector):
     def list_files(
         self, path: Optional[str] = None, pattern: Optional[str] = None
     ) -> List[str]:
-        """List files in Google Drive."""
+        """List files in Google Drive"""
         service = self._get_service()
 
         # Build query
         query_parts = []
-
-        # If folder_id is specified in config, search within that folder
         if self.config.folder_id:
             query_parts.append(f"'{self.config.folder_id}' in parents")
-        elif path:  # Use path as folder_id if provided
+        elif path:
             query_parts.append(f"'{path}' in parents")
 
-        # Filter by file types (documents, PDFs, images)
-        file_types = [
-            "mimeType='application/pdf'",
-            "mimeType contains 'image/'",
-        ]
+        # Filter by file types
+        file_types = ["mimeType='application/pdf'", "mimeType contains 'image/'"]
         query_parts.append(f"({' or '.join(file_types)})")
-
-        # Add pattern matching if provided
-        if pattern:
-            query_parts.append(f"name contains '{pattern}'")
 
         query = " and ".join(query_parts)
 
@@ -264,10 +287,13 @@ class GoogleDriveConnector(BaseConnector):
                 .list(q=query, fields="files(id, name, mimeType, size)")
                 .execute()
             )
-
             files = results.get("files", [])
-            return [file["id"] for file in files]
 
+            # Apply glob pattern filtering
+            if pattern:
+                files = [f for f in files if fnmatch.fnmatch(f["name"], pattern)]
+
+            return [file["id"] for file in files]
         except Exception as e:
             _LOGGER.error(f"Error listing Google Drive files: {e}")
             raise
@@ -292,8 +318,6 @@ class GoogleDriveConnector(BaseConnector):
             # Download file
             request = service.files().get_media(fileId=file_id)
             with open(local_path_obj, "wb") as f:
-                from googleapiclient.http import MediaIoBaseDownload
-
                 downloader = MediaIoBaseDownload(f, request)
                 done = False
                 while done is False:
@@ -340,16 +364,11 @@ class S3Connector(BaseConnector):
     def __init__(self, config: S3ConnectorConfig):
         super().__init__(config)
         self.config: S3ConnectorConfig = config
-        self._client: Optional[S3Client] = None
+        self._client: Optional[ClientCreator] = None
 
-    def _get_client(self) -> S3Client:
+    def _get_client(self) -> ClientCreator:
         """Initialize S3 client if not already done."""
         if self._client is None:
-            if "boto3" not in sys.modules:
-                raise ImportError(
-                    "S3 connector requires boto3. Install with: pip install boto3"
-                )
-
             kwargs = {"region_name": self.config.region_name}
 
             if self.config.aws_access_key_id:
@@ -366,7 +385,7 @@ class S3Connector(BaseConnector):
     def list_files(
         self, path: Optional[str] = None, pattern: Optional[str] = None
     ) -> List[str]:
-        """List files in S3 bucket."""
+        """List files in S3 bucket"""
         client = self._get_client()
 
         try:
@@ -380,22 +399,13 @@ class S3Connector(BaseConnector):
             for obj in response.get("Contents", []):
                 key = obj["Key"]
 
-                # Filter by pattern if provided
-                if pattern and pattern not in key:
-                    continue
-
                 # Filter by file extension (documents and images)
-                valid_extensions = [
-                    ".pdf",
-                    ".png",
-                    ".jpg",
-                    ".jpeg",
-                    ".gif",
-                    ".bmp",
-                    ".tiff",
-                ]
-                if any(key.lower().endswith(ext) for ext in valid_extensions):
-                    files.append(key)
+                if any(
+                    key.lower().endswith(ext) for ext in S3Connector._VALID_EXTENSIONS
+                ):
+                    # Apply glob pattern filtering
+                    if not pattern or fnmatch.fnmatch(key, pattern):
+                        files.append(key)
 
             return files
 
@@ -465,13 +475,6 @@ class URLConnector(BaseConnector):
     def download_file(self, file_id: str, local_path: Optional[str] = None) -> Path:
         """Download file from URL."""
         try:
-            import httpx
-        except ImportError:
-            raise ImportError(
-                "URL connector requires httpx. Install with: pip install httpx"
-            )
-
-        try:
             # Create local path if not provided
             if local_path is None:
                 temp_dir = tempfile.mkdtemp()
@@ -502,13 +505,6 @@ class URLConnector(BaseConnector):
 
     def get_file_info(self, file_id: str) -> Dict[str, Any]:
         """Get file info from URL headers."""
-        try:
-            import httpx
-        except ImportError:
-            raise ImportError(
-                "URL connector requires httpx. Install with: pip install httpx"
-            )
-
         try:
             headers = self.config.headers or {}
 
@@ -541,10 +537,3 @@ def create_connector(config: ConnectorConfig) -> BaseConnector:
         raise ValueError(f"Unknown connector type: {config.connector_type}")
 
     return connector_class(config)
-
-
-# Import statements that might fail (optional dependencies)
-try:
-    from googleapiclient.http import MediaIoBaseDownload
-except ImportError:
-    MediaIoBaseDownload = None

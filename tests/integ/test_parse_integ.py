@@ -360,6 +360,16 @@ def test_parse_documents_chunk_ids_unique(multi_page_pdf, results_dir):
         assert isinstance(chunk_id, str)
         assert len(chunk_id) > 0
 
+def test_parse_and_save_documents_with_invalid_file(sample_pdf_path, results_dir):
+    # Arrange
+    input_files = [
+        sample_pdf_path.parent / "invalid.pdf",  # Non-existent file
+        sample_pdf_path,
+    ]
+
+    # Act & Assert
+    with pytest.raises(FileNotFoundError):
+        parse_and_save_documents(input_files, result_save_dir=results_dir)
 
 def test_parse_documents_grounding_boxes_valid(sample_image_path, results_dir):
     # Test that all grounding boxes have valid coordinates
