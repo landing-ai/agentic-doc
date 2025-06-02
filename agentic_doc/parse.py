@@ -533,6 +533,10 @@ def _send_parsing_request(
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
             }
+            
+            if settings.field_extraction:
+                data["field_extraction"] = True
+
             headers = {
                 "Authorization": f"Basic {settings.vision_agent_api_key}",
                 "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",

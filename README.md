@@ -359,6 +359,8 @@ MAX_RETRIES=80
 MAX_RETRY_WAIT_TIME=30
 # Logging style for retry, defaults to log_msg
 RETRY_LOGGING_STYLE=log_msg
+# Enable field extraction, defaults to false
+FIELD_EXTRACTION=false
 ```
 
 ### Max Parallelism
