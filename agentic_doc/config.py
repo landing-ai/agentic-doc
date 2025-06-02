@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal
+from typing import Literal, Any
 
 import cv2
 import structlog
@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     field_extraction: bool = Field(
         default=False,
         description="Enable field extraction in the document analysis",
+    )
+    fields_schema: dict[str, Any] = Field(
+        default={},
+        description="Configuration for field extraction",
     )
     model_config = SettingsConfigDict(
         env_file=".env",

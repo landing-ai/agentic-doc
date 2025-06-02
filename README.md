@@ -333,6 +333,8 @@ MAX_RETRY_WAIT_TIME=30
 RETRY_LOGGING_STYLE=log_msg
 # Enable field extraction, defaults to false
 FIELD_EXTRACTION=false
+# Fields schema
+FIELDS_SCHEMA={}
 ```
 
 ### Max Parallelism

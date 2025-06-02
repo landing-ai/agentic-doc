@@ -510,6 +510,7 @@ def _send_parsing_request(
             
             if settings.field_extraction:
                 data["field_extraction"] = True
+                data["fields_schema"] = settings.fields_schema
 
             headers = {
                 "Authorization": f"Basic {settings.vision_agent_api_key}",
