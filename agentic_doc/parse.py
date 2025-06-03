@@ -533,10 +533,9 @@ def _send_parsing_request(
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
             }
-            
-            if settings.field_extraction:
-                data["field_extraction"] = True
-                data["fields_schema"] = settings.fields_schema
+
+            if settings.fields_schema:
+                data["fields_schema"] = json.dumps(settings.fields_schema)
 
             headers = {
                 "Authorization": f"Basic {settings.vision_agent_api_key}",

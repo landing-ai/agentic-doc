@@ -64,13 +64,9 @@ class Settings(BaseSettings):
         ge=1,
         le=50,
     )
-    field_extraction: bool = Field(
-        default=False,
-        description="Enable field extraction in the document analysis",
-    )
-    fields_schema: dict[str, Any] = Field(
+    fields_schema: dict[str, Any] | None = Field(
         default={},
-        description="Configuration for field extraction",
+        description="Schema for field extraction",
     )
     model_config = SettingsConfigDict(
         env_file=".env",
