@@ -395,10 +395,10 @@ from agentic_doc.parse import parse
 # Basic field extraction schema
 basic_schema = FieldExtractionSchema(
     properties={
-        "Employee_Name": FieldExtractionProperty(type="string"),
-        "Employee_SSN": FieldExtractionProperty(type="string"),
-        "Gross_Pay": FieldExtractionProperty(type="number"),
-        "Employer_Address": FieldExtractionProperty(type="string"),
+        "Employee Name": FieldExtractionProperty(type="string"),
+        "Employee SSN": FieldExtractionProperty(type="string"),
+        "Gross Pay": FieldExtractionProperty(type="number"),
+        "Employer Address": FieldExtractionProperty(type="string"),
     }
 )
 
@@ -414,7 +414,7 @@ boxed_schema = FieldExtractionSchema(
                 "Employee Name": BoxFieldExtractionProperty(),
                 "Employee SSN": BoxFieldExtractionProperty(),
                 "Gross Pay": BoxFieldExtractionProperty(),
-                "Employee Full Address": BoxFieldExtractionProperty(),
+                "Employee Address": BoxFieldExtractionProperty(),
             }
         )
     }
