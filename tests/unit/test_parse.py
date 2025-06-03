@@ -15,6 +15,9 @@ from agentic_doc.common import (
     Document,
     ParsedDocument,
     RetryableError,
+    FieldExtractionSchema,
+    FieldExtractionProperty,
+    BoxFieldExtractionProperty,
 )
 from agentic_doc.connectors import (
     GoogleDriveConnectorConfig,
@@ -88,6 +91,7 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
             grounding_save_dir=temp_dir,
             include_marginalia=True,
             include_metadata_in_markdown=True,
+            field_extraction_schema=None,
         )
 
 
@@ -105,6 +109,7 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
             include_metadata_in_markdown=True,
             result_save_dir=temp_dir,
             grounding_save_dir=temp_dir,
+            field_extraction_schema=None,
         )
 
         # Check that parse_and_save_document was called with the URL and the right parameters
@@ -114,6 +119,7 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
             include_metadata_in_markdown=True,
             result_save_dir=temp_dir,
             grounding_save_dir=temp_dir,
+            field_extraction_schema=None,
         )
 
         # Check the results
@@ -239,7 +245,7 @@ def test_parse_image(temp_dir, mock_parsed_document):
 
         # Check that _send_parsing_request was called with the right arguments
         mock_send_request.assert_called_once_with(
-            str(img_path), include_marginalia=True, include_metadata_in_markdown=True
+            str(img_path), include_marginalia=True, include_metadata_in_markdown=True, field_extraction_schema=None
         )
 
         # Check that the result is a ParsedDocument with the expected values
@@ -442,6 +448,7 @@ def test_parse_doc_parts_success(mock_parsed_document):
             str(doc.file_path),
             include_marginalia=True,
             include_metadata_in_markdown=True,
+            field_extraction_schema=None,
         )
 
         # Check the result
@@ -891,6 +898,7 @@ class TestParseFunctionConsolidated:
                 include_marginalia=False,
                 include_metadata_in_markdown=False,
                 grounding_save_dir=None,
+                field_extraction_schema=None,
             )
 
     def test_parse_with_bytes(
@@ -952,4 +960,71 @@ class TestParseFunctionConsolidated:
                 include_marginalia=True,
                 include_metadata_in_markdown=True,
                 grounding_save_dir=None,
+                field_extraction_schema=None,
             )
+
+    def test_parse_with_field_extraction_schema(self, temp_dir, mock_parsed_document):
+        """Test parsing with a field extraction schema."""
+        # Define a simple field extraction schema
+        schema = FieldExtractionSchema(
+            properties={
+                "Employee_Name": FieldExtractionProperty(type="string"),
+                "Gross Pay": FieldExtractionProperty(type="number"),
+                "Employee Full Address": FieldExtractionProperty(type="string"),
+            }
+        )
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        with patch(
+            "agentic_doc.parse.parse_and_save_document",
+            return_value=mock_parsed_document,
+        ) as mock_parse:
+            result = parse(
+                test_file,
+                field_extraction_schema=schema,
+            )
+            mock_parse.assert_called_once_with(
+                test_file,
+                include_marginalia=True,
+                include_metadata_in_markdown=True,
+                grounding_save_dir=None,
+                field_extraction_schema=schema,
+            )
+            assert isinstance(result, list)
+            assert all(isinstance(res, ParsedDocument) for res in result)
+
+    def test_parse_with_box_field_extraction_schema(self, temp_dir, mock_parsed_document):
+        """Test parsing with a boxed field extraction schema."""
+        # Define a boxed field extraction schema
+        schema = FieldExtractionSchema(
+            properties={
+                "values": FieldExtractionProperty(
+                    type="array",
+                    properties={
+                        "Employee Name": BoxFieldExtractionProperty(),
+                        "Gross Pay": BoxFieldExtractionProperty(),
+                        "Employee Full Address": BoxFieldExtractionProperty(),
+                    },
+                )
+            }
+        )
+        test_file = temp_dir / "test_box.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        with patch("agentic_doc.parse.parse_and_save_document", return_value=mock_parsed_document) as mock_parse:
+            result = parse(
+                test_file,
+                field_extraction_schema=schema,
+            )
+            mock_parse.assert_called_once_with(
+                test_file,
+                include_marginalia=True,
+                include_metadata_in_markdown=True,
+                grounding_save_dir=None,
+                field_extraction_schema=schema,
+            )
+            assert isinstance(result, list)
+            assert all(isinstance(res, ParsedDocument) for res in result)
