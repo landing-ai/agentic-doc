@@ -968,7 +968,7 @@ class TestParseFunctionConsolidated:
         # Define a simple field extraction schema
         schema = FieldExtractionSchema(
             properties={
-                "Employee_Name": FieldExtractionProperty(type="string"),
+                "Employee Name": FieldExtractionProperty(type="string"),
                 "Gross Pay": FieldExtractionProperty(type="number"),
                 "Employee Full Address": FieldExtractionProperty(type="string"),
             }
