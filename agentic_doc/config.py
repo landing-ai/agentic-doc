@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal, Any
+from typing import Literal, Any, Union
 
 import cv2
 import structlog
@@ -64,7 +64,7 @@ class Settings(BaseSettings):
         ge=1,
         le=50,
     )
-    fields_schema: dict[str, Any] | None = Field(
+    fields_schema: Union[dict[str, Any], None] = Field(
         default={},
         description="Schema for field extraction",
     )
