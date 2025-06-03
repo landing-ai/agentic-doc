@@ -3,7 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Union, Optional
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ChunkType(str, Enum):
@@ -54,6 +54,37 @@ class ParsedDocument(BaseModel):
     doc_type: Literal["pdf", "image"]
     result_path: Optional[Path] = None
     errors: list[PageError] = Field(default_factory=list)
+
+
+class FieldExtractionProperty(BaseModel):
+    type: str = Field(
+        description="The type of the field extraction property", default="object"
+    )
+    properties: dict[str, Any] = Field(
+        description="The properties of the field extraction property", default={}
+    )
+
+
+class BoxFieldExtractionProperty(FieldExtractionProperty):
+    def __init__(self) -> None:
+        super().__init__(
+            properties={
+                "value": FieldExtractionProperty(type="string"),
+                "box": FieldExtractionProperty(
+                    type="array", items=FieldExtractionProperty(type="number")
+                ),
+            }
+        )
+
+
+class FieldExtractionSchema(BaseModel):
+    model_config = ConfigDict(title="FieldExtractionSchema", extra="allow")
+    type: str = Field(
+        description="The type of the field extraction property", default="object"
+    )
+    properties: dict[str, FieldExtractionProperty] = Field(
+        description="The properties of the field extraction", default={}
+    )
 
 
 class RetryableError(Exception):

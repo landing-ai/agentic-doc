@@ -331,8 +331,6 @@ MAX_RETRIES=80
 MAX_RETRY_WAIT_TIME=30
 # Logging style for retry, defaults to log_msg
 RETRY_LOGGING_STYLE=log_msg
-# JSON schema to extract field values from the document
-FIELDS_SCHEMA={}
 ```
 
 ### Max Parallelism
@@ -389,4 +387,39 @@ results = parse(
 )
 ```
 
----
+#### Example: Using field extraction
+```python
+from agentic_doc.common import FieldExtractionSchema, FieldExtractionProperty, BoxFieldExtractionProperty
+from agentic_doc.parse import parse
+
+# Basic field extraction schema
+basic_schema = FieldExtractionSchema(
+    properties={
+        "Employee_Name": FieldExtractionProperty(type="string"),
+        "Employee_SSN": FieldExtractionProperty(type="string"),
+        "Gross_Pay": FieldExtractionProperty(type="number"),
+        "Employer_Address": FieldExtractionProperty(type="string"),
+    }
+)
+
+result = parse("basic.pdf", field_extraction_schema=basic_schema)
+fields = result.fields
+
+# Boxed field extraction schema
+boxed_schema = FieldExtractionSchema(
+    properties={
+        "values": FieldExtractionProperty(
+            type="array",
+            properties={
+                "Employee Name": BoxFieldExtractionProperty(),
+                "Employee SSN": BoxFieldExtractionProperty(),
+                "Gross Pay": BoxFieldExtractionProperty(),
+                "Employee Full Address": BoxFieldExtractionProperty(),
+            }
+        )
+    }
+)
+
+result = parse("boxed.pdf", field_extraction_schema=boxed_schema)
+fields = result.fields
+```
