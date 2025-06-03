@@ -506,7 +506,11 @@ def _send_parsing_request(
             data = {
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
-                "fields_schema": json.dumps(settings.fields_schema) if settings.fields_schema else None,
+                "fields_schema": (
+                    json.dumps(settings.fields_schema)
+                    if settings.fields_schema
+                    else None
+                ),
             }
 
             headers = {
