@@ -359,7 +359,7 @@ MAX_RETRIES=80
 MAX_RETRY_WAIT_TIME=30
 # Logging style for retry, defaults to log_msg
 RETRY_LOGGING_STYLE=log_msg
-# Fields schema
+# JSON schema to extract field values from the document
 FIELDS_SCHEMA={}
 ```
 
