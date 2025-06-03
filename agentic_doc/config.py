@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal, Any, Union
+from typing import Literal
 
 import cv2
 import structlog
@@ -63,10 +63,6 @@ class Settings(BaseSettings):
         description="Pages per chunk for splitting the document",
         ge=1,
         le=50,
-    )
-    fields_schema: Union[dict[str, Any], None] = Field(
-        default={},
-        description="Schema for field extraction",
     )
     model_config = SettingsConfigDict(
         env_file=".env",
