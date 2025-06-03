@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union, Type
 
 import httpx
 import structlog
@@ -20,6 +20,7 @@ from agentic_doc.common import (
     ParsedDocument,
     RetryableError,
     Timer,
+    FieldExtractionSchema,
 )
 from agentic_doc.config import settings
 from agentic_doc.connectors import (
@@ -59,6 +60,7 @@ def parse(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     connector_path: Optional[str] = None,
     connector_pattern: Optional[str] = None,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> List[ParsedDocument]:
     """
     Universal parse function that can handle single documents, lists of documents,
@@ -77,6 +79,7 @@ def parse(
         grounding_save_dir: Directory to save grounding images
         connector_path: Path for connector to search (when using connectors)
         connector_pattern: Pattern to filter files (when using connectors)
+        field_extraction_schema: Schema for field extraction (optional)
 
     Returns:
         List[ParsedDocument]
@@ -97,6 +100,7 @@ def parse(
         include_metadata_in_markdown=include_metadata_in_markdown,
         result_save_dir=result_save_dir,
         grounding_save_dir=grounding_save_dir,
+        field_extraction_schema=field_extraction_schema,
     )
 
     # Convert results to ParsedDocument objects
@@ -194,6 +198,7 @@ def _parse_document_list(
     include_metadata_in_markdown: bool = True,
     result_save_dir: Optional[Union[str, Path]] = None,
     grounding_save_dir: Optional[Union[str, Path]] = None,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> Union[List[ParsedDocument], List[Path]]:
     """Helper function to parse a list of documents."""
     documents_list = list(documents)
@@ -204,6 +209,7 @@ def _parse_document_list(
             grounding_save_dir=grounding_save_dir,
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
+            field_extraction_schema=field_extraction_schema,
         )
     else:
         return parse_documents(
@@ -211,6 +217,7 @@ def _parse_document_list(
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
             grounding_save_dir=grounding_save_dir,
+            field_extraction_schema=field_extraction_schema,
         )
 
 
@@ -220,6 +227,7 @@ def parse_documents(
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
     grounding_save_dir: Union[str, Path, None] = None,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> list[ParsedDocument]:
     """
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
@@ -227,6 +235,7 @@ def parse_documents(
     Args:
         documents (list[str | Path | Url]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `Url` object.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
+        field_extraction_schema (Type[FieldExtractionSchema] | None): Schema for field extraction.
     Returns:
         list[ParsedDocument]: The list of parsed documents. The list is sorted by the order of the input documents.
     """
@@ -236,6 +245,7 @@ def parse_documents(
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
         grounding_save_dir=grounding_save_dir,
+        field_extraction_schema=field_extraction_schema,
     )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
@@ -254,6 +264,7 @@ def parse_and_save_documents(
     grounding_save_dir: Union[str, Path, None] = None,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> list[Path]:
     """
     Parse a list of documents and save the results to a local directory.
@@ -262,6 +273,7 @@ def parse_and_save_documents(
         documents (list[str | Path | Url]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `Url` object.
         result_save_dir (str | Path): The local directory to save the results.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
+        field_extraction_schema (Type[FieldExtractionSchema] | None): Schema for field extraction.
     Returns:
         list[Path]: A list of json file paths to the saved results. The file paths are sorted by the order of the input file paths.
             The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_123456.json".
@@ -273,6 +285,7 @@ def parse_and_save_documents(
         include_metadata_in_markdown=include_metadata_in_markdown,
         result_save_dir=result_save_dir,
         grounding_save_dir=grounding_save_dir,
+        field_extraction_schema=field_extraction_schema,
     )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
@@ -291,6 +304,7 @@ def parse_and_save_document(
     include_metadata_in_markdown: bool = True,
     result_save_dir: Union[str, Path, None] = None,
     grounding_save_dir: Union[str, Path, None] = None,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> Union[Path, ParsedDocument]:
     """
     Parse a document and save the results to a local directory.
@@ -298,7 +312,7 @@ def parse_and_save_document(
     Args:
         document (str | Path | Url): The document to parse. It can be a local file path, a URL string, or a Pydantic `Url` object.
         result_save_dir (str | Path): The local directory to save the results. If None, the parsed document data is returned.
-
+        field_extraction_schema (Type[FieldExtractionSchema] | None): Schema for field extraction.
     Returns:
         Path | ParsedDocument: The file path to the saved result or the parsed document data.
     """
@@ -322,12 +336,14 @@ def parse_and_save_document(
                 document,
                 include_marginalia=include_marginalia,
                 include_metadata_in_markdown=include_metadata_in_markdown,
+                field_extraction_schema=field_extraction_schema,
             )
         elif file_type == "pdf":
             result = _parse_pdf(
                 document,
                 include_marginalia=include_marginalia,
                 include_metadata_in_markdown=include_metadata_in_markdown,
+                field_extraction_schema=field_extraction_schema,
             )
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
@@ -356,6 +372,7 @@ def _parse_pdf(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> ParsedDocument:
     with tempfile.TemporaryDirectory() as temp_dir:
         parts = split_pdf(file_path, temp_dir, settings.split_size)
@@ -365,6 +382,7 @@ def _parse_pdf(
             doc_name=file_path.name,
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
+            field_extraction_schema=field_extraction_schema,
         )
         return _merge_part_results(part_results)
 
@@ -374,12 +392,14 @@ def _parse_image(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> ParsedDocument:
     try:
         result_raw = _send_parsing_request(
             str(file_path),
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
+            field_extraction_schema=field_extraction_schema,
         )
         result_raw = {
             **result_raw["data"],
@@ -442,11 +462,13 @@ def _parse_doc_in_parallel(
     doc_name: str,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> list[ParsedDocument]:
     _parse_func = partial(
         _parse_doc_parts,
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
+        field_extraction_schema=field_extraction_schema,
     )
     with ThreadPoolExecutor(max_workers=settings.max_workers) as executor:
         return list(
@@ -463,6 +485,7 @@ def _parse_doc_parts(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> ParsedDocument:
     try:
         _LOGGER.info(f"Start parsing document part: '{doc}'")
@@ -470,6 +493,7 @@ def _parse_doc_parts(
             str(doc.file_path),
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
+            field_extraction_schema=field_extraction_schema,
         )
         _LOGGER.info(f"Successfully parsed document part: '{doc}'")
         return ParsedDocument.model_validate(
@@ -512,6 +536,7 @@ def _send_parsing_request(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
+    field_extraction_schema: Union[Type[FieldExtractionSchema], None] = None,
 ) -> dict[str, Any]:
     """
     Send a parsing request to the Landing AI Agentic Document Analysis API.
@@ -520,6 +545,7 @@ def _send_parsing_request(
         file_path (str): The path to the document file.
         include_marginalia (bool, optional): Whether to include marginalia in the analysis. Defaults to True.
         include_metadata_in_markdown (bool, optional): Whether to include metadata in the markdown output. Defaults to True.
+        field_extraction_schema (Type[FieldExtractionSchema] | None): Schema for field extraction.
 
     Returns:
         dict[str, Any]: The parsed document data.
@@ -529,15 +555,15 @@ def _send_parsing_request(
         # TODO: check if the file extension is a supported image type
         with open(file_path, "rb") as file:
             files = {file_type: file}
-            data = {
+            data: dict[str, Any] = {
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
-                "fields_schema": (
-                    json.dumps(settings.fields_schema)
-                    if settings.fields_schema
-                    else None
-                ),
             }
+
+            if field_extraction_schema is not None:
+                data["field_extraction_schema"] = json.dumps(
+                    field_extraction_schema.model_json_schema()
+                )
 
             headers = {
                 "Authorization": f"Basic {settings.vision_agent_api_key}",
