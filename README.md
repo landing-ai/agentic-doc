@@ -417,37 +417,15 @@ results = parse(
 
 #### Example: Using field extraction
 ```python
-from agentic_doc.common import FieldExtractionSchema, FieldExtractionProperty, BoxFieldExtractionProperty
+from pydantic import BaseModel, Field
 from agentic_doc.parse import parse
 
-# Basic field extraction schema
-basic_schema = FieldExtractionSchema(
-    properties={
-        "Employee Name": FieldExtractionProperty(type="string"),
-        "Employee SSN": FieldExtractionProperty(type="string"),
-        "Gross Pay": FieldExtractionProperty(type="number"),
-        "Employer Address": FieldExtractionProperty(type="string"),
-    }
-)
+class ExtractedFields(BaseModel):
+    employee_name: str = Field(description="the full name of the employee")
+    employee_ssn: str = Field(description="the social security number of the employee")
+    gross_pay: float = Field(description="the gross pay of the employee")
+    employee_address: str = Field(description="the address of the employee")
 
-result = parse("basic.pdf", field_extraction_schema=basic_schema)
-fields = result.fields
-
-# Boxed field extraction schema
-boxed_schema = FieldExtractionSchema(
-    properties={
-        "values": FieldExtractionProperty(
-            type="array",
-            properties={
-                "Employee Name": BoxFieldExtractionProperty(),
-                "Employee SSN": BoxFieldExtractionProperty(),
-                "Gross Pay": BoxFieldExtractionProperty(),
-                "Employee Address": BoxFieldExtractionProperty(),
-            }
-        )
-    }
-)
-
-result = parse("boxed.pdf", field_extraction_schema=boxed_schema)
+result = parse("mydoc.pdf", field_extraction_schema=ExtractedFields)
 fields = result.fields
 ```
