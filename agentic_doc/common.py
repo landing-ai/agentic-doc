@@ -3,7 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Union, Optional
 import httpx
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 
 class ChunkType(str, Enum):
