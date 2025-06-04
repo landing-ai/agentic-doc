@@ -12,6 +12,7 @@ from agentic_doc.parse import (
     parse_and_save_document,
     parse_and_save_documents,
     parse_documents,
+    parse
 )
 
 
@@ -398,3 +399,27 @@ def test_parse_documents_grounding_boxes_valid(sample_image_path, results_dir):
             # Right should be greater than left, bottom should be greater than top
             assert box.r > box.l, f"Right ({box.r}) should be > left ({box.l})"
             assert box.b > box.t, f"Bottom ({box.b}) should be > top ({box.t})"
+
+def test_parse_with_document_bytes(sample_pdf_path, results_dir):
+    with open(sample_pdf_path, "rb") as f:
+        doc_bytes = f.read()
+
+    # Act
+    result_docs = parse(
+        doc_bytes, result_save_dir=results_dir, grounding_save_dir=results_dir
+    )
+
+    # Assert
+    assert len(result_docs) == 1
+    result_path = result_docs[0].result_path
+    assert result_path.exists()
+
+    # Verify the saved JSON can be loaded and has expected structure
+    with open(result_path) as f:
+        result_data = json.load(f)
+
+    parsed_doc = ParsedDocument.model_validate(result_data)
+    assert parsed_doc.markdown
+    assert len(parsed_doc.chunks) > 0
+    assert parsed_doc.start_page_idx == 0
+    assert parsed_doc.end_page_idx == 3

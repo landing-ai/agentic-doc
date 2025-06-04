@@ -4,12 +4,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Literal, Union
 from urllib.parse import urlparse
+import requests
+import re
+import binascii
 
 import cv2
 import httpx
 import numpy as np
 import pymupdf
 import structlog
+import base64
 from PIL import Image
 from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
@@ -19,6 +23,47 @@ from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocumen
 from agentic_doc.config import VisualizationConfig, settings
 
 _LOGGER = structlog.getLogger(__name__)
+
+
+def check_endpoint_and_api_key(endpoint_url: str) -> None:
+    """Check if the API key is valid and if the endpoint is up."""
+    api_key = settings.vision_agent_api_key
+    if not api_key:
+        raise ValueError("API key is not set. Please provide a valid API key.")
+
+    try:
+        missing_padding = len(api_key) % 4
+        if missing_padding:
+            api_key += "=" * (4 - missing_padding)
+
+        decoded_bytes = base64.b64decode(api_key, validate=True)
+        decoded_str = decoded_bytes.decode("utf-8")
+
+        if ":" not in decoded_str or decoded_str.count(":") != 1:
+            raise ValueError("API key is invalid.")
+
+    except (UnicodeDecodeError, binascii.Error):
+        raise ValueError("API key is not a valid Base64-encoded string.")
+
+    headers = {"Authorization": f"Basic {api_key}"}
+
+    try:
+        response = requests.get(endpoint_url, headers=headers, timeout=5)
+    except requests.exceptions.ConnectionError:
+        raise ValueError(f'The endpoint URL "{endpoint_url}" is down or invalid.')
+
+    error = response.json().get("error")
+    if error:
+        if re.match(r"^The applications with ID `[^`]+` does not exist\.$", error):
+            raise ValueError("API key is not valid for this endpoint.")
+        elif error == "User not found, please check your API key":
+            raise ValueError(
+                "API key is in a valid format for this endpoint, but there is no user associated with this API key."
+            )
+        else:
+            raise ValueError("API key is invalid.")
+
+    _LOGGER.info("API key is valid.")
 
 
 def get_file_type(file_path: Path) -> Literal["pdf", "image"]:

@@ -888,6 +888,25 @@ class TestParseFunctionConsolidated:
                 grounding_save_dir=None,
             )
 
+    def test_parse_with_bytes(
+        self, mock_parsed_document
+    ):
+        """Test parsing with bytes."""
+        with patch(
+            "agentic_doc.parse.parse_and_save_document",
+            return_value=mock_parsed_document,
+        ) as mock_parse:
+            result = parse(
+                b"%PDF-1.7\n", include_marginalia=False, include_metadata_in_markdown=False
+            )
+
+            mock_parse.assert_called_once_with(
+                ANY,
+                include_marginalia=False,
+                include_metadata_in_markdown=False,
+                grounding_save_dir=None,
+            )
+
     def test_parse_list_with_save_dir(self, temp_dir, mock_parsed_document):
         """Test parsing list of documents with save directory."""
         test_files = [temp_dir / "test1.pdf", temp_dir / "test2.pdf"]

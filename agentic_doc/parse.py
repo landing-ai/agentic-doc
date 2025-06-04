@@ -28,6 +28,7 @@ from agentic_doc.connectors import (
     create_connector,
 )
 from agentic_doc.utils import (
+    check_endpoint_and_api_key,
     download_file,
     get_file_type,
     is_valid_httpurl,
@@ -43,7 +44,13 @@ _LIB_VERSION = importlib.metadata.version("agentic-doc")
 
 def parse(
     documents: Union[
-        str, Path, Url, List[Union[str, Path, Url]], BaseConnector, ConnectorConfig
+        bytes,
+        str,
+        Path,
+        Url,
+        List[Union[str, Path, Url]],
+        BaseConnector,
+        ConnectorConfig,
     ],
     *,
     include_marginalia: bool = True,
@@ -63,6 +70,7 @@ def parse(
             - List of document paths/URLs
             - Connector instance (BaseConnector)
             - Connector configuration (ConnectorConfig)
+            - Raw bytes of a document (either PDF or Image bytes)
         include_marginalia: Whether to include marginalia in the analysis
         include_metadata_in_markdown: Whether to include metadata in markdown output
         result_save_dir: Directory to save results
@@ -73,6 +81,8 @@ def parse(
     Returns:
         List[ParsedDocument]
     """
+    check_endpoint_and_api_key(_ENDPOINT_URL)
+
     # Convert input to list of document paths
     doc_paths = _get_document_paths(documents, connector_path, connector_pattern)
 
@@ -95,7 +105,13 @@ def parse(
 
 def _get_document_paths(
     documents: Union[
-        str, Path, Url, List[Union[str, Path, Url]], BaseConnector, ConnectorConfig
+        bytes,
+        str,
+        Path,
+        Url,
+        List[Union[str, Path, Url]],
+        BaseConnector,
+        ConnectorConfig,
     ],
     connector_path: Optional[str] = None,
     connector_pattern: Optional[str] = None,
@@ -107,6 +123,8 @@ def _get_document_paths(
         return [documents]
     elif isinstance(documents, list):
         return documents
+    elif isinstance(documents, bytes):
+        return _get_documents_from_bytes(documents)
     else:
         raise ValueError(f"Unsupported documents type: {type(documents)}")
 
@@ -136,6 +154,14 @@ def _get_paths_from_connector(
             _LOGGER.error(f"Failed to download file {file_id}: {e}")
 
     return local_paths
+
+
+def _get_documents_from_bytes(doc_bytes: bytes) -> List[Path]:
+    """Save raw bytes to a temporary file and return its path."""
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(doc_bytes)
+        temp_file_path = Path(temp_file.name)
+    return [temp_file_path]
 
 
 def _convert_to_parsed_documents(

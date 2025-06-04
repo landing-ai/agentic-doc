@@ -40,6 +40,89 @@ from agentic_doc.utils import (
 )
 
 
+import base64
+import re
+import requests
+from unittest.mock import patch, MagicMock
+import pytest
+
+from agentic_doc.utils import check_endpoint_and_api_key
+from agentic_doc.config import settings
+
+
+@pytest.mark.parametrize(
+    "api_key_str, endpoint_response, expected_exception, expected_msg",
+    [
+        # No API key
+        ("", None, ValueError, "API key is not set"),
+
+        # Bad base64
+        ("not-base64!", None, ValueError, "API key is not a valid Base64-encoded string"),
+
+        # Bad decoded format
+        (base64.b64encode(b"invalidkeyformat").decode(), None, ValueError, "API key is invalid."),
+
+        # Endpoint down
+        (base64.b64encode(b"user:pass").decode(), requests.exceptions.ConnectionError, ValueError, "endpoint URL"),
+
+        # Known error response
+        (
+            base64.b64encode(b"user:pass").decode(),
+            {"error": "The applications with ID `123` does not exist."},
+            ValueError,
+            "API key is not valid for this endpoint",
+        ),
+
+        # Another known error
+        (
+            base64.b64encode(b"user:pass").decode(),
+            {"error": "User not found, please check your API key"},
+            ValueError,
+            "no user associated with this API key",
+        ),
+
+        # Unexpected error
+        (
+            base64.b64encode(b"user:pass").decode(),
+            {"error": "Unexpected error"},
+            ValueError,
+            "API key is invalid",
+        ),
+    ],
+)
+def test_check_endpoint_and_api_key_failures(api_key_str, endpoint_response, expected_exception, expected_msg):
+    with patch("agentic_doc.utils.settings") as mock_settings:
+        mock_settings.vision_agent_api_key = api_key_str
+
+        if isinstance(endpoint_response, dict):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = endpoint_response
+            mock_requests_get = MagicMock(return_value=mock_resp)
+        elif isinstance(endpoint_response, type) and issubclass(endpoint_response, Exception):
+            mock_requests_get = MagicMock(side_effect=endpoint_response)
+        else:
+            mock_requests_get = MagicMock()
+
+        with patch("agentic_doc.utils.requests.get", mock_requests_get):
+            with pytest.raises(expected_exception) as exc_info:
+                check_endpoint_and_api_key("https://example.com")
+
+            assert expected_msg in str(exc_info.value)
+
+
+def test_check_endpoint_and_api_key_success():
+    valid_api_key = base64.b64encode(b"user:pass").decode()
+
+    with patch("agentic_doc.utils.settings") as mock_settings:
+        mock_settings.vision_agent_api_key = valid_api_key
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {}
+
+        with patch("agentic_doc.utils.requests.get", return_value=mock_resp):
+            check_endpoint_and_api_key("https://example.com")
+
+
 def test_download_file_with_url(results_dir):
     url = "https://pdfobject.com/pdf/sample.pdf"
     output_file_path = Path(results_dir) / "sample.pdf"
