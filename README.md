@@ -181,6 +181,31 @@ config = URLConnectorConfig(
 results = parse(config, connector_path="https://example.com/document.pdf")
 ```
 
+##### Raw Bytes Input
+
+```python
+from agentic_doc.parse import parse
+
+# Load a PDF or image file as bytes
+with open("document.pdf", "rb") as f:
+    raw_bytes = f.read()
+
+# Parse the document from bytes
+results = parse(raw_bytes)
+```
+
+You can also parse image bytes:
+
+```python
+with open("image.png", "rb") as f:
+    image_bytes = f.read()
+
+results = parse(image_bytes)
+```
+
+This is useful when documents are already loaded into memory (e.g., from an API response or uploaded via a web interface). The parser will auto-detect the file type from the bytes.
+
+
 ## Why Use It?
 
 - **Simplified Setup:** No need to manage API keys or handle low-level REST calls.

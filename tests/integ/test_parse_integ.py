@@ -423,3 +423,35 @@ def test_parse_with_document_bytes(sample_pdf_path, results_dir):
     assert len(parsed_doc.chunks) > 0
     assert parsed_doc.start_page_idx == 0
     assert parsed_doc.end_page_idx == 3
+
+def test_parse_with_image_bytes(sample_image_path, results_dir):
+    with open(sample_image_path, "rb") as f:
+        doc_bytes = f.read()
+
+    # Act
+    result = parse(
+        doc_bytes, result_save_dir=results_dir, grounding_save_dir=results_dir
+    )
+
+    assert len(result) == 1
+    parsed_doc = result[0]
+
+    # Check basic structure
+    assert parsed_doc.doc_type == "image"
+    assert parsed_doc.start_page_idx == 0
+    assert parsed_doc.end_page_idx == 0
+    assert parsed_doc.markdown
+    assert len(parsed_doc.chunks) > 0
+
+    # Check chunk structure
+    for chunk in parsed_doc.chunks:
+        assert chunk.text
+        assert len(chunk.grounding) > 0
+        for grounding in chunk.grounding:
+            assert grounding.page == 0
+            if grounding.box:
+                assert 0 <= grounding.box.l <= 1
+                assert 0 <= grounding.box.t <= 1
+                assert 0 <= grounding.box.r <= 1
+                assert 0 <= grounding.box.b <= 1
+
