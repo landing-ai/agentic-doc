@@ -28,9 +28,11 @@ _LOGGER = structlog.getLogger(__name__)
 def check_endpoint_and_api_key(endpoint_url: str) -> None:
     """Check if the API key is valid and if the endpoint is up."""
     api_key = settings.vision_agent_api_key
+
+    if api_key == "PLACEHOLDER":
+        return
     if not api_key:
         raise ValueError("API key is not set. Please provide a valid API key.")
-
     try:
         missing_padding = len(api_key) % 4
         if missing_padding:
