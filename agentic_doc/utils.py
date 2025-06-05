@@ -33,19 +33,6 @@ def check_endpoint_and_api_key(endpoint_url: str) -> None:
         return
     if not api_key:
         raise ValueError("API key is not set. Please provide a valid API key.")
-    try:
-        missing_padding = len(api_key) % 4
-        if missing_padding:
-            api_key += "=" * (4 - missing_padding)
-
-        decoded_bytes = base64.b64decode(api_key, validate=True)
-        decoded_str = decoded_bytes.decode("utf-8")
-
-        if ":" not in decoded_str or decoded_str.count(":") != 1:
-            raise ValueError("API key is invalid.")
-
-    except (UnicodeDecodeError, binascii.Error):
-        raise ValueError("API key is not a valid Base64-encoded string.")
 
     headers = {"Authorization": f"Basic {api_key}"}
 
@@ -54,16 +41,10 @@ def check_endpoint_and_api_key(endpoint_url: str) -> None:
     except requests.exceptions.ConnectionError:
         raise ValueError(f'The endpoint URL "{endpoint_url}" is down or invalid.')
 
-    error = response.json().get("error")
-    if error:
-        if re.match(r"^The applications with ID `[^`]+` does not exist\.$", error):
-            raise ValueError("API key is not valid for this endpoint.")
-        elif error == "User not found, please check your API key":
-            raise ValueError(
-                "API key is in a valid format for this endpoint, but there is no user associated with this API key."
-            )
-        else:
-            raise ValueError("API key is invalid.")
+    if response.status_code == 404:
+        raise ValueError("API key is not valid for this endpoint.")
+    elif response.status_code == 401:
+        raise ValueError("API key is invalid")
 
     _LOGGER.info("API key is valid.")
 
