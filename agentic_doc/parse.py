@@ -42,6 +42,7 @@ _LOGGER = structlog.getLogger(__name__)
 _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
 
+
 def parse(
     documents: Union[
         bytes,
@@ -567,13 +568,13 @@ def _send_parsing_request(
             if extraction_model is not None:
                 # Get the JSON schema from the Pydantic model
                 schema = extraction_model.model_json_schema()
-                
+
                 # Add response format to ensure JSON output
                 data["response_format"] = {"type": "json_object"}
-                
+
                 # Add the schema for validation
                 data["fields_schema"] = json.dumps(schema)
-                
+
                 # Add a note about JSON output in the headers
                 headers = {
                     "Authorization": f"Basic {settings.vision_agent_api_key}",
@@ -602,7 +603,7 @@ def _send_parsing_request(
         f"Time taken to successfully parse a document chunk: {timer.elapsed:.2f} seconds"
     )
     result: dict[str, Any] = response.json()
-    
+
     # Validate the response against the schema if provided
     if extraction_model is not None:
         try:
@@ -613,5 +614,5 @@ def _send_parsing_request(
         except Exception as e:
             _LOGGER.error(f"Response validation failed: {str(e)}")
             raise ValueError(f"Response validation failed: {str(e)}")
-    
+
     return result
