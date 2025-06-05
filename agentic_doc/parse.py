@@ -42,7 +42,6 @@ _LOGGER = structlog.getLogger(__name__)
 _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
 
-
 def parse(
     documents: Union[
         bytes,
@@ -545,10 +544,15 @@ def _send_parsing_request(
         file_path (str): The path to the document file.
         include_marginalia (bool, optional): Whether to include marginalia in the analysis. Defaults to True.
         include_metadata_in_markdown (bool, optional): Whether to include metadata in the markdown output. Defaults to True.
-        extraction_model (type[BaseModel] | None): Schema for field extraction.
+        extraction_model (type[BaseModel] | None): Schema for field extraction. If provided, ensures the response matches this schema.
 
     Returns:
-        dict[str, Any]: The parsed document data.
+        dict[str, Any]: The parsed document data. If extraction_model is provided, the response will be validated against the schema.
+
+    Raises:
+        ValidationError: If the response doesn't match the provided schema.
+        RetryableError: If the request fails with a retryable error.
+        HTTPError: If the request fails with a non-retryable error.
     """
     with Timer() as timer:
         file_type = "pdf" if Path(file_path).suffix.lower() == ".pdf" else "image"
@@ -561,12 +565,27 @@ def _send_parsing_request(
             }
 
             if extraction_model is not None:
-                data["fields_schema"] = json.dumps(extraction_model.model_json_schema())
+                # Get the JSON schema from the Pydantic model
+                schema = extraction_model.model_json_schema()
+                
+                # Add response format to ensure JSON output
+                data["response_format"] = {"type": "json_object"}
+                
+                # Add the schema for validation
+                data["fields_schema"] = json.dumps(schema)
+                
+                # Add a note about JSON output in the headers
+                headers = {
+                    "Authorization": f"Basic {settings.vision_agent_api_key}",
+                    "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
+                    "X-Response-Format": "json",
+                }
+            else:
+                headers = {
+                    "Authorization": f"Basic {settings.vision_agent_api_key}",
+                    "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
+                }
 
-            headers = {
-                "Authorization": f"Basic {settings.vision_agent_api_key}",
-                "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
-            }
             response = httpx.post(
                 _ENDPOINT_URL,
                 files=files,
@@ -583,4 +602,16 @@ def _send_parsing_request(
         f"Time taken to successfully parse a document chunk: {timer.elapsed:.2f} seconds"
     )
     result: dict[str, Any] = response.json()
+    
+    # Validate the response against the schema if provided
+    if extraction_model is not None:
+        try:
+            # Extract the fields from the response
+            fields = result.get("data", {}).get("fields", {})
+            # Validate against the model
+            extraction_model.model_validate(fields)
+        except Exception as e:
+            _LOGGER.error(f"Response validation failed: {str(e)}")
+            raise ValueError(f"Response validation failed: {str(e)}")
+    
     return result
