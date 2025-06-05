@@ -5,15 +5,12 @@ from pathlib import Path
 from typing import Literal, Union
 from urllib.parse import urlparse
 import requests
-import re
-import binascii
 
 import cv2
 import httpx
 import numpy as np
 import pymupdf
 import structlog
-import base64
 from PIL import Image
 from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
@@ -29,8 +26,6 @@ def check_endpoint_and_api_key(endpoint_url: str) -> None:
     """Check if the API key is valid and if the endpoint is up."""
     api_key = settings.vision_agent_api_key
 
-    if api_key == "PLACEHOLDER":
-        return
     if not api_key:
         raise ValueError("API key is not set. Please provide a valid API key.")
 
