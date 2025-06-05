@@ -43,6 +43,7 @@ from agentic_doc.utils import (
 import base64
 import re
 import requests
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from unittest.mock import patch, MagicMock
 import pytest
 
@@ -51,61 +52,35 @@ from agentic_doc.config import settings
 
 
 @pytest.mark.parametrize(
-    "api_key_str, endpoint_response, expected_exception, expected_msg",
+    "api_key_str, mock_response_status, side_effect, expected_exception, expected_msg",
     [
         # No API key
-        ("", None, ValueError, "API key is not set"),
-
-        # Bad base64
-        ("not-base64!", None, ValueError, "API key is not a valid Base64-encoded string"),
-
-        # Bad decoded format
-        (base64.b64encode(b"invalidkeyformat").decode(), None, ValueError, "API key is invalid."),
+        ("", None, None, ValueError, "API key is not set"),
 
         # Endpoint down
-        (base64.b64encode(b"user:pass").decode(), requests.exceptions.ConnectionError, ValueError, "endpoint URL"),
+        (base64.b64encode(b"user:pass").decode(), None, RequestsConnectionError("mocked connection error"), ValueError, "endpoint URL"),
 
-        # Known error response
-        (
-            base64.b64encode(b"user:pass").decode(),
-            {"error": "The applications with ID `123` does not exist."},
-            ValueError,
-            "API key is not valid for this endpoint",
-        ),
+        # 404 Not Found
+        (base64.b64encode(b"user:pass").decode(), 404, None, ValueError, "API key is not valid for this endpoint"),
 
-        # Another known error
-        (
-            base64.b64encode(b"user:pass").decode(),
-            {"error": "User not found, please check your API key"},
-            ValueError,
-            "no user associated with this API key",
-        ),
-
-        # Unexpected error
-        (
-            base64.b64encode(b"user:pass").decode(),
-            {"error": "Unexpected error"},
-            ValueError,
-            "API key is invalid",
-        ),
+        # 401 Unauthorized
+        (base64.b64encode(b"user:pass").decode(), 401, None, ValueError, "API key is invalid"),
     ],
 )
-def test_check_endpoint_and_api_key_failures(api_key_str, endpoint_response, expected_exception, expected_msg):
+def test_check_endpoint_and_api_key_failures(api_key_str, mock_response_status, side_effect, expected_exception, expected_msg):
     with patch("agentic_doc.utils.settings") as mock_settings:
         mock_settings.vision_agent_api_key = api_key_str
 
-        if isinstance(endpoint_response, dict):
-            mock_resp = MagicMock()
-            mock_resp.json.return_value = endpoint_response
-            mock_requests_get = MagicMock(return_value=mock_resp)
-        elif isinstance(endpoint_response, type) and issubclass(endpoint_response, Exception):
-            mock_requests_get = MagicMock(side_effect=endpoint_response)
+        if side_effect is not None:
+            mock_requests_get = MagicMock(side_effect=side_effect)
         else:
-            mock_requests_get = MagicMock()
+            mock_resp = MagicMock()
+            mock_resp.status_code = mock_response_status
+            mock_requests_get = MagicMock(return_value=mock_resp)
 
         with patch("agentic_doc.utils.requests.get", mock_requests_get):
             with pytest.raises(expected_exception) as exc_info:
-                check_endpoint_and_api_key("https://example.com")
+                check_endpoint_and_api_key("https://example123.com")
 
             assert expected_msg in str(exc_info.value)
 
