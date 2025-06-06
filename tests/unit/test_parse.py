@@ -36,6 +36,11 @@ from agentic_doc.parse import (
     parse_documents,
 )
 
+@pytest.fixture(autouse=True)
+def patch_check_api_key():
+    with patch("agentic_doc.parse.check_endpoint_and_api_key"):
+        yield
+
 def test_parse_and_save_documents_empty_list(results_dir):
     # Act
     result_paths = parse_and_save_documents([], result_save_dir=results_dir)
