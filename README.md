@@ -416,6 +416,7 @@ results = parse(
 ```
 
 #### Example: Using field extraction
+
 ```python
 from pydantic import BaseModel, Field
 from agentic_doc.parse import parse
@@ -427,5 +428,5 @@ class ExtractedFields(BaseModel):
     employee_address: str = Field(description="the address of the employee")
 
 results = parse("mydoc.pdf", extraction_model=ExtractedFields)
-fields = result[0].fields
+fields = results[0].extraction_metadata
 ```

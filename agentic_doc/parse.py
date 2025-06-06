@@ -415,6 +415,7 @@ def _parse_image(
         return ParsedDocument(
             markdown="",
             chunks=[],
+            extraction_metadata=None,
             start_page_idx=0,
             end_page_idx=0,
             doc_type="image",
@@ -431,6 +432,7 @@ def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
         return ParsedDocument(
             markdown="",
             chunks=[],
+            extraction_metadata=None,
             start_page_idx=0,
             end_page_idx=0,
             doc_type="pdf",
@@ -515,6 +517,7 @@ def _parse_doc_parts(
         return ParsedDocument(
             markdown="",
             chunks=[],
+            extraction_metadata=None,
             start_page_idx=doc.start_page_idx,
             end_page_idx=doc.end_page_idx,
             doc_type="pdf",
