@@ -566,16 +566,11 @@ def _send_parsing_request(
             if extraction_model is not None:
                 schema = extraction_model.model_json_schema()
                 data["fields_schema"] = json.dumps(schema)
-                headers = {
-                    "Authorization": f"Basic {settings.vision_agent_api_key}",
-                    "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
-                    "X-Response-Format": "json",
-                }
-            else:
-                headers = {
-                    "Authorization": f"Basic {settings.vision_agent_api_key}",
-                    "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
-                }
+
+            headers = {
+                "Authorization": f"Basic {settings.vision_agent_api_key}",
+                "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
+            }
 
             response = httpx.post(
                 _ENDPOINT_URL,
