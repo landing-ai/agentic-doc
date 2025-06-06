@@ -60,7 +60,7 @@ def parse(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     connector_path: Optional[str] = None,
     connector_pattern: Optional[str] = None,
-    extraction_model: Union[type[BaseModel], None] = None,
+    extraction_model: Optional[type[BaseModel]] = None,
 ) -> List[ParsedDocument]:
     """
     Universal parse function that can handle single documents, lists of documents,
