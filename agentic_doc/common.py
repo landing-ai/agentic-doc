@@ -49,6 +49,8 @@ class PageError(BaseModel):
 class ParsedDocument(BaseModel):
     markdown: str
     chunks: list[Chunk]
+    extracted_schema: Optional[dict[str, Any]] = None
+    extraction_metadata: Optional[dict[str, Any]] = None
     start_page_idx: int
     end_page_idx: int
     doc_type: Literal["pdf", "image"]
