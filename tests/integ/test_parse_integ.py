@@ -465,5 +465,4 @@ def test_parse_with_extraction_model(sample_image_path):
     )
 
     extraction_results = result_path[0].extracted_schema
-    print(result_path[0])
     assert extraction_results['eye_color'] == 'green'
