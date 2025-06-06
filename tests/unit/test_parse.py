@@ -919,6 +919,7 @@ class TestParseFunctionConsolidated:
                 include_marginalia=False,
                 include_metadata_in_markdown=False,
                 grounding_save_dir=None,
+                extraction_model=None
             )
 
     def test_parse_list_with_save_dir(self, temp_dir, mock_parsed_document):
