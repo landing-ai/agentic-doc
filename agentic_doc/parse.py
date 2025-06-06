@@ -525,12 +525,7 @@ def _send_parsing_request(
         extraction_model (type[BaseModel] | None): Schema for field extraction. If provided, ensures the response matches this schema.
 
     Returns:
-        dict[str, Any]: The parsed document data. If extraction_model is provided, the response will be validated against the schema.
-
-    Raises:
-        ValidationError: If the response doesn't match the provided schema.
-        RetryableError: If the request fails with a retryable error.
-        HTTPError: If the request fails with a non-retryable error.
+        dict[str, Any]: The parsed document data.
     """
     with Timer() as timer:
         file_type = "pdf" if Path(file_path).suffix.lower() == ".pdf" else "image"
