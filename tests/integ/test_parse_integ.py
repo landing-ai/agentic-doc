@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from pydantic_core import Url
+from pydantic import BaseModel, Field
 
 from agentic_doc.common import ChunkType, ParsedDocument
 from agentic_doc.config import settings
@@ -455,3 +456,14 @@ def test_parse_with_image_bytes(sample_image_path, results_dir):
                 assert 0 <= grounding.box.r <= 1
                 assert 0 <= grounding.box.b <= 1
 
+def test_parse_with_extraction_model(sample_image_path):
+    class SampleFormFields(BaseModel):
+            eye_color: str = Field(description="Eye color")
+
+    result_path = parse(
+        sample_image_path, extraction_model=SampleFormFields
+    )
+
+    extraction_results = result_path[0].extracted_schema
+    print(result_path[0])
+    assert extraction_results['eye_color'] == 'green'
