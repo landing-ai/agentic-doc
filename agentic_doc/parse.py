@@ -401,6 +401,7 @@ def _parse_image(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
         )
+        print(result_raw)
         result_raw = {
             **result_raw["data"],
             "errors": result_raw.get("errors", []),
@@ -416,6 +417,7 @@ def _parse_image(
             markdown="",
             chunks=[],
             extraction_metadata=None,
+            extracted_schema=None,
             start_page_idx=0,
             end_page_idx=0,
             doc_type="image",
@@ -433,6 +435,7 @@ def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
             markdown="",
             chunks=[],
             extraction_metadata=None,
+            extracted_schema=None,
             start_page_idx=0,
             end_page_idx=0,
             doc_type="pdf",
@@ -518,6 +521,7 @@ def _parse_doc_parts(
             markdown="",
             chunks=[],
             extraction_metadata=None,
+            extracted_schema=None,
             start_page_idx=doc.start_page_idx,
             end_page_idx=doc.end_page_idx,
             doc_type="pdf",

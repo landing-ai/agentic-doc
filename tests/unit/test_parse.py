@@ -966,7 +966,7 @@ class TestParseFunctionConsolidated:
             )
 
     def test_parse_with_extraction_model(self, temp_dir, mock_parsed_document):
-
+        """Test parsing with an extraction model."""
         test_file = temp_dir / "test.pdf"
         with open(test_file, "wb") as f:
             f.write(b"%PDF-1.7\n")
