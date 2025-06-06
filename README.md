@@ -398,6 +398,6 @@ class ExtractedFields(BaseModel):
     gross_pay: float = Field(description="the gross pay of the employee")
     employee_address: str = Field(description="the address of the employee")
 
-result = parse("mydoc.pdf", extraction_model=ExtractedFields)
-fields = result.fields
+results = parse("mydoc.pdf", extraction_model=ExtractedFields)
+fields = result[0].fields
 ```

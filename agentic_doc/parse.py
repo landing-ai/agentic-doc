@@ -540,16 +540,8 @@ def _send_parsing_request(
             }
 
             if extraction_model is not None:
-                # Get the JSON schema from the Pydantic model
                 schema = extraction_model.model_json_schema()
-
-                # Add response format to ensure JSON output
-                data["response_format"] = {"type": "json_object"}
-
-                # Add the schema for validation
                 data["fields_schema"] = json.dumps(schema)
-
-                # Add a note about JSON output in the headers
                 headers = {
                     "Authorization": f"Basic {settings.vision_agent_api_key}",
                     "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
@@ -577,16 +569,5 @@ def _send_parsing_request(
         f"Time taken to successfully parse a document chunk: {timer.elapsed:.2f} seconds"
     )
     result: dict[str, Any] = response.json()
-
-    # Validate the response against the schema if provided
-    if extraction_model is not None:
-        try:
-            # Extract the fields from the response
-            fields = result.get("data", {}).get("fields", {})
-            # Validate against the model
-            extraction_model.model_validate(fields)
-        except Exception as e:
-            _LOGGER.error(f"Response validation failed: {str(e)}")
-            raise ValueError(f"Response validation failed: {str(e)}")
 
     return result
