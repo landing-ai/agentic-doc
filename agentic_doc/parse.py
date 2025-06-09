@@ -13,7 +13,6 @@ import structlog
 import tenacity
 from pydantic import BaseModel
 from pydantic_core import Url
-from pydantic import BaseModel
 from tqdm import tqdm
 
 from agentic_doc.common import (

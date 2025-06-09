@@ -8,7 +8,6 @@ import httpx
 import pytest
 from pydantic import BaseModel, Field
 from pydantic_core import Url
-from pydantic import BaseModel, Field
 
 from agentic_doc.common import (
     Chunk,
