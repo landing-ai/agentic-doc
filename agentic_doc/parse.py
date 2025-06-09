@@ -2,16 +2,16 @@ import copy
 import importlib.metadata
 import json
 import tempfile
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Union, Dict
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import httpx
 import structlog
 import tenacity
-from pydantic import BaseModel
 from pydantic_core import Url
 from tqdm import tqdm
 
@@ -167,9 +167,9 @@ def _get_documents_from_bytes(doc_bytes: bytes) -> List[Path]:
 
 
 def _convert_to_parsed_documents(
-    parse_results: Union[List[ParsedDocument], List[Path]],
+    parse_results: Union[List[ParsedDocument[T]], List[Path]],
     result_save_dir: Optional[Union[str, Path]],
-) -> List[ParsedDocument]:
+) -> List[ParsedDocument[T]]:
     """Convert parse results to ParsedDocument objects."""
     parsed_docs = []
 
@@ -179,7 +179,7 @@ def _convert_to_parsed_documents(
         elif isinstance(result, Path):
             with open(result) as f:
                 data = json.load(f)
-            parsed_doc: ParsedDocument = ParsedDocument.model_validate(data)
+            parsed_doc: ParsedDocument[T] = ParsedDocument.model_validate(data)
             if result_save_dir:
                 parsed_doc.result_path = result
             parsed_docs.append(parsed_doc)
@@ -196,8 +196,8 @@ def _parse_document_list(
     include_metadata_in_markdown: bool = True,
     result_save_dir: Optional[Union[str, Path]] = None,
     grounding_save_dir: Optional[Union[str, Path]] = None,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> Union[List[ParsedDocument], List[Path]]:
+    extraction_model: Optional[type[T]] = None,
+) -> Union[List[ParsedDocument[T]], List[Path]]:
     """Helper function to parse a list of documents."""
     documents_list = list(documents)
     if result_save_dir:
@@ -219,14 +219,35 @@ def _parse_document_list(
         )
 
 
+def _parse_document_without_save(
+    document: Union[str, Path, Url],
+    include_marginalia: bool,
+    include_metadata_in_markdown: bool,
+    grounding_save_dir: Union[str, Path, None],
+    extraction_model: Optional[type[T]],
+) -> ParsedDocument[T]:
+    """Wrapper to ensure parse_and_save_document returns ParsedDocument when no save dir."""
+    result = parse_and_save_document(
+        document,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
+        result_save_dir=None,
+        grounding_save_dir=grounding_save_dir,
+        extraction_model=extraction_model,
+    )
+    # When result_save_dir is None, parse_and_save_document returns ParsedDocument[T]
+    assert isinstance(result, ParsedDocument)
+    return result
+
+
 def parse_documents(
     documents: list[Union[str, Path, Url]],
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
     grounding_save_dir: Union[str, Path, None] = None,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> list[ParsedDocument]:
+    extraction_model: Optional[type[T]] = None,
+) -> list[ParsedDocument[T]]:
     """
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
 
@@ -238,8 +259,8 @@ def parse_documents(
         list[ParsedDocument]: The list of parsed documents. The list is sorted by the order of the input documents.
     """
     _LOGGER.info(f"Parsing {len(documents)} documents")
-    _parse_func = partial(
-        parse_and_save_document,
+    _parse_func: Callable[[Union[str, Path, Url]], ParsedDocument[T]] = partial(
+        _parse_document_without_save,
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
         grounding_save_dir=grounding_save_dir,
@@ -248,11 +269,33 @@ def parse_documents(
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(_parse_func, documents),  # type: ignore [arg-type]
+                executor.map(_parse_func, documents),
                 total=len(documents),
                 desc="Parsing documents",
             )
         )
+
+
+def _parse_document_with_save(
+    document: Union[str, Path, Url],
+    include_marginalia: bool,
+    include_metadata_in_markdown: bool,
+    result_save_dir: Union[str, Path],
+    grounding_save_dir: Union[str, Path, None],
+    extraction_model: Optional[type[T]],
+) -> Path:
+    """Wrapper to ensure parse_and_save_document returns Path when save dir provided."""
+    result = parse_and_save_document(
+        document,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
+        result_save_dir=result_save_dir,
+        grounding_save_dir=grounding_save_dir,
+        extraction_model=extraction_model,
+    )
+    # When result_save_dir is provided, parse_and_save_document returns Path
+    assert isinstance(result, Path)
+    return result
 
 
 def parse_and_save_documents(
@@ -262,7 +305,7 @@ def parse_and_save_documents(
     grounding_save_dir: Union[str, Path, None] = None,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
-    extraction_model: Union[type[BaseModel], None] = None,
+    extraction_model: Optional[type[T]] = None,
 ) -> list[Path]:
     """
     Parse a list of documents and save the results to a local directory.
@@ -277,8 +320,9 @@ def parse_and_save_documents(
             The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_123456.json".
     """
     _LOGGER.info(f"Parsing {len(documents)} documents")
-    _parse_func = partial(
-        parse_and_save_document,
+
+    _parse_func: Callable[[Union[str, Path, Url]], Path] = partial(
+        _parse_document_with_save,
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
         result_save_dir=result_save_dir,
@@ -288,7 +332,7 @@ def parse_and_save_documents(
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
             tqdm(
-                executor.map(_parse_func, documents),  # type: ignore [arg-type]
+                executor.map(_parse_func, documents),
                 total=len(documents),
                 desc="Parsing documents",
             )
@@ -302,8 +346,8 @@ def parse_and_save_document(
     include_metadata_in_markdown: bool = True,
     result_save_dir: Union[str, Path, None] = None,
     grounding_save_dir: Union[str, Path, None] = None,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> Union[Path, ParsedDocument]:
+    extraction_model: Optional[type[T]] = None,
+) -> Union[Path, ParsedDocument[T]]:
     """
     Parse a document and save the results to a local directory.
 
@@ -370,8 +414,8 @@ def _parse_pdf(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> ParsedDocument:
+    extraction_model: Optional[type[T]] = None,
+) -> ParsedDocument[T]:
     with tempfile.TemporaryDirectory() as temp_dir:
         parts = split_pdf(file_path, temp_dir, settings.split_size)
         file_path = Path(file_path)
@@ -390,8 +434,8 @@ def _parse_image(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> ParsedDocument:
+    extraction_model: Optional[type[T]] = None,
+) -> ParsedDocument[T]:
     try:
         result_raw = _send_parsing_request(
             str(file_path),
@@ -399,7 +443,6 @@ def _parse_image(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
         )
-        print(result_raw)
         result_raw = {
             **result_raw["data"],
             "errors": result_raw.get("errors", []),
@@ -444,7 +487,7 @@ def _parse_image(
         )
 
 
-def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
+def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
     if not results:
         _LOGGER.warning(
             f"No results to merge: {results}, returning empty ParsedDocument"
@@ -467,7 +510,7 @@ def _merge_part_results(results: list[ParsedDocument]) -> ParsedDocument:
     return init_result
 
 
-def _merge_next_part(curr: ParsedDocument, next: ParsedDocument) -> None:
+def _merge_next_part(curr: ParsedDocument[T], next: ParsedDocument[T]) -> None:
     curr.markdown += "\n\n" + next.markdown
     next_chunks = next.chunks
     for chunk in next_chunks:
@@ -485,9 +528,9 @@ def _parse_doc_in_parallel(
     doc_name: str,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> list[ParsedDocument]:
-    _parse_func = partial(
+    extraction_model: Optional[type[T]] = None,
+) -> list[ParsedDocument[T]]:
+    _parse_func: Callable[[Document], ParsedDocument[T]] = partial(
         _parse_doc_parts,
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
@@ -508,8 +551,8 @@ def _parse_doc_parts(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
-    extraction_model: Union[type[BaseModel], None] = None,
-) -> ParsedDocument:
+    extraction_model: Optional[type[T]] = None,
+) -> ParsedDocument[T]:
     try:
         _LOGGER.info(f"Start parsing document part: '{doc}'")
         result = _send_parsing_request(
@@ -580,7 +623,7 @@ def _send_parsing_request(
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
-    extraction_model: Union[type[BaseModel], None] = None,
+    extraction_model: Optional[type[T]] = None,
 ) -> dict[str, Any]:
     """
     Send a parsing request to the Landing AI Agentic Document Analysis API.

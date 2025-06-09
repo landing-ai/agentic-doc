@@ -90,6 +90,7 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
             grounding_save_dir=temp_dir,
             include_marginalia=True,
             include_metadata_in_markdown=True,
+            result_save_dir=None,
             extraction_model=None,
         )
 
@@ -900,6 +901,7 @@ class TestParseFunctionConsolidated:
                 include_marginalia=False,
                 include_metadata_in_markdown=False,
                 grounding_save_dir=None,
+                result_save_dir=None,
                 extraction_model=None,
             )
 
@@ -920,6 +922,7 @@ class TestParseFunctionConsolidated:
                 include_marginalia=False,
                 include_metadata_in_markdown=False,
                 grounding_save_dir=None,
+                result_save_dir=None,
                 extraction_model=None,
             )
 
@@ -965,6 +968,7 @@ class TestParseFunctionConsolidated:
                 include_marginalia=True,
                 include_metadata_in_markdown=True,
                 grounding_save_dir=None,
+                result_save_dir=None,
                 extraction_model=None,
             )
     def test_parse_with_extraction_model(self, temp_dir, mock_parsed_document):
@@ -988,6 +992,7 @@ class TestParseFunctionConsolidated:
                 include_marginalia=True,
                 include_metadata_in_markdown=True,
                 grounding_save_dir=None,
+                result_save_dir=None,
                 extraction_model=EmployeeFields,
             )
 
