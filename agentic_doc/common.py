@@ -1,9 +1,22 @@
+import inspect
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, Union, Optional
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    List,
+    Literal,
+    Optional,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+)
+
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 
 class ChunkType(str, Enum):
@@ -46,16 +59,68 @@ class PageError(BaseModel):
     error_code: int
 
 
-class ParsedDocument(BaseModel):
+T = TypeVar("T", bound=BaseModel)
+
+
+def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
+    """
+    Recursively creates a new Pydantic model from an existing one,
+    replacing all leaf-level field types with dict[str, list[str]].
+    """
+    fields: Dict[str, Any] = {}
+    for name, field in model.model_fields.items():
+        field_type = field.annotation
+
+        # Handle Optional/Union types
+        origin = get_origin(field_type)
+        if origin is Union:
+            args = get_args(field_type)
+            if len(args) == 2 and type(None) in args:
+                # This is Optional[T]
+                non_none_type = args[0] if args[1] is type(None) else args[1]
+                if inspect.isclass(non_none_type) and issubclass(
+                    non_none_type, BaseModel
+                ):
+                    metadata_type = create_metadata_model(non_none_type)
+                    fields[name] = (Optional[metadata_type], Field(default=None))
+                else:
+                    fields[name] = (Optional[Dict[str, List[str]]], Field(default=None))
+                continue
+
+        # Handle nesting in lists
+        if origin is list:
+            inner_type = get_args(field_type)[0]
+            if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
+                metadata_inner_type = create_metadata_model(inner_type)
+                fields[name] = (List[metadata_inner_type], Field(default_factory=lambda: []))  # type: ignore[valid-type]
+            else:
+                # For List[primitive], each element should be dict[str, list[str]]
+                fields[name] = (
+                    List[Dict[str, List[str]]],
+                    Field(default_factory=lambda: []),
+                )
+            continue
+
+        # Handle nested models
+        if inspect.isclass(field_type) and issubclass(field_type, BaseModel):
+            fields[name] = (create_metadata_model(field_type), Field())
+        else:
+            fields[name] = (Dict[str, List[str]], Field(default_factory=lambda: {}))
+
+    return create_model(f"{model.__name__}Metadata", **fields)
+
+
+class ParsedDocument(BaseModel, Generic[T]):
     markdown: str
     chunks: list[Chunk]
-    extracted_schema: Optional[dict[str, Any]] = None
-    extraction_metadata: Optional[dict[str, Any]] = None
+    extracted_schema: Optional[T] = None
+    extraction_metadata: Optional[BaseModel] = None
     start_page_idx: int
     end_page_idx: int
     doc_type: Literal["pdf", "image"]
     result_path: Optional[Path] = None
     errors: list[PageError] = Field(default_factory=list)
+    extraction_error: Optional[str] = None
 
 
 class RetryableError(Exception):

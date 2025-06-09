@@ -14,8 +14,11 @@ from agentic_doc.common import (
     ParsedDocument,
     RetryableError,
     Timer,
+    create_metadata_model,
 )
 
+from typing import List, Optional
+from pydantic import BaseModel
 
 def test_chunk_type_enum():
     # Test all the enumeration values
@@ -238,3 +241,132 @@ def test_timer():
 
     # Verify elapsed time is positive
     assert timer.elapsed > 0
+
+
+def test_create_metadata_model():
+    # Simple nested model
+    class Researcher(BaseModel):
+        age: int
+        name: str
+
+    class TopLevelModel(BaseModel):
+        id: int
+        researcher: Researcher
+
+    MetadataModel = create_metadata_model(TopLevelModel)
+    metadata_instance = MetadataModel(
+        id={"chunk_references": ["dummy"]},
+        researcher={
+            "age": {"chunk_references": ["dummy", "dummy"]},
+            "name": {"chunk_references": ["dummy"]},
+        },
+    )
+
+    assert isinstance(metadata_instance.id, dict)
+    assert isinstance(metadata_instance.researcher.age, dict)
+    assert isinstance(metadata_instance.researcher.name, dict)
+
+    # Test with Optional fields
+    class ModelWithOptional(BaseModel):
+        required_field: str
+        optional_field: Optional[str] = None
+
+    MetadataWithOptional = create_metadata_model(ModelWithOptional)
+
+    optional_instance = MetadataWithOptional(
+        required_field={"chunk_references": ["dummy"]}, optional_field=None
+    )
+
+    assert isinstance(optional_instance.required_field, dict)
+    assert optional_instance.optional_field is None
+
+    # Test with list fields
+    class ModelWithList(BaseModel):
+        items: List[Researcher]
+
+    MetadataWithList = create_metadata_model(ModelWithList)
+
+    list_instance = MetadataWithList(
+        items=[
+            {"age": {"chunk_references": ["dummy"]}, "name": {"chunk_references": ["dummy"]}},
+            {"age": {"chunk_references": ["dummy"]}, "name": {"chunk_references": ["dummy"]}},
+        ]
+    )
+
+    assert isinstance(list_instance.items, list)
+    assert len(list_instance.items) == 2
+    assert isinstance(list_instance.items[0].age, dict)
+    
+    # Test with list of primitive types
+    class ModelWithPrimitiveList(BaseModel):
+        tags: List[str]
+        
+    MetadataWithPrimitiveList = create_metadata_model(ModelWithPrimitiveList)
+    
+    primitive_list_instance = MetadataWithPrimitiveList(
+        tags=[{"chunk_references": ["dummy"]}, {"chunk_references": ["dummy"]}]
+    )
+    
+    assert isinstance(primitive_list_instance.tags, list)
+    assert len(primitive_list_instance.tags) == 2
+    assert isinstance(primitive_list_instance.tags[0], dict)
+    assert "chunk_references" in primitive_list_instance.tags[0]
+
+
+
+def test_extraction_metadata_type_validation():
+    class NestedModel(BaseModel):
+        field1: str
+        field2: int
+        
+    class ComplexModel(BaseModel):
+        simple_field: str
+        optional_field: Optional[int] = None
+        nested_field: NestedModel
+        list_field: List[str]
+        nested_list_field: List[NestedModel]
+        
+    # Create the metadata model
+    MetadataModel = create_metadata_model(ComplexModel)
+    
+    metadata_instance = MetadataModel(
+        simple_field={"chunk_references": ["text"]},
+        optional_field={"chunk_references": ["low"]},
+        nested_field={
+            "field1": {"chunk_references": ["table"]},
+            "field2": {"chunk_references": ["high"]}
+        },
+        list_field=[{"chunk_references": ["text1"]}, {"chunk_references": ["text2"]}],  # List of primitive metadata
+        nested_list_field=[
+            {
+                "field1": {"chunk_references": ["page1"]},
+                "field2": {"chunk_references": ["medium"]}
+            }
+        ]
+    )
+    
+    # Verify types
+    assert isinstance(metadata_instance.simple_field, dict)
+    assert isinstance(metadata_instance.optional_field, dict)
+    assert hasattr(metadata_instance.nested_field, 'field1')
+    assert hasattr(metadata_instance.nested_field, 'field2')
+    assert isinstance(metadata_instance.nested_field.field1, dict)
+    assert isinstance(metadata_instance.nested_field.field2, dict)
+    assert isinstance(metadata_instance.list_field, list)
+    if len(metadata_instance.list_field) > 0:
+        assert isinstance(metadata_instance.list_field[0], dict)
+    assert isinstance(metadata_instance.nested_list_field, list)
+    
+    metadata_with_none = MetadataModel(
+        simple_field={"chunk_references": ["text"]},
+        optional_field=None,
+        nested_field={
+            "field1": {"chunk_references": ["table"]},
+            "field2": {"chunk_references": ["high"]}
+        },
+        list_field=[],
+        nested_list_field=[]
+    )
+    
+    assert metadata_with_none.optional_field is None
+

@@ -1,18 +1,18 @@
 import copy
 import importlib.metadata
-import tempfile
 import json
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union, Dict
 
 import httpx
 import structlog
 import tenacity
-from pydantic_core import Url
 from pydantic import BaseModel
+from pydantic_core import Url
 from tqdm import tqdm
 
 from agentic_doc.common import (
@@ -20,14 +20,12 @@ from agentic_doc.common import (
     PageError,
     ParsedDocument,
     RetryableError,
+    T,
     Timer,
+    create_metadata_model,
 )
 from agentic_doc.config import settings
-from agentic_doc.connectors import (
-    BaseConnector,
-    ConnectorConfig,
-    create_connector,
-)
+from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
 from agentic_doc.utils import (
     check_endpoint_and_api_key,
     download_file,
@@ -60,8 +58,8 @@ def parse(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     connector_path: Optional[str] = None,
     connector_pattern: Optional[str] = None,
-    extraction_model: Optional[type[BaseModel]] = None,
-) -> List[ParsedDocument]:
+    extraction_model: Optional[type[T]] = None,
+) -> List[ParsedDocument[T]]:
     """
     Universal parse function that can handle single documents, lists of documents,
     or documents from various connectors.
@@ -181,7 +179,7 @@ def _convert_to_parsed_documents(
         elif isinstance(result, Path):
             with open(result) as f:
                 data = json.load(f)
-            parsed_doc = ParsedDocument.model_validate(data)
+            parsed_doc: ParsedDocument = ParsedDocument.model_validate(data)
             if result_save_dir:
                 parsed_doc.result_path = result
             parsed_docs.append(parsed_doc)
@@ -401,7 +399,6 @@ def _parse_image(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
         )
-        print(result_raw)
         result_raw = {
             **result_raw["data"],
             "errors": result_raw.get("errors", []),
@@ -409,6 +406,26 @@ def _parse_image(
             "start_page_idx": 0,
             "end_page_idx": 0,
         }
+
+        if (
+            extraction_model
+            and "extracted_schema" in result_raw
+            and result_raw["extracted_schema"]
+        ):
+            result_raw["extracted_schema"] = extraction_model.model_validate(
+                result_raw["extracted_schema"]
+            )
+
+        if (
+            extraction_model
+            and "extraction_metadata" in result_raw
+            and result_raw["extraction_metadata"]
+        ):
+            metadata_model = create_metadata_model(extraction_model)
+            result_raw["extraction_metadata"] = metadata_model.model_validate(
+                result_raw["extraction_metadata"]
+            )
+
         return ParsedDocument.model_validate(result_raw)
     except Exception as e:
         error_msg = str(e)
@@ -501,15 +518,34 @@ def _parse_doc_parts(
             extraction_model=extraction_model,
         )
         _LOGGER.info(f"Successfully parsed document part: '{doc}'")
-        return ParsedDocument.model_validate(
-            {
-                **result["data"],
-                "errors": result.get("errors", []),
-                "start_page_idx": doc.start_page_idx,
-                "end_page_idx": doc.end_page_idx,
-                "doc_type": "pdf",
-            }
-        )
+        result_data = {
+            **result["data"],
+            "errors": result.get("errors", []),
+            "start_page_idx": doc.start_page_idx,
+            "end_page_idx": doc.end_page_idx,
+            "doc_type": "pdf",
+        }
+        if (
+            extraction_model
+            and "extracted_schema" in result_data
+            and result_data["extracted_schema"]
+        ):
+            result_data["extracted_schema"] = extraction_model.model_validate(
+                result_data["extracted_schema"]
+            )
+
+        if (
+            extraction_model
+            and "extraction_metadata" in result_data
+            and result_data["extraction_metadata"]
+        ):
+            metadata_model = create_metadata_model(extraction_model)
+
+            result_data["extraction_metadata"] = metadata_model.model_validate(
+                result_data["extraction_metadata"]
+            )
+
+        return ParsedDocument.model_validate(result_data)
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing document '{doc}' due to: {error_msg}")
@@ -567,8 +603,20 @@ def _send_parsing_request(
                 "include_metadata_in_markdown": include_metadata_in_markdown,
             }
 
+            def resolve_refs(obj: Any, defs: Dict[str, Any]) -> Any:
+                if isinstance(obj, dict):
+                    if "$ref" in obj:
+                        ref_name = obj["$ref"].split("/")[-1]
+                        return resolve_refs(copy.deepcopy(defs[ref_name]), defs)
+                    return {k: resolve_refs(v, defs) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [resolve_refs(item, defs) for item in obj]
+                return obj
+
             if extraction_model is not None:
                 schema = extraction_model.model_json_schema()
+                defs = schema.pop("$defs", {})
+                schema = resolve_refs(schema, defs)
                 data["fields_schema"] = json.dumps(schema)
 
             headers = {
