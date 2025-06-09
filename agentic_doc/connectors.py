@@ -1,28 +1,27 @@
+import fnmatch
+import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
+import httpx
 import structlog
 from pydantic import BaseModel
-import os
-import fnmatch
-import httpx
 
 try:
     from typing import TYPE_CHECKING
 except ImportError:
     TYPE_CHECKING = False
 
+import boto3  # type: ignore
+from botocore.client import ClientCreator  # type: ignore
 from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.discovery import Resource
 from googleapiclient.http import MediaIoBaseDownload  # type: ignore
-import boto3  # type: ignore
-from botocore.client import ClientCreator  # type: ignore
-
 
 _LOGGER = structlog.getLogger(__name__)
 

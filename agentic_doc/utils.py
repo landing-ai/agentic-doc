@@ -4,12 +4,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Literal, Union
 from urllib.parse import urlparse
-import requests
 
 import cv2
 import httpx
 import numpy as np
 import pymupdf
+import requests
 import structlog
 from PIL import Image
 from pydantic_core import Url

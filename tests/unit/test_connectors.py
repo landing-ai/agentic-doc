@@ -156,6 +156,7 @@ class TestLocalConnector:
 class TestGoogleDriveConnector:
     """Test GoogleDriveConnector functionality."""
 
+
 class TestS3Connector:
     """Test S3Connector functionality."""
 
@@ -172,6 +173,7 @@ class TestS3Connector:
         assert connector.config.bucket_name == "test-bucket"
         assert connector.config.aws_access_key_id == "test-key"
         assert connector.config.region_name == "us-west-2"
+
 
 class TestURLConnector:
     """Test URLConnector functionality."""
@@ -196,6 +198,7 @@ class TestURLConnector:
         assert len(files) == 1
         assert files[0] == "https://example.com/document.pdf"
 
+
 class TestConnectorFactory:
     """Test the connector factory function."""
 
@@ -208,9 +211,7 @@ class TestConnectorFactory:
 
     def test_create_google_drive_connector(self):
         """Test creating a Google Drive connector."""
-        config = GoogleDriveConnectorConfig(
-            client_secret_file="test"
-        )
+        config = GoogleDriveConnectorConfig(client_secret_file="test")
         connector = create_connector(config)
 
         assert isinstance(connector, GoogleDriveConnector)
