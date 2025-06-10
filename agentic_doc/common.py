@@ -107,7 +107,7 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
         else:
             fields[name] = (Dict[str, List[str]], Field(default_factory=lambda: {}))
 
-    return create_model(f"{model.__name__}Metadata", **fields, __base__=model)
+    return create_model(f"{model.__name__}Metadata", **fields)
 
 
 class ParsedDocument(BaseModel, Generic[T]):
