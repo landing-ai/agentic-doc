@@ -102,6 +102,25 @@ for result in results:
 # result_paths: ["path/to/save/results/document1_20250313_070305.json", ...]
 ```
 
+
+#### Using field extraction
+
+```python
+from pydantic import BaseModel, Field
+from agentic_doc.parse import parse
+
+class ExtractedFields(BaseModel):
+    employee_name: str = Field(description="the full name of the employee")
+    employee_ssn: str = Field(description="the social security number of the employee")
+    gross_pay: float = Field(description="the gross pay of the employee")
+    employee_address: str = Field(description="the address of the employee")
+
+results = parse("mydoc.pdf", extraction_model=ExtractedFields)
+fields = results[0].extraction_schema
+print(fields['employee_name'])
+```
+
+
 #### Extract Data Using Connectors
 The library now supports various connectors to easily access documents from different sources:
 
@@ -413,21 +432,4 @@ results = parse(
     include_marginalia=False,  # Exclude marginalia from output
     include_metadata_in_markdown=False  # Exclude metadata from markdown
 )
-```
-
-#### Example: Using field extraction
-
-```python
-from pydantic import BaseModel, Field
-from agentic_doc.parse import parse
-
-class ExtractedFields(BaseModel):
-    employee_name: str = Field(description="the full name of the employee")
-    employee_ssn: str = Field(description="the social security number of the employee")
-    gross_pay: float = Field(description="the gross pay of the employee")
-    employee_address: str = Field(description="the address of the employee")
-
-results = parse("mydoc.pdf", extraction_model=ExtractedFields)
-fields = results[0].extraction_schema
-print(fields['employee_name'])
 ```
