@@ -92,7 +92,10 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
             inner_type = get_args(field_type)[0]
             if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
                 metadata_inner_type = create_metadata_model(inner_type)
-                fields[name] = (List[metadata_inner_type], Field(default_factory=lambda: []))  # type: ignore[valid-type]
+                fields[name] = (
+                    List[metadata_inner_type],
+                    Field(default_factory=lambda: []),
+                )  # type: ignore[valid-type]
             else:
                 # For List[primitive], each element should be dict[str, list[str]]
                 fields[name] = (
@@ -113,7 +116,7 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
 class ParsedDocument(BaseModel, Generic[T]):
     markdown: str
     chunks: list[Chunk]
-    extracted_schema: Optional[T] = None
+    extraction: Optional[T] = None
     extraction_metadata: Optional[BaseModel] = None
     start_page_idx: int
     end_page_idx: int

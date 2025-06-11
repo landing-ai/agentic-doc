@@ -80,9 +80,9 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
     for i in range(1, len(parsed_doc.chunks)):
         prev_page = parsed_doc.chunks[i - 1].grounding[0].page
         curr_page = parsed_doc.chunks[i].grounding[0].page
-        assert (
-            curr_page >= prev_page
-        ), f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
+        assert curr_page >= prev_page, (
+            f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
+        )
 
     # Verify that there were no errors
     assert len(parsed_doc.errors) == 0
@@ -467,27 +467,29 @@ def test_parse_with_extraction_model(sample_image_path):
 
     result_path = parse(sample_image_path, extraction_model=SampleFormFields)
 
-    extraction_results = result_path[0].extracted_schema
+    extraction_results = result_path[0].extraction
     assert extraction_results.eye_color == "green"
+
 
 def test_extraction_metadata_simple(sample_image_path):
     class SampleFormFields(BaseModel):
         eye_color: str = Field(description="Eye color")
-        
+
     result = parse(sample_image_path, extraction_model=SampleFormFields)
-    
+
     assert len(result) == 1
     parsed_doc = result[0]
-    assert parsed_doc.extracted_schema is not None
-    assert isinstance(parsed_doc.extracted_schema, SampleFormFields)
+    assert parsed_doc.extraction is not None
+    assert isinstance(parsed_doc.extraction, SampleFormFields)
 
-    assert hasattr(parsed_doc.extraction_metadata, 'eye_color')
+    assert hasattr(parsed_doc.extraction_metadata, "eye_color")
     assert isinstance(parsed_doc.extraction_metadata.eye_color, dict)
     for key, value in parsed_doc.extraction_metadata.eye_color.items():
         assert isinstance(key, str)
         assert isinstance(value, list)
         for item in value:
             assert isinstance(item, str)
+
 
 def test_extraction_metadata_nested(sample_pdf_path):
     class Invoices(BaseModel):
@@ -499,7 +501,9 @@ def test_extraction_metadata_nested(sample_pdf_path):
         trans_type: str = Field(description="Transaction type")
 
     class Amount(BaseModel):
-        invoices_by_trans_amount: int = Field(description="Invoices by transaction amount")
+        invoices_by_trans_amount: int = Field(
+            description="Invoices by transaction amount"
+        )
         trans_amount: str = Field(description="Transaction amount")
 
     class SampleBookmarkFile(BaseModel):
@@ -519,47 +523,59 @@ def test_extraction_metadata_nested(sample_pdf_path):
     def check_structure_matches(obj, model_class, is_metadata=False):
         """
         Recursively verify that obj has the same structure as model_class.
-        If is_metadata=True, leaf values should be dict[str, list[str]], 
+        If is_metadata=True, leaf values should be dict[str, list[str]],
         otherwise they should match the model's field types.
         """
         field_annotations = model_class.model_fields
-        
+
         for field_name, field_info in field_annotations.items():
             assert hasattr(obj, field_name), f"Missing field: {field_name}"
-            
+
             field_value = getattr(obj, field_name)
             field_type = field_info.annotation
-            
-            if hasattr(field_type, '__bases__') and BaseModel in field_type.__bases__:
+
+            if hasattr(field_type, "__bases__") and BaseModel in field_type.__bases__:
                 if is_metadata:
                     # Recursively check the nested structure
                     check_structure_matches(field_value, field_type, is_metadata=True)
                 else:
-                    # For extracted_schema, should be actual model instances
-                    assert isinstance(field_value, field_type), f"Field {field_name} should be {field_type}"
+                    # For extraction, should be actual model instances
+                    assert isinstance(field_value, field_type), (
+                        f"Field {field_name} should be {field_type}"
+                    )
                     check_structure_matches(field_value, field_type, is_metadata=False)
             else:
                 # This is a leaf field
                 if is_metadata:
-                    assert isinstance(field_value, dict), f"Leaf field {field_name} should be dict[str, list[str]] in metadata"
+                    assert isinstance(field_value, dict), (
+                        f"Leaf field {field_name} should be dict[str, list[str]] in metadata"
+                    )
                     for key, value in field_value.items():
-                        assert isinstance(key, str), f"Keys in {field_name} should be strings"
-                        assert isinstance(value, list), f"Values in {field_name} should be lists"
-                        assert all(isinstance(item, str) for item in value), f"List items in {field_name} should be strings"
+                        assert isinstance(key, str), (
+                            f"Keys in {field_name} should be strings"
+                        )
+                        assert isinstance(value, list), (
+                            f"Values in {field_name} should be lists"
+                        )
+                        assert all(isinstance(item, str) for item in value), (
+                            f"List items in {field_name} should be strings"
+                        )
                 else:
-                    # For extracted_schema, check against the actual field type
-                    assert isinstance(field_value, field_type), f"Field {field_name} should be {field_type}"
-                    
+                    # For extraction, check against the actual field type
+                    assert isinstance(field_value, field_type), (
+                        f"Field {field_name} should be {field_type}"
+                    )
+
     result = parse(sample_pdf_path, extraction_model=Files)
-    
+
     assert len(result) == 1
     parsed_doc = result[0]
-    
-    # Check that extracted_schema has the exact same type as Files
-    assert parsed_doc.extracted_schema is not None
-    assert isinstance(parsed_doc.extracted_schema, Files)
-    check_structure_matches(parsed_doc.extracted_schema, Files, is_metadata=False)
-    
+
+    # Check that extraction has the exact same type as Files
+    assert parsed_doc.extraction is not None
+    assert isinstance(parsed_doc.extraction, Files)
+    check_structure_matches(parsed_doc.extraction, Files, is_metadata=False)
+
     # Check that extraction_metadata has the same structure but with dict[str, list[str]] leaves
     assert parsed_doc.extraction_metadata is not None
     check_structure_matches(parsed_doc.extraction_metadata, Files, is_metadata=True)

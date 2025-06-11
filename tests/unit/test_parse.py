@@ -16,7 +16,7 @@ from agentic_doc.common import (
     ChunkType,
     Document,
     ParsedDocument,
-    create_metadata_model
+    create_metadata_model,
 )
 from agentic_doc.connectors import (
     LocalConnector,
@@ -159,10 +159,11 @@ def test_parse_and_save_document_with_local_file(temp_dir, mock_parsed_document)
 
 def test_parse_and_save_document_with_url(temp_dir, mock_parsed_document):
     # Mock download_file and _parse_pdf functions
-    with patch("agentic_doc.parse.download_file") as mock_download, patch(
-        "agentic_doc.parse.get_file_type", return_value="pdf"
-    ), patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
-
+    with (
+        patch("agentic_doc.parse.download_file") as mock_download,
+        patch("agentic_doc.parse.get_file_type", return_value="pdf"),
+        patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document),
+    ):
         # Call function with URL
         result = parse_and_save_document("https://example.com/document.pdf")
 
@@ -196,10 +197,10 @@ def test_parse_pdf(temp_dir, mock_parsed_document):
         f.write(b"%PDF-1.7\n")
 
     # Mock split_pdf and _parse_doc_in_parallel functions
-    with patch("agentic_doc.parse.split_pdf") as mock_split, patch(
-        "agentic_doc.parse._parse_doc_in_parallel"
-    ) as mock_parse_parts:
-
+    with (
+        patch("agentic_doc.parse.split_pdf") as mock_split,
+        patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts,
+    ):
         # Setup mocks
         mock_split.return_value = [
             Document(
@@ -500,10 +501,11 @@ def test_send_parsing_request_success():
     mock_response.json.return_value = {"data": {"markdown": "Test", "chunks": []}}
 
     # Mock httpx.post to return the mock response
-    with patch("agentic_doc.parse.httpx.post", return_value=mock_response), patch(
-        "agentic_doc.parse.open", MagicMock()
-    ), patch("agentic_doc.parse.Path") as mock_path:
-
+    with (
+        patch("agentic_doc.parse.httpx.post", return_value=mock_response),
+        patch("agentic_doc.parse.open", MagicMock()),
+        patch("agentic_doc.parse.Path") as mock_path,
+    ):
         # Setup mock to make the suffix check work
         mock_path_instance = MagicMock()
         mock_path_instance.suffix.lower.return_value = ".pdf"
@@ -527,10 +529,10 @@ def test_parse_and_save_document_with_grounding_save_dir(
     grounding_dir = temp_dir / "groundings"
 
     # Mock the required functions
-    with patch(
-        "agentic_doc.parse._parse_pdf", return_value=mock_parsed_document
-    ), patch("agentic_doc.parse.save_groundings_as_images") as mock_save_groundings:
-
+    with (
+        patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document),
+        patch("agentic_doc.parse.save_groundings_as_images") as mock_save_groundings,
+    ):
         result = parse_and_save_document(test_file, grounding_save_dir=grounding_dir)
         # Check that save_groundings_as_images was called
         args, kwargs = mock_save_groundings.call_args
@@ -546,10 +548,10 @@ def test_parse_pdf_with_empty_result(temp_dir):
     with open(pdf_path, "wb") as f:
         f.write(b"%PDF-1.7\n")
 
-    with patch("agentic_doc.parse.split_pdf") as mock_split, patch(
-        "agentic_doc.parse._parse_doc_in_parallel"
-    ) as mock_parse_parts:
-
+    with (
+        patch("agentic_doc.parse.split_pdf") as mock_split,
+        patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts,
+    ):
         # Mock an empty result
         empty_doc = ParsedDocument(
             markdown="", chunks=[], start_page_idx=0, end_page_idx=0, doc_type="pdf"
@@ -617,10 +619,10 @@ def test_parse_documents_with_mixed_file_types(temp_dir):
         doc_type="image",
     )
 
-    with patch("agentic_doc.parse._parse_pdf", return_value=mock_pdf_doc), patch(
-        "agentic_doc.parse._parse_image", return_value=mock_img_doc
+    with (
+        patch("agentic_doc.parse._parse_pdf", return_value=mock_pdf_doc),
+        patch("agentic_doc.parse._parse_image", return_value=mock_img_doc),
     ):
-
         results = parse_documents([str(pdf_path), str(img_path)])
 
         assert len(results) == 2
@@ -640,10 +642,10 @@ def test_send_parsing_request_with_different_file_types(temp_dir):
     mock_response.status_code = 200
     mock_response.json.return_value = {"data": {"markdown": "PDF Test", "chunks": []}}
 
-    with patch("agentic_doc.parse.httpx.post", return_value=mock_response), patch(
-        "agentic_doc.parse.open", MagicMock()
+    with (
+        patch("agentic_doc.parse.httpx.post", return_value=mock_response),
+        patch("agentic_doc.parse.open", MagicMock()),
     ):
-
         result = _send_parsing_request(str(pdf_path))
         assert result["data"]["markdown"] == "PDF Test"
 
@@ -654,10 +656,10 @@ def test_send_parsing_request_with_different_file_types(temp_dir):
 
     mock_response.json.return_value = {"data": {"markdown": "Image Test", "chunks": []}}
 
-    with patch("agentic_doc.parse.httpx.post", return_value=mock_response), patch(
-        "agentic_doc.parse.open", MagicMock()
+    with (
+        patch("agentic_doc.parse.httpx.post", return_value=mock_response),
+        patch("agentic_doc.parse.open", MagicMock()),
     ):
-
         result = _send_parsing_request(str(img_path))
         assert result["data"]["markdown"] == "Image Test"
 
@@ -686,10 +688,10 @@ def test_parse_pdf_handles_single_page_document(temp_dir):
         doc_type="pdf",
     )
 
-    with patch("agentic_doc.parse.split_pdf") as mock_split, patch(
-        "agentic_doc.parse._parse_doc_in_parallel"
-    ) as mock_parse_parts:
-
+    with (
+        patch("agentic_doc.parse.split_pdf") as mock_split,
+        patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts,
+    ):
         mock_split.return_value = [
             Document(
                 file_path=temp_dir / "single_1.pdf", start_page_idx=0, end_page_idx=0
@@ -759,9 +761,12 @@ class TestParseFunctionConsolidated:
 
         grounding_dir = temp_dir / "groundings"
 
-        with patch(
-            "agentic_doc.parse._parse_pdf", return_value=mock_parsed_document
-        ), patch("agentic_doc.parse.save_groundings_as_images") as mock_save_groundings:
+        with (
+            patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document),
+            patch(
+                "agentic_doc.parse.save_groundings_as_images"
+            ) as mock_save_groundings,
+        ):
             result = parse(test_file, grounding_save_dir=grounding_dir)
 
             assert isinstance(result, list)
@@ -779,11 +784,13 @@ class TestParseFunctionConsolidated:
 
         config = LocalConnectorConfig()
 
-        with patch("agentic_doc.parse.create_connector") as mock_create, patch(
-            "agentic_doc.parse._parse_document_list",
-            return_value=[mock_parsed_document],
-        ) as mock_parse_list:
-
+        with (
+            patch("agentic_doc.parse.create_connector") as mock_create,
+            patch(
+                "agentic_doc.parse._parse_document_list",
+                return_value=[mock_parsed_document],
+            ) as mock_parse_list,
+        ):
             # Mock connector
             mock_connector = MagicMock()
             mock_connector.list_files.return_value = [str(test_file)]
@@ -806,13 +813,14 @@ class TestParseFunctionConsolidated:
         config = LocalConnectorConfig()
         connector = LocalConnector(config)
 
-        with patch.object(
-            connector, "list_files", return_value=[str(test_file)]
-        ), patch.object(connector, "download_file", return_value=test_file), patch(
-            "agentic_doc.parse._parse_document_list",
-            return_value=[mock_parsed_document],
-        ) as mock_parse_list:
-
+        with (
+            patch.object(connector, "list_files", return_value=[str(test_file)]),
+            patch.object(connector, "download_file", return_value=test_file),
+            patch(
+                "agentic_doc.parse._parse_document_list",
+                return_value=[mock_parsed_document],
+            ) as mock_parse_list,
+        ):
             result = parse(connector, connector_path=str(temp_dir))
 
             assert isinstance(result, list)
@@ -838,11 +846,13 @@ class TestParseFunctionConsolidated:
         """Test parsing with connector when some downloads fail."""
         config = LocalConnectorConfig()
 
-        with patch("agentic_doc.parse.create_connector") as mock_create, patch(
-            "agentic_doc.parse._parse_document_list",
-            return_value=[mock_parsed_document],
-        ) as mock_parse_list:
-
+        with (
+            patch("agentic_doc.parse.create_connector") as mock_create,
+            patch(
+                "agentic_doc.parse._parse_document_list",
+                return_value=[mock_parsed_document],
+            ) as mock_parse_list,
+        ):
             # Mock connector
             mock_connector = MagicMock()
             mock_connector.list_files.return_value = ["file1.pdf", "file2.pdf"]
@@ -971,6 +981,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=None,
             )
+
     def test_parse_with_extraction_model(self, temp_dir, mock_parsed_document):
         """Test parsing with an extraction model."""
         test_file = temp_dir / "test.pdf"
@@ -1000,150 +1011,163 @@ class TestParseFunctionConsolidated:
         class PersonInfo(BaseModel):
             name: str = Field(description="Person's name")
             age: int = Field(description="Person's age")
-            
+
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
             mock_request.return_value = {
                 "data": {
                     "markdown": "# Test Document\nName: John Doe\nAge: 30",
-                    "chunks": [{
-                        "text": "Name: John Doe",
-                        "grounding": [{"page": 0, "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2}}],
-                        "chunk_type": "text",
-                        "chunk_id": "1"
-                    }],
-                    "extracted_schema": {
-                        "name": "John Doe",
-                        "age": 30
-                    },
+                    "chunks": [
+                        {
+                            "text": "Name: John Doe",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
+                    "extracted_schema": {"name": "John Doe", "age": 30},
                     "extraction_metadata": {
                         "name": {"chunk_references": ["high"]},
-                        "age": {"chunk_references": ["medium"]}
-                    }
+                        "age": {"chunk_references": ["medium"]},
+                    },
                 },
-                "errors": []
+                "errors": [],
             }
-            
+
             result = parse(sample_image_path, extraction_model=PersonInfo)
-            
-            # Verify extracted_schema is correctly typed
-            assert isinstance(result[0].extracted_schema, PersonInfo)
-            assert result[0].extracted_schema.name == "John Doe"
-            assert result[0].extracted_schema.age == 30
-            
+
+            # Verify extraction is correctly typed
+            assert isinstance(result[0].extraction, PersonInfo)
+            assert result[0].extraction.name == "John Doe"
+            assert result[0].extraction.age == 30
+
             # Verify extraction_metadata is correctly typed
             metadata = result[0].extraction_metadata
             assert metadata is not None
-            
+
             # Check that metadata fields are dict[str, list[str]]
             assert isinstance(metadata.name, dict)
             assert isinstance(metadata.age, dict)
-            
+
             # Check specific metadata values
             assert metadata.name["chunk_references"] == ["high"]
             assert metadata.age["chunk_references"] == ["medium"]
 
-
     def test_extraction_metadata_with_nested_models(self, sample_image_path):
         """Test extraction_metadata functionality with nested models."""
-        
+
         class Address(BaseModel):
             street: str = Field(description="Street address")
             city: str = Field(description="City")
-            
+
         class Person(BaseModel):
             name: str = Field(description="Person's name")
             address: Address = Field(description="Person's address")
-            
+
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
             mock_request.return_value = {
                 "data": {
                     "markdown": "# Person Info\nName: Jane Smith\nAddress: 123 Main St, Springfield",
-                    "chunks": [{
-                        "text": "Name: Jane Smith",
-                        "grounding": [{"page": 0, "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2}}],
-                        "chunk_type": "text",
-                        "chunk_id": "1"
-                    }],
+                    "chunks": [
+                        {
+                            "text": "Name: Jane Smith",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
                     "extracted_schema": {
                         "name": "Jane Smith",
-                        "address": {
-                            "street": "123 Main St",
-                            "city": "Springfield"
-                        }
+                        "address": {"street": "123 Main St", "city": "Springfield"},
                     },
                     "extraction_metadata": {
                         "name": {"chunk_references": ["high"]},
                         "address": {
                             "street": {"chunk_references": ["medium"]},
-                            "city": {"chunk_references": ["high"]}
-                        }
-                    }
+                            "city": {"chunk_references": ["high"]},
+                        },
+                    },
                 },
-                "errors": []
+                "errors": [],
             }
             result = parse(sample_image_path, extraction_model=Person)
-            
-            assert isinstance(result[0].extracted_schema, Person)
-            assert result[0].extracted_schema.name == "Jane Smith"
-            assert isinstance(result[0].extracted_schema.address, Address)
-            assert result[0].extracted_schema.address.street == "123 Main St"
-            assert result[0].extracted_schema.address.city == "Springfield"
-            
+
+            assert isinstance(result[0].extraction, Person)
+            assert result[0].extraction.name == "Jane Smith"
+            assert isinstance(result[0].extraction.address, Address)
+            assert result[0].extraction.address.street == "123 Main St"
+            assert result[0].extraction.address.city == "Springfield"
+
             metadata = result[0].extraction_metadata
             assert metadata is not None
 
             assert isinstance(metadata.name, dict)
             assert metadata.name["chunk_references"] == ["high"]
 
-            assert hasattr(metadata, 'address')
-            assert hasattr(metadata.address, 'street')
-            assert hasattr(metadata.address, 'city')
-            
+            assert hasattr(metadata, "address")
+            assert hasattr(metadata.address, "street")
+            assert hasattr(metadata.address, "city")
+
             assert isinstance(metadata.address.street, dict)
             assert isinstance(metadata.address.city, dict)
             assert metadata.address.street["chunk_references"] == ["medium"]
             assert metadata.address.city["chunk_references"] == ["high"]
 
-
     def test_extraction_metadata_with_optional_fields(self, sample_image_path):
         """Test extraction_metadata functionality with optional fields."""
-        
+
         class PersonWithOptional(BaseModel):
             name: str = Field(description="Person's name")
             phone: Optional[str] = Field(default=None, description="Phone number")
             email: Optional[str] = Field(default=None, description="Email address")
-            
+
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
             mock_request.return_value = {
                 "data": {
                     "markdown": "# Contact Info\nName: Bob Johnson\nEmail: bob@example.com",
-                    "chunks": [{
-                        "text": "Name: Bob Johnson",
-                        "grounding": [{"page": 0, "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2}}],
-                        "chunk_type": "text",
-                        "chunk_id": "1"
-                    }],
+                    "chunks": [
+                        {
+                            "text": "Name: Bob Johnson",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
                     "extracted_schema": {
                         "name": "Bob Johnson",
                         "phone": None,
-                        "email": "bob@example.com"
+                        "email": "bob@example.com",
                     },
                     "extraction_metadata": {
                         "name": {"chunk_references": ["high"]},
                         "phone": None,
-                        "email": {"chunk_references": ["medium"]}
-                    }
+                        "email": {"chunk_references": ["medium"]},
+                    },
                 },
-                "errors": []
+                "errors": [],
             }
-            
+
             result = parse(sample_image_path, extraction_model=PersonWithOptional)
-            
-            assert isinstance(result[0].extracted_schema, PersonWithOptional)
-            assert result[0].extracted_schema.name == "Bob Johnson"
-            assert result[0].extracted_schema.phone is None
-            assert result[0].extracted_schema.email == "bob@example.com"
-            
+
+            assert isinstance(result[0].extraction, PersonWithOptional)
+            assert result[0].extraction.name == "Bob Johnson"
+            assert result[0].extraction.phone is None
+            assert result[0].extraction.email == "bob@example.com"
+
             metadata = result[0].extraction_metadata
             assert metadata is not None
 
@@ -1154,66 +1178,72 @@ class TestParseFunctionConsolidated:
             assert isinstance(metadata.email, dict)
             assert metadata.email["chunk_references"] == ["medium"]
 
-
     def test_extraction_metadata_with_list_fields(self, sample_image_path):
         """Test extraction_metadata functionality with list fields."""
-        
+
         class Skill(BaseModel):
             name: str = Field(description="Skill name")
             level: str = Field(description="Skill level")
-            
+
         class PersonWithSkills(BaseModel):
             name: str = Field(description="Person's name")
             skills: List[Skill] = Field(description="List of skills")
-            
+
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
             mock_request.return_value = {
                 "data": {
                     "markdown": "# Resume\nName: Alice Brown\nSkills: Python (Expert), Java (Intermediate)",
-                    "chunks": [{
-                        "text": "Name: Alice Brown",
-                        "grounding": [{"page": 0, "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2}}],
-                        "chunk_type": "text",
-                        "chunk_id": "1"
-                    }],
+                    "chunks": [
+                        {
+                            "text": "Name: Alice Brown",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
                     "extracted_schema": {
                         "name": "Alice Brown",
                         "skills": [
                             {"name": "Python", "level": "Expert"},
-                            {"name": "Java", "level": "Intermediate"}
-                        ]
+                            {"name": "Java", "level": "Intermediate"},
+                        ],
                     },
                     "extraction_metadata": {
                         "name": {"chunk_references": ["high"]},
                         "skills": [
                             {
                                 "name": {"chunk_references": ["high"]},
-                                "level": {"chunk_references": ["high"]}
+                                "level": {"chunk_references": ["high"]},
                             },
                             {
                                 "name": {"chunk_references": ["high"]},
-                                "level": {"chunk_references": ["medium"]}
-                            }
-                        ]
-                    }
+                                "level": {"chunk_references": ["medium"]},
+                            },
+                        ],
+                    },
                 },
-                "errors": []
+                "errors": [],
             }
-            
+
             result = parse(sample_image_path, extraction_model=PersonWithSkills)
-            
-            assert isinstance(result[0].extracted_schema, PersonWithSkills)
-            assert result[0].extracted_schema.name == "Alice Brown"
-            assert len(result[0].extracted_schema.skills) == 2
-            assert result[0].extracted_schema.skills[0].name == "Python"
-            assert result[0].extracted_schema.skills[0].level == "Expert"
-            
+
+            assert isinstance(result[0].extraction, PersonWithSkills)
+            assert result[0].extraction.name == "Alice Brown"
+            assert len(result[0].extraction.skills) == 2
+            assert result[0].extraction.skills[0].name == "Python"
+            assert result[0].extraction.skills[0].level == "Expert"
+
             metadata = result[0].extraction_metadata
             assert metadata is not None
-            
+
             assert isinstance(metadata.name, dict)
             assert metadata.name["chunk_references"] == ["high"]
-            
+
             assert isinstance(metadata.skills, list)
             assert len(metadata.skills) == 2
 
@@ -1222,7 +1252,7 @@ class TestParseFunctionConsolidated:
             assert isinstance(first_skill_meta.level, dict)
             assert first_skill_meta.name["chunk_references"] == ["high"]
             assert first_skill_meta.level["chunk_references"] == ["high"]
-            
+
             second_skill_meta = metadata.skills[1]
             assert isinstance(second_skill_meta.name, dict)
             assert isinstance(second_skill_meta.level, dict)
@@ -1231,50 +1261,57 @@ class TestParseFunctionConsolidated:
 
     def test_extraction_metadata_error(self, sample_image_path):
         """Test extraction_metadata error."""
-        
+
         class Skill(BaseModel):
             name: str = Field(description="Skill name")
             level: str = Field(description="Skill level")
-            
+
         class PersonWithSkills(BaseModel):
             name: str = Field(description="Person's name")
             skills: List[Skill] = Field(description="List of skills")
-            
+
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
             mock_request.return_value = {
                 "data": {
                     "markdown": "# Resume\nName: Alice Brown\nSkills: Python (Expert), Java (Intermediate)",
-                    "chunks": [{
-                        "text": "Name: Alice Brown",
-                        "grounding": [{"page": 0, "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2}}],
-                        "chunk_type": "text",
-                        "chunk_id": "1"
-                    }],
+                    "chunks": [
+                        {
+                            "text": "Name: Alice Brown",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
                     "extracted_schema": {
                         "name": "Alice Brown",
                         "skills": [
                             {"name": "Python", "level": "Expert"},
-                            {"name": "Java", "level": "Intermediate"}
-                        ]
+                            {"name": "Java", "level": "Intermediate"},
+                        ],
                     },
                     "extraction_metadata": {
                         "name": "Alice Brown",
                         "skills": [
                             {
                                 "name": {"chunk_references": ["high"]},
-                                "level": {"chunk_references": ["high"]}
+                                "level": {"chunk_references": ["high"]},
                             },
                             {
                                 "name": {"chunk_references": ["high"]},
-                                "level": {"chunk_references": ["medium"]}
-                            }
-                        ]
-                    }
+                                "level": {"chunk_references": ["medium"]},
+                            },
+                        ],
+                    },
                 },
-                "errors": []
+                "errors": [],
             }
-            
+
             result = parse(sample_image_path, extraction_model=PersonWithSkills)
-            assert result[0].extracted_schema is None
+            assert result[0].extraction is None
             assert result[0].extraction_metadata is None
-            assert  'validation error' in result[0].errors[0].error.lower()
+            assert "validation error" in result[0].errors[0].error.lower()
