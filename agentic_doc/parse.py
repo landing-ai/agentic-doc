@@ -456,7 +456,7 @@ def _parse_image(
             and "extracted_schema" in result_raw
             and result_raw["extracted_schema"]
         ):
-            result_raw["extracted_schema"] = extraction_model.model_validate(
+            result_raw["extraction"] = extraction_model.model_validate(
                 result_raw["extracted_schema"]
             )
 
@@ -466,7 +466,7 @@ def _parse_image(
             and result_raw["extraction_metadata"]
         ):
             metadata_model = create_metadata_model(extraction_model)
-            result_raw["extraction_metadata"] = metadata_model.model_validate(
+            result_raw["extraction"] = metadata_model.model_validate(
                 result_raw["extraction_metadata"]
             )
 
@@ -574,7 +574,7 @@ def _parse_doc_parts(
             and "extracted_schema" in result_data
             and result_data["extracted_schema"]
         ):
-            result_data["extracted_schema"] = extraction_model.model_validate(
+            result_data["extraction"] = extraction_model.model_validate(
                 result_data["extracted_schema"]
             )
 
@@ -585,7 +585,7 @@ def _parse_doc_parts(
         ):
             metadata_model = create_metadata_model(extraction_model)
 
-            result_data["extraction_metadata"] = metadata_model.model_validate(
+            result_data["extraction"] = metadata_model.model_validate(
                 result_data["extraction_metadata"]
             )
 

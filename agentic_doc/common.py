@@ -93,9 +93,9 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
             if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
                 metadata_inner_type = create_metadata_model(inner_type)
                 fields[name] = (
-                    List[metadata_inner_type],
+                    List[metadata_inner_type],  # type: ignore[valid-type]
                     Field(default_factory=lambda: []),
-                )  # type: ignore[valid-type]
+                )
             else:
                 # For List[primitive], each element should be dict[str, list[str]]
                 fields[name] = (
