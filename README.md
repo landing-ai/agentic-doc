@@ -117,7 +117,7 @@ class ExtractedFields(BaseModel):
 
 results = parse("mydoc.pdf", extraction_model=ExtractedFields)
 fields = results[0].extraction
-print(fields['employee_name'])
+print(fields.employee_name)
 ```
 
 
