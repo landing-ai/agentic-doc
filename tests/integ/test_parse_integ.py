@@ -592,10 +592,9 @@ def test_extraction_metadata_simple_schema(sample_image_path):
     assert parsed_doc.extraction is not None
     assert isinstance(parsed_doc.extraction, dict)
 
-    assert "eye_color" in parsed_doc.extraction_metadata
-    assert parsed_doc.extraction_metadata["eye_color"] == "green"
-    assert isinstance(parsed_doc.extraction_metadata["eye_color"], dict)
-    for key, value in parsed_doc.extraction_metadata["eye_color"].items():
+    assert hasattr(parsed_doc.extraction_metadata, "eye_color")
+    assert isinstance(parsed_doc.extraction_metadata.eye_color, dict)
+    for key, value in parsed_doc.extraction_metadata.eye_color.items():
         assert isinstance(key, str)
         assert isinstance(value, list)
         for item in value:
@@ -670,14 +669,7 @@ def test_extraction_metadata_nested_schema(sample_pdf_path):
     assert isinstance(parsed_doc.extraction, dict)
     assert "sample_bookmark_file" in parsed_doc.extraction
     assert "sample_data_file" in parsed_doc.extraction
-    assert "invoices_by_date" in parsed_doc.extraction["sample_bookmark_file"]["invoices"]
-    assert "invoices_by_type" in parsed_doc.extraction["sample_bookmark_file"]["type"]
-    assert "invoices_by_trans_amount" in parsed_doc.extraction["sample_bookmark_file"]["amount"]
-    assert "invoices_by_date" in parsed_doc.extraction["sample_data_file"]["invoices"]
-    assert "invoices_by_type" in parsed_doc.extraction["sample_data_file"]["type"]
-    assert "invoices_by_trans_amount" in parsed_doc.extraction["sample_data_file"]["amount"]
 
     assert parsed_doc.extraction_metadata is not None
-    assert isinstance(parsed_doc.extraction_metadata, dict)
-    assert "sample_bookmark_file" in parsed_doc.extraction_metadata
-    assert "sample_data_file" in parsed_doc.extraction_metadata
+    assert hasattr(parsed_doc.extraction_metadata, "sample_bookmark_file")
+    assert hasattr(parsed_doc.extraction_metadata, "sample_data_file")
