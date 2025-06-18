@@ -15,6 +15,7 @@ import tenacity
 from pydantic_core import Url
 from tqdm import tqdm
 import jsonschema
+from pypdf import PdfReader
 
 from agentic_doc.common import (
     Document,
@@ -441,7 +442,21 @@ def _parse_pdf(
     extraction_schema: Optional[dict[str, Any]] = None,
 ) -> ParsedDocument[Any]:
     with tempfile.TemporaryDirectory() as temp_dir:
-        parts = split_pdf(file_path, temp_dir, settings.split_size)
+        if extraction_model or extraction_schema is not None:
+            total_pages = 0
+            with open(file_path, "rb") as file:
+                reader = PdfReader(file)
+                total_pages = len(reader.pages)
+            if total_pages > 50:
+                raise ValueError(
+                    f"Document has {total_pages} pages, which exceeds the maximum of 50 pages "
+                    "allowed when using field extraction. Please use a document with 50 pages or fewer."
+                )
+            split_size = 50
+        else:
+            split_size = settings.split_size
+
+        parts = split_pdf(file_path, temp_dir, split_size)
         file_path = Path(file_path)
         part_results = _parse_doc_in_parallel(
             parts,
