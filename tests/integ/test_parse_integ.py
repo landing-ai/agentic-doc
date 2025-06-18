@@ -577,7 +577,7 @@ def test_extraction_metadata_nested(sample_pdf_path):
     check_structure_matches(parsed_doc.extraction_metadata, Files, is_metadata=True)
 
 
-def test_extraction_metadata_simple_schema(sample_image_path):
+def test_extraction_schema_simple(sample_image_path):
     extraction_schema = {
         "type": "object",
         "properties": {
@@ -588,20 +588,13 @@ def test_extraction_metadata_simple_schema(sample_image_path):
     result = parse(sample_image_path, extraction_schema=extraction_schema)
 
     assert len(result) == 1
-    parsed_doc = result[0]
-    assert parsed_doc.extraction is not None
-    assert isinstance(parsed_doc.extraction, dict)
-
-    assert hasattr(parsed_doc.extraction_metadata, "eye_color")
-    assert isinstance(parsed_doc.extraction_metadata.eye_color, dict)
-    for key, value in parsed_doc.extraction_metadata.eye_color.items():
-        assert isinstance(key, str)
-        assert isinstance(value, list)
-        for item in value:
-            assert isinstance(item, str)
+    extraction_result = result[0]
+    assert extraction_result.extraction is not None
+    assert isinstance(extraction_result.extraction, dict)
+    assert extraction_result.extraction["eye_color"] == "green"
 
 
-def test_extraction_metadata_nested_schema(sample_pdf_path):
+def test_extraction_schema_nested(sample_pdf_path):
     extraction_schema = {
         "type": "object",
         "properties": {
@@ -663,13 +656,14 @@ def test_extraction_metadata_nested_schema(sample_pdf_path):
     result = parse(sample_pdf_path, extraction_schema=extraction_schema)
 
     assert len(result) == 1
-    parsed_doc = result[0]
-
-    assert parsed_doc.extraction is not None
-    assert isinstance(parsed_doc.extraction, dict)
-    assert "sample_bookmark_file" in parsed_doc.extraction
-    assert "sample_data_file" in parsed_doc.extraction
-
-    assert parsed_doc.extraction_metadata is not None
-    assert hasattr(parsed_doc.extraction_metadata, "sample_bookmark_file")
-    assert hasattr(parsed_doc.extraction_metadata, "sample_data_file")
+    extraction_result = result[0]
+    assert extraction_result.extraction is not None
+    assert isinstance(extraction_result.extraction, dict)
+    assert "sample_bookmark_file" in extraction_result.extraction
+    assert "sample_data_file" in extraction_result.extraction
+    assert "invoices_by_date" in extraction_result.extraction["sample_bookmark_file"]["invoices"]
+    assert "invoices_by_type" in extraction_result.extraction["sample_bookmark_file"]["type"]
+    assert "invoices_by_trans_amount" in extraction_result.extraction["sample_bookmark_file"]["amount"]
+    assert "invoices_by_date" in extraction_result.extraction["sample_data_file"]["invoices"]
+    assert "invoices_by_type" in extraction_result.extraction["sample_data_file"]["type"]
+    assert "invoices_by_trans_amount" in extraction_result.extraction["sample_data_file"]["amount"]
