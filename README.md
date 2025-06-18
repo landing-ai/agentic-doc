@@ -203,7 +203,7 @@ config = URLConnectorConfig(
 results = parse(config, connector_path="https://example.com/document.pdf")
 ```
 
-##### Raw Bytes Input
+#### Raw Bytes Input
 
 ```python
 from agentic_doc.parse import parse
