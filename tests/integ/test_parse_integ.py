@@ -1,14 +1,10 @@
 import json
 import os
-from typing import List, Optional
-from unittest.mock import MagicMock, patch
 
-import httpx
 import pytest
-from pydantic_core import Url
 from pydantic import BaseModel, Field
 
-from agentic_doc.common import ChunkType, ParsedDocument, create_metadata_model
+from agentic_doc.common import ChunkType, ParsedDocument
 from agentic_doc.config import settings
 from agentic_doc.parse import (
     parse,
@@ -579,3 +575,109 @@ def test_extraction_metadata_nested(sample_pdf_path):
     # Check that extraction_metadata has the same structure but with dict[str, list[str]] leaves
     assert parsed_doc.extraction_metadata is not None
     check_structure_matches(parsed_doc.extraction_metadata, Files, is_metadata=True)
+
+
+def test_extraction_metadata_simple_schema(sample_image_path):
+    extraction_schema = {
+        "type": "object",
+        "properties": {
+            "eye_color": {"type": "string", "description": "Eye color"}
+        }
+    }
+
+    result = parse(sample_image_path, extraction_schema=extraction_schema)
+
+    assert len(result) == 1
+    parsed_doc = result[0]
+    assert parsed_doc.extraction is not None
+    assert isinstance(parsed_doc.extraction, dict)
+
+    assert "eye_color" in parsed_doc.extraction_metadata
+    assert parsed_doc.extraction_metadata["eye_color"] == "green"
+    assert isinstance(parsed_doc.extraction_metadata["eye_color"], dict)
+    for key, value in parsed_doc.extraction_metadata["eye_color"].items():
+        assert isinstance(key, str)
+        assert isinstance(value, list)
+        for item in value:
+            assert isinstance(item, str)
+
+
+def test_extraction_metadata_nested_schema(sample_pdf_path):
+    extraction_schema = {
+        "type": "object",
+        "properties": {
+            "sample_bookmark_file": {
+                "type": "object",
+                "properties": {
+                    "invoices": {
+                        "type": "object",
+                        "properties": {
+                            "invoices_by_date": {"type": "integer", "description": "Invoices by date"},
+                            "trans_date": {"type": "string", "description": "Transaction date"}
+                        }
+                    },
+                    "type": {
+                        "type": "object",
+                        "properties": {
+                            "invoices_by_type": {"type": "integer", "description": "Invoices by type"},
+                            "trans_type": {"type": "string", "description": "Transaction type"}
+                        }
+                    },
+                    "amount": {
+                        "type": "object",
+                        "properties": {
+                            "invoices_by_trans_amount": {"type": "integer", "description": "Invoices by transaction amount"},
+                            "trans_amount": {"type": "string", "description": "Transaction amount"}
+                        }
+                    }
+                }
+            },
+            "sample_data_file": {
+                "type": "object",
+                "properties": {
+                    "invoices": {
+                        "type": "object",
+                        "properties": {
+                            "invoices_by_date": {"type": "integer", "description": "Invoices by date"},
+                            "trans_date": {"type": "string", "description": "Transaction date"}
+                        }
+                    },
+                    "type": {
+                        "type": "object",
+                        "properties": {
+                            "invoices_by_type": {"type": "integer", "description": "Invoices by type"},
+                            "trans_type": {"type": "string", "description": "Transaction type"}
+                        }
+                    },
+                    "amount": {
+                        "type": "object",
+                        "properties": {
+                            "invoices_by_trans_amount": {"type": "integer", "description": "Invoices by transaction amount"},
+                            "trans_amount": {"type": "string", "description": "Transaction amount"}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    result = parse(sample_pdf_path, extraction_schema=extraction_schema)
+
+    assert len(result) == 1
+    parsed_doc = result[0]
+
+    assert parsed_doc.extraction is not None
+    assert isinstance(parsed_doc.extraction, dict)
+    assert "sample_bookmark_file" in parsed_doc.extraction
+    assert "sample_data_file" in parsed_doc.extraction
+    assert "invoices_by_date" in parsed_doc.extraction["sample_bookmark_file"]["invoices"]
+    assert "invoices_by_type" in parsed_doc.extraction["sample_bookmark_file"]["type"]
+    assert "invoices_by_trans_amount" in parsed_doc.extraction["sample_bookmark_file"]["amount"]
+    assert "invoices_by_date" in parsed_doc.extraction["sample_data_file"]["invoices"]
+    assert "invoices_by_type" in parsed_doc.extraction["sample_data_file"]["type"]
+    assert "invoices_by_trans_amount" in parsed_doc.extraction["sample_data_file"]["amount"]
+
+    assert parsed_doc.extraction_metadata is not None
+    assert isinstance(parsed_doc.extraction_metadata, dict)
+    assert "sample_bookmark_file" in parsed_doc.extraction_metadata
+    assert "sample_data_file" in parsed_doc.extraction_metadata
