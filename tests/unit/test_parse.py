@@ -1,13 +1,10 @@
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 from typing import List, Optional
 
-import httpx
 import pytest
 from pydantic import BaseModel, Field
-from pydantic_core import Url
 
 from agentic_doc.common import (
     Chunk,
@@ -16,7 +13,6 @@ from agentic_doc.common import (
     ChunkType,
     Document,
     ParsedDocument,
-    create_metadata_model,
 )
 from agentic_doc.connectors import (
     LocalConnector,
@@ -92,6 +88,7 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
             include_metadata_in_markdown=True,
             result_save_dir=None,
             extraction_model=None,
+            extraction_schema=None,
         )
 
 
@@ -110,6 +107,7 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
             result_save_dir=temp_dir,
             grounding_save_dir=temp_dir,
             extraction_model=None,
+            extraction_schema=None,
         )
 
         # Check that parse_and_save_document was called with the URL and the right parameters
@@ -120,6 +118,7 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
             result_save_dir=temp_dir,
             grounding_save_dir=temp_dir,
             extraction_model=None,
+            extraction_schema=None,
         )
 
         # Check the results
@@ -250,6 +249,7 @@ def test_parse_image(temp_dir, mock_parsed_document):
             include_marginalia=True,
             include_metadata_in_markdown=True,
             extraction_model=None,
+            extraction_schema=None,
         )
 
         # Check that the result is a ParsedDocument with the expected values
@@ -453,6 +453,7 @@ def test_parse_doc_parts_success(mock_parsed_document):
             include_marginalia=True,
             include_metadata_in_markdown=True,
             extraction_model=None,
+            extraction_schema=None,
         )
 
         # Check the result
@@ -913,6 +914,7 @@ class TestParseFunctionConsolidated:
                 grounding_save_dir=None,
                 result_save_dir=None,
                 extraction_model=None,
+                extraction_schema=None,
             )
 
     def test_parse_with_bytes(self, mock_parsed_document):
@@ -934,6 +936,7 @@ class TestParseFunctionConsolidated:
                 grounding_save_dir=None,
                 result_save_dir=None,
                 extraction_model=None,
+                extraction_schema=None,
             )
 
     def test_parse_list_with_save_dir(self, temp_dir, mock_parsed_document):
@@ -980,6 +983,7 @@ class TestParseFunctionConsolidated:
                 grounding_save_dir=None,
                 result_save_dir=None,
                 extraction_model=None,
+                extraction_schema=None,
             )
 
     def test_parse_with_extraction_model(self, temp_dir, mock_parsed_document):
@@ -1005,6 +1009,7 @@ class TestParseFunctionConsolidated:
                 grounding_save_dir=None,
                 result_save_dir=None,
                 extraction_model=EmployeeFields,
+                extraction_schema=None,
             )
 
     def test_extraction_metadata_with_simple_model(self, sample_image_path):
@@ -1315,3 +1320,231 @@ class TestParseFunctionConsolidated:
             assert result[0].extraction is None
             assert result[0].extraction_metadata is None
             assert "validation error" in result[0].errors[0].error.lower()
+
+    def test_parse_with_extraction_schema(self, temp_dir, mock_parsed_document):
+        """Test parsing with an extraction schema."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        extraction_schema = {
+            "type": "object",
+            "properties": {
+                "employee_name": {"type": "string", "description": "the full name of the employee"},
+                "gross_pay": {"type": "number", "description": "the gross pay of the employee"}
+            },
+            "required": ["employee_name", "gross_pay"]
+        }
+
+        with patch(
+            "agentic_doc.parse.parse_and_save_document",
+            return_value=mock_parsed_document,
+        ) as mock_parse:
+            result = parse(test_file, extraction_schema=extraction_schema)
+            assert all(isinstance(res, ParsedDocument) for res in result)
+            mock_parse.assert_called_once_with(
+                test_file,
+                include_marginalia=True,
+                include_metadata_in_markdown=True,
+                grounding_save_dir=None,
+                result_save_dir=None,
+                extraction_model=None,
+                extraction_schema=extraction_schema,
+            )
+
+    def test_parse_with_extraction_schema_validation(self, sample_image_path):
+        """Test that extraction_schema validates the response correctly."""
+        extraction_schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Person's name"},
+                "age": {"type": "integer", "description": "Person's age"}
+            },
+            "required": ["name", "age"]
+        }
+
+        with patch("agentic_doc.parse._send_parsing_request") as mock_request:
+            mock_request.return_value = {
+                "data": {
+                    "markdown": "# Test Document\nName: John Doe\nAge: 30",
+                    "chunks": [
+                        {
+                            "text": "Name: John Doe",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
+                    "extracted_schema": {"name": "John Doe", "age": 30},
+                },
+                "errors": [],
+            }
+
+            result = parse(sample_image_path, extraction_schema=extraction_schema)
+
+            # Verify extraction is a dict (not a Pydantic model)
+            assert isinstance(result[0].extraction, dict)
+            assert result[0].extraction["name"] == "John Doe"
+            assert result[0].extraction["age"] == 30
+
+    def test_parse_with_extraction_schema_validation_error(self, sample_image_path):
+        """Test that extraction_schema validation errors are handled correctly."""
+        extraction_schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Person's name"},
+                "age": {"type": "integer", "description": "Person's age"}
+            },
+            "required": ["name", "age"]
+        }
+
+        with patch("agentic_doc.parse._send_parsing_request") as mock_request:
+            # Return data that doesn't match the schema (age is string instead of integer)
+            mock_request.return_value = {
+                "data": {
+                    "markdown": "# Test Document\nName: John Doe\nAge: thirty",
+                    "chunks": [
+                        {
+                            "text": "Name: John Doe",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
+                    "extracted_schema": {"name": "John Doe", "age": "thirty"},  # Invalid: age should be integer
+                },
+                "errors": [],
+            }
+
+            result = parse(sample_image_path, extraction_schema=extraction_schema)
+
+            assert result[0].extraction is None
+            assert len(result[0].errors) > 0
+
+    def test_parse_with_extraction_schema_complex(self, sample_image_path):
+        """Test extraction_schema with complex nested schema."""
+        extraction_schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Person's name"},
+                "address": {
+                    "type": "object",
+                    "properties": {
+                        "street": {"type": "string", "description": "Street address"},
+                        "city": {"type": "string", "description": "City"}
+                    },
+                    "required": ["street", "city"]
+                },
+                "skills": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "Skill name"},
+                            "level": {"type": "string", "description": "Skill level"}
+                        },
+                        "required": ["name", "level"]
+                    }
+                }
+            },
+            "required": ["name", "address", "skills"]
+        }
+
+        with patch("agentic_doc.parse._send_parsing_request") as mock_request:
+            mock_request.return_value = {
+                "data": {
+                    "markdown": "# Resume\nName: Alice Brown\nAddress: 123 Main St, Springfield\nSkills: Python (Expert), Java (Intermediate)",
+                    "chunks": [
+                        {
+                            "text": "Name: Alice Brown",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
+                    "extracted_schema": {
+                        "name": "Alice Brown",
+                        "address": {
+                            "street": "123 Main St",
+                            "city": "Springfield"
+                        },
+                        "skills": [
+                            {"name": "Python", "level": "Expert"},
+                            {"name": "Java", "level": "Intermediate"}
+                        ]
+                    },
+                },
+                "errors": [],
+            }
+
+            result = parse(sample_image_path, extraction_schema=extraction_schema)
+
+            # Verify extraction is a dict with complex nested structure
+            assert isinstance(result[0].extraction, dict)
+            assert result[0].extraction["name"] == "Alice Brown"
+            assert isinstance(result[0].extraction["address"], dict)
+            assert result[0].extraction["address"]["street"] == "123 Main St"
+            assert result[0].extraction["address"]["city"] == "Springfield"
+            assert isinstance(result[0].extraction["skills"], list)
+            assert len(result[0].extraction["skills"]) == 2
+            assert result[0].extraction["skills"][0]["name"] == "Python"
+            assert result[0].extraction["skills"][0]["level"] == "Expert"
+
+    def test_parse_with_both_extraction_model_and_schema_error(self, temp_dir):
+        """Test that providing both extraction_model and extraction_schema raises an error."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        class EmployeeFields(BaseModel):
+            employee_name: str = Field(description="the full name of the employee")
+            gross_pay: float = Field(description="the gross pay of the employee")
+
+        extraction_schema = {
+            "type": "object",
+            "properties": {
+                "employee_name": {"type": "string"},
+                "gross_pay": {"type": "number"}
+            }
+        }
+
+        with pytest.raises(ValueError, match="extraction_model and extraction_schema cannot be used together"):
+            parse(test_file, extraction_model=EmployeeFields, extraction_schema=extraction_schema)
+
+    def test_parse_with_neither_extraction_model_nor_schema(self, temp_dir, mock_parsed_document):
+        """Test parsing without any extraction model or schema."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        with patch(
+            "agentic_doc.parse.parse_and_save_document",
+            return_value=mock_parsed_document,
+        ) as mock_parse:
+            result = parse(test_file)
+            assert all(isinstance(res, ParsedDocument) for res in result)
+            mock_parse.assert_called_once_with(
+                test_file,
+                include_marginalia=True,
+                include_metadata_in_markdown=True,
+                grounding_save_dir=None,
+                result_save_dir=None,
+                extraction_model=None,
+                extraction_schema=None,
+            )
+

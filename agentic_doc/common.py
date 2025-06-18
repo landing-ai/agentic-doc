@@ -116,7 +116,7 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
 class ParsedDocument(BaseModel, Generic[T]):
     markdown: str
     chunks: list[Chunk]
-    extraction: Optional[T] = None
+    extraction: Optional[Union[T, Dict[str, Any]]] = None
     extraction_metadata: Optional[BaseModel] = None
     start_page_idx: int
     end_page_idx: int
