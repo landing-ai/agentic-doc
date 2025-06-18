@@ -59,10 +59,10 @@ class Settings(BaseSettings):
         ge=1,
     )
     split_size: int = Field(
-        default=10,
+        default=50,
         description="Pages per chunk for splitting the document",
         ge=1,
-        le=50,
+        le=100,
     )
     model_config = SettingsConfigDict(
         env_file=".env",
