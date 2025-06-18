@@ -2396,6 +2396,20 @@ slack = ["slack-sdk"]
 telegram = ["requests"]
 
 [[package]]
+name = "types-jsonschema"
+version = "4.24.0.20250528"
+description = "Typing stubs for jsonschema"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "types_jsonschema-4.24.0.20250528-py3-none-any.whl", hash = "sha256:6a906b5ff73ac11c8d1e0b6c30a9693e1e4e1ab56c56c932b3a7e081b86d187b"},
+    {file = "types_jsonschema-4.24.0.20250528.tar.gz", hash = "sha256:7e28c64e0ae7980eeb158105b20663fc6a6b8f81d5f86ea6614aa0014417bd1e"},
+]
+
+[package.dependencies]
+referencing = "*"
+
+[[package]]
 name = "types-pillow"
 version = "9.5.0.6"
 description = "Typing stubs for Pillow"
@@ -2623,4 +2637,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4.0"
-content-hash = "846ab225a3d6048116712c2b5d6f38c0a3986a36e66fcce2534025a0e7931032"
+content-hash = "bf930bfded200453c70deb6698d216f77f7545fdce75e0786c3fbf40d8fb6623"

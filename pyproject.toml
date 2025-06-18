@@ -35,6 +35,7 @@ google-auth-oauthlib = "^1.2.2"
 google-auth = "^2.40.2"
 boto3 = "^1.38.23"
 jsonschema = "^4.24.0"
+types-jsonschema = "^4.24.0.20250528"
 
 
 [tool.poetry.group.dev.dependencies]
