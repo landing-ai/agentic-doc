@@ -117,7 +117,7 @@ class ParsedDocument(BaseModel, Generic[T]):
     markdown: str
     chunks: list[Chunk]
     extraction: Optional[Union[T, Dict[str, Any]]] = None
-    extraction_metadata: Optional[Union[BaseModel, Dict[str, Any]]] = None
+    extraction_metadata: Optional[Union[Dict[str, Any], BaseModel]] = None
     start_page_idx: int
     end_page_idx: int
     doc_type: Literal["pdf", "image"]
