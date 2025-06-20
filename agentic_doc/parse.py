@@ -62,7 +62,7 @@ def parse(
     connector_pattern: Optional[str] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> List[ParsedDocument[Any]]:
+) -> List[ParsedDocument[T]]:
     """
     Universal parse function that can handle single documents, lists of documents,
     or documents from various connectors.
@@ -239,7 +239,7 @@ def _parse_document_without_save(
     grounding_save_dir: Union[str, Path, None],
     extraction_model: Optional[type[T]],
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> ParsedDocument[Any]:
+) -> ParsedDocument[T]:
     """Wrapper to ensure parse_and_save_document returns ParsedDocument when no save dir."""
     result = parse_and_save_document(
         document,
@@ -263,7 +263,7 @@ def parse_documents(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> list[ParsedDocument[Any]]:
+) -> list[ParsedDocument[T]]:
     """
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
 
@@ -369,7 +369,7 @@ def parse_and_save_document(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> Union[Path, ParsedDocument[Any]]:
+) -> Union[Path, ParsedDocument[T]]:
     """
     Parse a document and save the results to a local directory.
 
@@ -440,19 +440,20 @@ def _parse_pdf(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> ParsedDocument[Any]:
+) -> ParsedDocument[T]:
     with tempfile.TemporaryDirectory() as temp_dir:
         if extraction_model or extraction_schema is not None:
             total_pages = 0
             with open(file_path, "rb") as file:
                 reader = PdfReader(file)
                 total_pages = len(reader.pages)
-            if total_pages > 50:
+            if total_pages > settings.extraction_split_size:
                 raise ValueError(
-                    f"Document has {total_pages} pages, which exceeds the maximum of 50 pages "
-                    "allowed when using field extraction. Please use a document with 50 pages or fewer."
+                    f"Document has {total_pages} pages, which exceeds the maximum of {settings.extraction_split_size} pages "
+                    "allowed when using field extraction. "
+                    f"Please use a document with {settings.extraction_split_size} pages or fewer."
                 )
-            split_size = 50
+            split_size = settings.extraction_split_size
         else:
             split_size = settings.split_size
 
@@ -476,7 +477,7 @@ def _parse_image(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> ParsedDocument[Any]:
+) -> ParsedDocument[T]:
     try:
         result_raw = _send_parsing_request(
             str(file_path),
@@ -543,7 +544,7 @@ def _parse_image(
         )
 
 
-def _merge_part_results(results: list[ParsedDocument[Any]]) -> ParsedDocument[Any]:
+def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
     if not results:
         _LOGGER.warning(
             f"No results to merge: {results}, returning empty ParsedDocument"
@@ -566,7 +567,7 @@ def _merge_part_results(results: list[ParsedDocument[Any]]) -> ParsedDocument[An
     return init_result
 
 
-def _merge_next_part(curr: ParsedDocument[Any], next: ParsedDocument[Any]) -> None:
+def _merge_next_part(curr: ParsedDocument[T], next: ParsedDocument[T]) -> None:
     curr.markdown += "\n\n" + next.markdown
     next_chunks = next.chunks
     for chunk in next_chunks:
@@ -586,8 +587,8 @@ def _parse_doc_in_parallel(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> list[ParsedDocument[Any]]:
-    _parse_func: Callable[[Document], ParsedDocument[Any]] = partial(
+) -> list[ParsedDocument[T]]:
+    _parse_func: Callable[[Document], ParsedDocument[T]] = partial(
         _parse_doc_parts,
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
@@ -611,7 +612,7 @@ def _parse_doc_parts(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> ParsedDocument[Any]:
+) -> ParsedDocument[T]:
     try:
         _LOGGER.info(f"Start parsing document part: '{doc}'")
         result = _send_parsing_request(
@@ -660,7 +661,7 @@ def _parse_doc_parts(
             )
 
         if extraction_schema:
-            return ParsedDocument[Any].model_validate(result_data)
+            return ParsedDocument[T].model_validate(result_data)
         else:
             return ParsedDocument.model_validate(result_data)
     except Exception as e:
