@@ -62,6 +62,12 @@ class Settings(BaseSettings):
         default=10,
         description="Pages per chunk for splitting the document",
         ge=1,
+        le=100,
+    )
+    extraction_split_size: int = Field(
+        default=50,
+        description="Pages per chunk for splitting the document when field extraction is enabled",
+        ge=1,
         le=50,
     )
     model_config = SettingsConfigDict(

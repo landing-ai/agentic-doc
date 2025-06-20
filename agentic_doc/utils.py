@@ -205,8 +205,8 @@ def split_pdf(
     input_pdf_path = Path(input_pdf_path)
     assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
     assert (
-        0 < split_size <= 50
-    ), "split_size must be greater than 0 and less than or equal to 50"
+        0 < split_size <= 100
+    ), "split_size must be greater than 0 and less than or equal to 100"
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_dir = str(output_dir)
