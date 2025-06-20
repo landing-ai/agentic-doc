@@ -525,9 +525,9 @@ def _parse_image(
             )
 
         if extraction_schema:
-            return ParsedDocument[dict].model_validate(result_raw)
+            return ParsedDocument[Any].model_validate(result_raw)
         else:
-            return ParsedDocument[T].model_validate(result_raw)
+            return ParsedDocument.model_validate(result_raw)
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing image '{file_path}' due to: {error_msg}")
@@ -661,9 +661,9 @@ def _parse_doc_parts(
             )
 
         if extraction_schema:
-            return ParsedDocument[dict].model_validate(result_data)
+            return ParsedDocument[Any].model_validate(result_data)
         else:
-            return ParsedDocument[T].model_validate(result_data)
+            return ParsedDocument.model_validate(result_data)
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing document '{doc}' due to: {error_msg}")
