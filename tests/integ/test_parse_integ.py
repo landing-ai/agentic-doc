@@ -592,6 +592,7 @@ def test_extraction_schema_simple(sample_image_path):
     assert extraction_result.extraction is not None
     assert isinstance(extraction_result.extraction, dict)
     assert extraction_result.extraction["eye_color"] == "green"
+    assert isinstance(extraction_result.extraction_metadata, dict)
 
 
 def test_extraction_schema_nested(sample_pdf_path):
@@ -667,3 +668,4 @@ def test_extraction_schema_nested(sample_pdf_path):
     assert "invoices_by_date" in extraction_result.extraction["sample_data_file"]["invoices"]
     assert "invoices_by_type" in extraction_result.extraction["sample_data_file"]["type"]
     assert "invoices_by_trans_amount" in extraction_result.extraction["sample_data_file"]["amount"]
+    assert isinstance(extraction_result.extraction_metadata, dict)

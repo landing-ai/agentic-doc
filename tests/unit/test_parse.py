@@ -1381,6 +1381,10 @@ class TestParseFunctionConsolidated:
                         }
                     ],
                     "extracted_schema": {"name": "John Doe", "age": 30},
+                    "extraction_metadata": {
+                        "name": {"chunk_references": ["high"]},
+                        "age": {"chunk_references": ["medium"]},
+                    },
                 },
                 "errors": [],
             }
@@ -1391,6 +1395,7 @@ class TestParseFunctionConsolidated:
             assert isinstance(result[0].extraction, dict)
             assert result[0].extraction["name"] == "John Doe"
             assert result[0].extraction["age"] == 30
+            assert isinstance(result[0].extraction_metadata, dict)
 
     def test_parse_with_extraction_schema_validation_error(self, sample_image_path):
         """Test that extraction_schema validation errors are handled correctly."""
@@ -1488,6 +1493,23 @@ class TestParseFunctionConsolidated:
                             {"name": "Java", "level": "Intermediate"}
                         ]
                     },
+                    "extraction_metadata": {
+                        "name": {"chunk_references": ["high"]},
+                        "address": {
+                            "street": {"chunk_references": ["medium"]},
+                            "city": {"chunk_references": ["high"]},
+                        },
+                        "skills": [
+                            {
+                                "name": {"chunk_references": ["high"]},
+                                "level": {"chunk_references": ["high"]},
+                            },
+                            {
+                                "name": {"chunk_references": ["high"]},
+                                "level": {"chunk_references": ["medium"]},
+                            },
+                        ],
+                    },
                 },
                 "errors": [],
             }
@@ -1504,6 +1526,7 @@ class TestParseFunctionConsolidated:
             assert len(result[0].extraction["skills"]) == 2
             assert result[0].extraction["skills"][0]["name"] == "Python"
             assert result[0].extraction["skills"][0]["level"] == "Expert"
+            assert isinstance(result[0].extraction_metadata, dict)
 
     def test_parse_with_both_extraction_model_and_schema_error(self, temp_dir):
         """Test that providing both extraction_model and extraction_schema raises an error."""
