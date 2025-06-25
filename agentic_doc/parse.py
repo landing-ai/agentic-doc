@@ -489,6 +489,7 @@ def _parse_image(
         result_raw = {
             **result_raw["data"],
             "errors": result_raw.get("errors", []),
+            "extraction_error": result_raw.get("extraction_error", None),
             "doc_type": "image",
             "start_page_idx": 0,
             "end_page_idx": 0,
@@ -626,6 +627,7 @@ def _parse_doc_parts(
         result_data = {
             **result["data"],
             "errors": result.get("errors", []),
+            "extraction_error": result.get("extraction_error", None),
             "start_page_idx": doc.start_page_idx,
             "end_page_idx": doc.end_page_idx,
             "doc_type": "pdf",

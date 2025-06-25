@@ -1436,6 +1436,47 @@ class TestParseFunctionConsolidated:
             assert result[0].extraction is None
             assert len(result[0].errors) > 0
 
+    def test_parse_with_extraction_schema_api_validation_error(self, sample_image_path):
+        """Test that extraction_schema api validation errors are forwarded correctly."""
+        extraction_schema = {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Person's name"},
+                "age": {"type": "integer", "description": "Person's age"}
+            },
+            "required": ["name"]
+        }
+        extraction_error_msg = "Failed to extract the fields from the input schema. Error: Invalid schema - All object keys must be required at root. Expected required=['name', 'age'], got required=['name']"
+
+        with patch("agentic_doc.parse._send_parsing_request") as mock_request:
+            # Return data that doesn't match the schema (age is string instead of integer)
+            mock_request.return_value = {
+                "data": {
+                    "markdown": "# Test Document\nName: John Doe\nAge: 30",
+                    "chunks": [
+                        {
+                            "text": "Name: John Doe",
+                            "grounding": [
+                                {
+                                    "page": 0,
+                                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                }
+                            ],
+                            "chunk_type": "text",
+                            "chunk_id": "1",
+                        }
+                    ],
+                    "extracted_schema": None,  # No fields extracted because of schema validation error
+                },
+                "errors": [],
+                "extraction_error": extraction_error_msg,
+            }
+
+            result = parse(sample_image_path, extraction_schema=extraction_schema)
+
+            assert result[0].extraction is None
+            assert result[0].extraction_error == extraction_error_msg
+
     def test_parse_with_extraction_schema_complex(self, sample_image_path):
         """Test extraction_schema with complex nested schema."""
         extraction_schema = {
