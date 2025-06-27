@@ -1,0 +1,117 @@
+name: Release Branch CI/CD
+
+on:
+  push:
+    branches: [release]
+
+env:
+  VISION_AGENT_API_KEY: "PLACEHOLDER"
+  PYTHONUTF8: 1
+
+jobs:
+  unit_test:
+    name: Test
+    strategy:
+      matrix:
+        python-version: [3.9, 3.13]
+        os: [ubuntu-22.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    env:
+      RUNTIME_TAG: ci_job
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python Poetry
+        uses: abatilo/actions-poetry@v2.1.0
+        with:
+          poetry-version: 1.4.2
+      - name: Configure poetry
+        shell: bash
+        run: poetry config virtualenvs.in-project true
+      - name: Print Python environment information
+        run: |
+          poetry env info
+          poetry --version
+          poetry run pip -V
+      - name: Install dependencies
+        run: |
+          poetry install --all-extras
+      - name: Linting
+        run: |
+          poetry run flake8 . --exclude .venv,examples,tests --count --show-source --statistics
+      - name: Check Format
+        run: |
+          poetry run black --check --diff --color agentic_doc/
+      - name: Type Checking
+        run: |
+          poetry run mypy agentic_doc
+      - name: Test with pytest
+        run: |
+          poetry run pytest -s -vvv tests/unit
+
+  integ_test:
+    name: Integ Test
+    runs-on: ubuntu-latest
+    env:
+      RUNTIME_TAG: ci_job
+      VISION_AGENT_API_KEY: ${{ secrets.VISION_AGENT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+      - name: Install Python Poetry
+        uses: abatilo/actions-poetry@v2.1.0
+        with:
+          poetry-version: 1.4.2
+      - name: Configure poetry
+        shell: bash
+        run: poetry config virtualenvs.in-project true
+      - name: Print Python environment information
+        run: |
+          poetry env info
+          poetry --version
+          poetry run pip -V
+      - name: Install dependencies
+        run: |
+          poetry install --all-extras
+      - name: Integ Test with pytest
+        run: |
+          poetry run pytest -n auto -s -vvv tests/integ
+
+  release:
+    name: Release to PyPI
+    needs: [unit_test, integ_test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.11
+      - name: Install Python Poetry
+        uses: abatilo/actions-poetry@v2.1.0
+        with:
+          poetry-version: 1.4.2
+      - name: Configure poetry
+        shell: bash
+        run: poetry config virtualenvs.in-project true
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+      - name: setup git config
+        run: |
+          git config user.name "Landing AI Bot"
+          git config user.email "dev@landing.ai"
+      - name: Bump up version
+        run: |
+          poetry version patch
+          git add pyproject.toml
+          new_version=`poetry version`
+          git commit -m "[skip ci] chore(release): ${new_version}"
+          git push -f
+      - name: Publish to PyPI
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
+          poetry publish --build -vvv

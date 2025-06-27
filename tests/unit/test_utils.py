@@ -42,6 +42,7 @@ from agentic_doc.utils import (
     split_pdf,
     viz_chunks,
     viz_parsed_document,
+    get_chunk_from_reference,
 )
 
 
@@ -862,3 +863,34 @@ def test_log_retry_failure_with_different_attempt_numbers(monkeypatch):
 
         # Should not raise an exception regardless of attempt number
         log_retry_failure(retry_state)
+
+
+def test_get_chunk_from_reference():
+    chunks = [
+        {
+            "text": "Name: Bob Johnson",
+            "grounding": [
+                {
+                    "page": 0,
+                    "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                }
+            ],
+            "chunk_type": "text",
+            "chunk_id": "1",
+        },
+        {
+            "text": "Name: Alice Smith",
+            "grounding": [
+                {
+                    "page": 1,
+                    "box": {"l": 0.2, "t": 0.2, "r": 0.8, "b": 0.3},
+                }
+            ],
+            "chunk_type": "text",
+            "chunk_id": "2",
+        },
+    ]
+
+    result = get_chunk_from_reference("1", chunks)
+    assert result["text"] == "Name: Bob Johnson"
+    assert get_chunk_from_reference("999", chunks) == None

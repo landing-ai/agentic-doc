@@ -15,10 +15,12 @@ from agentic_doc.common import (
     RetryableError,
     Timer,
     create_metadata_model,
+    MetadataType,
 )
 
 from typing import List, Optional
 from pydantic import BaseModel
+
 
 def test_chunk_type_enum():
     # Test all the enumeration values
@@ -255,16 +257,24 @@ def test_create_metadata_model():
 
     MetadataModel = create_metadata_model(TopLevelModel)
     metadata_instance = MetadataModel(
-        id={"chunk_references": ["dummy"]},
+        id={"confidence": 0.5, "chunk_references": ["dummy"], "value": 5},
         researcher={
-            "age": {"chunk_references": ["dummy", "dummy"]},
-            "name": {"chunk_references": ["dummy"]},
+            "age": {
+                "confidence": 0.5,
+                "chunk_references": ["dummy", "dummy"],
+                "value": 5,
+            },
+            "name": {
+                "confidence": 0.5,
+                "chunk_references": ["dummy"],
+                "value": "john doe",
+            },
         },
     )
 
-    assert isinstance(metadata_instance.id, dict)
-    assert isinstance(metadata_instance.researcher.age, dict)
-    assert isinstance(metadata_instance.researcher.name, dict)
+    assert isinstance(metadata_instance.id, MetadataType[int])
+    assert isinstance(metadata_instance.researcher.age, MetadataType[int])
+    assert isinstance(metadata_instance.researcher.name, MetadataType[str])
 
     # Test with Optional fields
     class ModelWithOptional(BaseModel):
@@ -274,10 +284,15 @@ def test_create_metadata_model():
     MetadataWithOptional = create_metadata_model(ModelWithOptional)
 
     optional_instance = MetadataWithOptional(
-        required_field={"chunk_references": ["dummy"]}, optional_field=None
+        required_field={
+            "confidence": 0.5,
+            "chunk_references": ["dummy"],
+            "value": "dummy",
+        },
+        optional_field=None,
     )
 
-    assert isinstance(optional_instance.required_field, dict)
+    assert isinstance(optional_instance.required_field, MetadataType[str])
     assert optional_instance.optional_field is None
 
     # Test with list fields
@@ -288,85 +303,96 @@ def test_create_metadata_model():
 
     list_instance = MetadataWithList(
         items=[
-            {"age": {"chunk_references": ["dummy"]}, "name": {"chunk_references": ["dummy"]}},
-            {"age": {"chunk_references": ["dummy"]}, "name": {"chunk_references": ["dummy"]}},
+            {
+                "age": {"chunk_references": ["dummy"]},
+                "name": {"chunk_references": ["dummy"]},
+            },
+            {
+                "age": {"chunk_references": ["dummy"]},
+                "name": {"chunk_references": ["dummy"]},
+            },
         ]
     )
 
     assert isinstance(list_instance.items, list)
     assert len(list_instance.items) == 2
-    assert isinstance(list_instance.items[0].age, dict)
-    
+    assert isinstance(list_instance.items[0].age, MetadataType[int])
+
     # Test with list of primitive types
     class ModelWithPrimitiveList(BaseModel):
         tags: List[str]
-        
+
     MetadataWithPrimitiveList = create_metadata_model(ModelWithPrimitiveList)
-    
+
     primitive_list_instance = MetadataWithPrimitiveList(
         tags=[{"chunk_references": ["dummy"]}, {"chunk_references": ["dummy"]}]
     )
-    
+
     assert isinstance(primitive_list_instance.tags, list)
     assert len(primitive_list_instance.tags) == 2
-    assert isinstance(primitive_list_instance.tags[0], dict)
-    assert "chunk_references" in primitive_list_instance.tags[0]
-
+    assert isinstance(primitive_list_instance.tags[0], MetadataType[str])
+    assert "chunk_references" in primitive_list_instance.tags[0].__class__.model_fields
 
 
 def test_extraction_metadata_type_validation():
     class NestedModel(BaseModel):
         field1: str
         field2: int
-        
+
     class ComplexModel(BaseModel):
         simple_field: str
         optional_field: Optional[int] = None
         nested_field: NestedModel
         list_field: List[str]
         nested_list_field: List[NestedModel]
-        
+
     # Create the metadata model
     MetadataModel = create_metadata_model(ComplexModel)
-    
+
     metadata_instance = MetadataModel(
-        simple_field={"chunk_references": ["text"]},
-        optional_field={"chunk_references": ["low"]},
+        simple_field={
+            "confidence": 0.5,
+            "chunk_references": ["text"],
+            "value": "string",
+        },
+        optional_field={"confidence": 0.4, "chunk_references": ["low"]},
         nested_field={
             "field1": {"chunk_references": ["table"]},
-            "field2": {"chunk_references": ["high"]}
+            "field2": {"chunk_references": ["high"]},
         },
-        list_field=[{"chunk_references": ["text1"]}, {"chunk_references": ["text2"]}],  # List of primitive metadata
+        list_field=[
+            {"chunk_references": ["text1"]},
+            {"chunk_references": ["text2"]},
+        ],  # List of primitive metadata
         nested_list_field=[
             {
                 "field1": {"chunk_references": ["page1"]},
-                "field2": {"chunk_references": ["medium"]}
+                "field2": {"chunk_references": ["medium"]},
             }
-        ]
+        ],
     )
-    
+
     # Verify types
-    assert isinstance(metadata_instance.simple_field, dict)
-    assert isinstance(metadata_instance.optional_field, dict)
-    assert hasattr(metadata_instance.nested_field, 'field1')
-    assert hasattr(metadata_instance.nested_field, 'field2')
-    assert isinstance(metadata_instance.nested_field.field1, dict)
-    assert isinstance(metadata_instance.nested_field.field2, dict)
+    assert isinstance(metadata_instance.simple_field, MetadataType[str])
+    assert isinstance(metadata_instance.optional_field, MetadataType[int])
+    assert hasattr(metadata_instance.nested_field, "field1")
+    assert hasattr(metadata_instance.nested_field, "field2")
+    assert isinstance(metadata_instance.nested_field.field1, MetadataType[str])
+    assert isinstance(metadata_instance.nested_field.field2, MetadataType[int])
     assert isinstance(metadata_instance.list_field, list)
     if len(metadata_instance.list_field) > 0:
-        assert isinstance(metadata_instance.list_field[0], dict)
+        assert isinstance(metadata_instance.list_field[0], MetadataType[str])
     assert isinstance(metadata_instance.nested_list_field, list)
-    
+
     metadata_with_none = MetadataModel(
         simple_field={"chunk_references": ["text"]},
         optional_field=None,
         nested_field={
             "field1": {"chunk_references": ["table"]},
-            "field2": {"chunk_references": ["high"]}
+            "field2": {"chunk_references": ["high"]},
         },
         list_field=[],
-        nested_list_field=[]
+        nested_list_field=[],
     )
-    
-    assert metadata_with_none.optional_field is None
 
+    assert metadata_with_none.optional_field is None
