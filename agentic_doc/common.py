@@ -60,23 +60,30 @@ class PageError(BaseModel):
 
 
 T = TypeVar("T", bound=BaseModel)
+VT = TypeVar("VT")
+
+
+class MetadataType(BaseModel, Generic[VT]):
+    value: Optional[VT] = None
+    chunk_references: List[str]
+    experimental_confidence: Optional[float] = None
 
 
 def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
     """
     Recursively creates a new Pydantic model from an existing one,
-    replacing all leaf-level field types with dict[str, list[str]].
+    replacing all leaf-level field types with MetadataType.
     """
     fields: Dict[str, Any] = {}
     for name, field in model.model_fields.items():
         field_type = field.annotation
 
-        # Handle Optional/Union types
         origin = get_origin(field_type)
+
+        # Handle Optional/Union types
         if origin is Union:
             args = get_args(field_type)
             if len(args) == 2 and type(None) in args:
-                # This is Optional[T]
                 non_none_type = args[0] if args[1] is type(None) else args[1]
                 if inspect.isclass(non_none_type) and issubclass(
                     non_none_type, BaseModel
@@ -84,23 +91,25 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
                     metadata_type = create_metadata_model(non_none_type)
                     fields[name] = (Optional[metadata_type], Field(default=None))
                 else:
-                    fields[name] = (Optional[Dict[str, List[str]]], Field(default=None))
+                    fields[name] = (
+                        Optional[MetadataType[non_none_type]],  # type: ignore[valid-type]
+                        Field(default=None),
+                    )
                 continue
 
-        # Handle nesting in lists
+        # Handle lists
         if origin is list:
             inner_type = get_args(field_type)[0]
             if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
                 metadata_inner_type = create_metadata_model(inner_type)
                 fields[name] = (
                     List[metadata_inner_type],  # type: ignore[valid-type]
-                    Field(default_factory=lambda: []),
+                    Field(default_factory=list),  # type: ignore[arg-type]
                 )
             else:
-                # For List[primitive], each element should be dict[str, list[str]]
                 fields[name] = (
-                    List[Dict[str, List[str]]],
-                    Field(default_factory=lambda: []),
+                    List[MetadataType[inner_type]],  # type: ignore[valid-type]
+                    Field(default_factory=list),  # type: ignore[arg-type]
                 )
             continue
 
@@ -108,7 +117,11 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
         if inspect.isclass(field_type) and issubclass(field_type, BaseModel):
             fields[name] = (create_metadata_model(field_type), Field())
         else:
-            fields[name] = (Dict[str, List[str]], Field(default_factory=lambda: {}))
+            # Replace primitive leaf with MetadataType[original type]
+            fields[name] = (
+                MetadataType[field_type],  # type: ignore[valid-type]
+                Field(),
+            )
 
     return create_model(f"{model.__name__}Metadata", **fields)
 
