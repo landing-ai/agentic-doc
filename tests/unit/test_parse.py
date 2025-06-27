@@ -13,6 +13,7 @@ from agentic_doc.common import (
     ChunkType,
     Document,
     ParsedDocument,
+    MetadataType,
 )
 from agentic_doc.connectors import (
     LocalConnector,
@@ -1055,12 +1056,12 @@ class TestParseFunctionConsolidated:
             assert metadata is not None
 
             # Check that metadata fields are dict[str, list[str]]
-            assert isinstance(metadata.name, dict)
-            assert isinstance(metadata.age, dict)
+            assert isinstance(metadata.name, MetadataType)
+            assert isinstance(metadata.age, MetadataType)
 
             # Check specific metadata values
-            assert metadata.name["chunk_references"] == ["high"]
-            assert metadata.age["chunk_references"] == ["medium"]
+            assert metadata.name.chunk_references == ["high"]
+            assert metadata.age.chunk_references == ["medium"]
 
     def test_extraction_metadata_with_nested_models(self, sample_image_path):
         """Test extraction_metadata functionality with nested models."""
@@ -1115,17 +1116,17 @@ class TestParseFunctionConsolidated:
             metadata = result[0].extraction_metadata
             assert metadata is not None
 
-            assert isinstance(metadata.name, dict)
-            assert metadata.name["chunk_references"] == ["high"]
+            assert isinstance(metadata.name, MetadataType)
+            assert metadata.name.chunk_references == ["high"]
 
             assert hasattr(metadata, "address")
             assert hasattr(metadata.address, "street")
             assert hasattr(metadata.address, "city")
 
-            assert isinstance(metadata.address.street, dict)
-            assert isinstance(metadata.address.city, dict)
-            assert metadata.address.street["chunk_references"] == ["medium"]
-            assert metadata.address.city["chunk_references"] == ["high"]
+            assert isinstance(metadata.address.street, MetadataType)
+            assert isinstance(metadata.address.city, MetadataType)
+            assert metadata.address.street.chunk_references == ["medium"]
+            assert metadata.address.city.chunk_references == ["high"]
 
     def test_extraction_metadata_with_optional_fields(self, sample_image_path):
         """Test extraction_metadata functionality with optional fields."""
@@ -1176,12 +1177,12 @@ class TestParseFunctionConsolidated:
             metadata = result[0].extraction_metadata
             assert metadata is not None
 
-            assert isinstance(metadata.name, dict)
-            assert metadata.name["chunk_references"] == ["high"]
+            assert isinstance(metadata.name, MetadataType)
+            assert metadata.name.chunk_references == ["high"]
 
             assert metadata.phone is None  # Optional field with no data should be None
-            assert isinstance(metadata.email, dict)
-            assert metadata.email["chunk_references"] == ["medium"]
+            assert isinstance(metadata.email, MetadataType)
+            assert metadata.email.chunk_references == ["medium"]
 
     def test_extraction_metadata_with_list_fields(self, sample_image_path):
         """Test extraction_metadata functionality with list fields."""
@@ -1246,23 +1247,23 @@ class TestParseFunctionConsolidated:
             metadata = result[0].extraction_metadata
             assert metadata is not None
 
-            assert isinstance(metadata.name, dict)
-            assert metadata.name["chunk_references"] == ["high"]
+            assert isinstance(metadata.name, MetadataType)
+            assert metadata.name.chunk_references == ["high"]
 
             assert isinstance(metadata.skills, list)
             assert len(metadata.skills) == 2
 
             first_skill_meta = metadata.skills[0]
-            assert isinstance(first_skill_meta.name, dict)
-            assert isinstance(first_skill_meta.level, dict)
-            assert first_skill_meta.name["chunk_references"] == ["high"]
-            assert first_skill_meta.level["chunk_references"] == ["high"]
+            assert isinstance(first_skill_meta.name, MetadataType)
+            assert isinstance(first_skill_meta.level, MetadataType)
+            assert first_skill_meta.name.chunk_references == ["high"]
+            assert first_skill_meta.level.chunk_references == ["high"]
 
             second_skill_meta = metadata.skills[1]
-            assert isinstance(second_skill_meta.name, dict)
-            assert isinstance(second_skill_meta.level, dict)
-            assert second_skill_meta.name["chunk_references"] == ["high"]
-            assert second_skill_meta.level["chunk_references"] == ["medium"]
+            assert isinstance(second_skill_meta.name, MetadataType)
+            assert isinstance(second_skill_meta.level, MetadataType)
+            assert second_skill_meta.name.chunk_references == ["high"]
+            assert second_skill_meta.level.chunk_references == ["medium"]
 
     def test_extraction_metadata_error(self, sample_image_path):
         """Test extraction_metadata error."""
@@ -1330,10 +1331,16 @@ class TestParseFunctionConsolidated:
         extraction_schema = {
             "type": "object",
             "properties": {
-                "employee_name": {"type": "string", "description": "the full name of the employee"},
-                "gross_pay": {"type": "number", "description": "the gross pay of the employee"}
+                "employee_name": {
+                    "type": "string",
+                    "description": "the full name of the employee",
+                },
+                "gross_pay": {
+                    "type": "number",
+                    "description": "the gross pay of the employee",
+                },
             },
-            "required": ["employee_name", "gross_pay"]
+            "required": ["employee_name", "gross_pay"],
         }
 
         with patch(
@@ -1358,9 +1365,9 @@ class TestParseFunctionConsolidated:
             "type": "object",
             "properties": {
                 "name": {"type": "string", "description": "Person's name"},
-                "age": {"type": "integer", "description": "Person's age"}
+                "age": {"type": "integer", "description": "Person's age"},
             },
-            "required": ["name", "age"]
+            "required": ["name", "age"],
         }
 
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
@@ -1403,9 +1410,9 @@ class TestParseFunctionConsolidated:
             "type": "object",
             "properties": {
                 "name": {"type": "string", "description": "Person's name"},
-                "age": {"type": "integer", "description": "Person's age"}
+                "age": {"type": "integer", "description": "Person's age"},
             },
-            "required": ["name", "age"]
+            "required": ["name", "age"],
         }
 
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
@@ -1426,7 +1433,10 @@ class TestParseFunctionConsolidated:
                             "chunk_id": "1",
                         }
                     ],
-                    "extracted_schema": {"name": "John Doe", "age": "thirty"},  # Invalid: age should be integer
+                    "extracted_schema": {
+                        "name": "John Doe",
+                        "age": "thirty",
+                    },  # Invalid: age should be integer
                 },
                 "errors": [],
             }
@@ -1442,9 +1452,9 @@ class TestParseFunctionConsolidated:
             "type": "object",
             "properties": {
                 "name": {"type": "string", "description": "Person's name"},
-                "age": {"type": "integer", "description": "Person's age"}
+                "age": {"type": "integer", "description": "Person's age"},
             },
-            "required": ["name"]
+            "required": ["name"],
         }
         extraction_error_msg = "Failed to extract the fields from the input schema. Error: Invalid schema - All object keys must be required at root. Expected required=['name', 'age'], got required=['name']"
 
@@ -1487,9 +1497,9 @@ class TestParseFunctionConsolidated:
                     "type": "object",
                     "properties": {
                         "street": {"type": "string", "description": "Street address"},
-                        "city": {"type": "string", "description": "City"}
+                        "city": {"type": "string", "description": "City"},
                     },
-                    "required": ["street", "city"]
+                    "required": ["street", "city"],
                 },
                 "skills": {
                     "type": "array",
@@ -1497,13 +1507,13 @@ class TestParseFunctionConsolidated:
                         "type": "object",
                         "properties": {
                             "name": {"type": "string", "description": "Skill name"},
-                            "level": {"type": "string", "description": "Skill level"}
+                            "level": {"type": "string", "description": "Skill level"},
                         },
-                        "required": ["name", "level"]
-                    }
-                }
+                        "required": ["name", "level"],
+                    },
+                },
             },
-            "required": ["name", "address", "skills"]
+            "required": ["name", "address", "skills"],
         }
 
         with patch("agentic_doc.parse._send_parsing_request") as mock_request:
@@ -1525,14 +1535,11 @@ class TestParseFunctionConsolidated:
                     ],
                     "extracted_schema": {
                         "name": "Alice Brown",
-                        "address": {
-                            "street": "123 Main St",
-                            "city": "Springfield"
-                        },
+                        "address": {"street": "123 Main St", "city": "Springfield"},
                         "skills": [
                             {"name": "Python", "level": "Expert"},
-                            {"name": "Java", "level": "Intermediate"}
-                        ]
+                            {"name": "Java", "level": "Intermediate"},
+                        ],
                     },
                     "extraction_metadata": {
                         "name": {"chunk_references": ["high"]},
@@ -1583,14 +1590,23 @@ class TestParseFunctionConsolidated:
             "type": "object",
             "properties": {
                 "employee_name": {"type": "string"},
-                "gross_pay": {"type": "number"}
-            }
+                "gross_pay": {"type": "number"},
+            },
         }
 
-        with pytest.raises(ValueError, match="extraction_model and extraction_schema cannot be used together"):
-            parse(test_file, extraction_model=EmployeeFields, extraction_schema=extraction_schema)
+        with pytest.raises(
+            ValueError,
+            match="extraction_model and extraction_schema cannot be used together",
+        ):
+            parse(
+                test_file,
+                extraction_model=EmployeeFields,
+                extraction_schema=extraction_schema,
+            )
 
-    def test_parse_with_neither_extraction_model_nor_schema(self, temp_dir, mock_parsed_document):
+    def test_parse_with_neither_extraction_model_nor_schema(
+        self, temp_dir, mock_parsed_document
+    ):
         """Test parsing without any extraction model or schema."""
         test_file = temp_dir / "test.pdf"
         with open(test_file, "wb") as f:
@@ -1611,4 +1627,3 @@ class TestParseFunctionConsolidated:
                 extraction_model=None,
                 extraction_schema=None,
             )
-

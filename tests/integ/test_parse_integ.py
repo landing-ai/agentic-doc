@@ -4,7 +4,7 @@ import os
 import pytest
 from pydantic import BaseModel, Field
 
-from agentic_doc.common import ChunkType, ParsedDocument
+from agentic_doc.common import ChunkType, ParsedDocument, MetadataType
 from agentic_doc.config import settings
 from agentic_doc.parse import (
     parse,
@@ -76,9 +76,9 @@ def test_parse_and_save_documents_single_pdf(sample_pdf_path, results_dir):
     for i in range(1, len(parsed_doc.chunks)):
         prev_page = parsed_doc.chunks[i - 1].grounding[0].page
         curr_page = parsed_doc.chunks[i].grounding[0].page
-        assert curr_page >= prev_page, (
-            f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
-        )
+        assert (
+            curr_page >= prev_page
+        ), f"Chunks not ordered by page: chunk {i - 1} (page {prev_page}) followed by chunk {i} (page {curr_page})"
 
     # Verify that there were no errors
     assert len(parsed_doc.errors) == 0
@@ -479,12 +479,9 @@ def test_extraction_metadata_simple(sample_image_path):
     assert isinstance(parsed_doc.extraction, SampleFormFields)
 
     assert hasattr(parsed_doc.extraction_metadata, "eye_color")
-    assert isinstance(parsed_doc.extraction_metadata.eye_color, dict)
-    for key, value in parsed_doc.extraction_metadata.eye_color.items():
-        assert isinstance(key, str)
-        assert isinstance(value, list)
-        for item in value:
-            assert isinstance(item, str)
+    assert isinstance(parsed_doc.extraction_metadata.eye_color, MetadataType)
+    assert hasattr(parsed_doc.extraction_metadata.eye_color, "chunk_references")
+    assert isinstance(parsed_doc.extraction_metadata.eye_color.chunk_references, list)
 
 
 def test_extraction_metadata_nested(sample_pdf_path):
@@ -536,31 +533,25 @@ def test_extraction_metadata_nested(sample_pdf_path):
                     check_structure_matches(field_value, field_type, is_metadata=True)
                 else:
                     # For extraction, should be actual model instances
-                    assert isinstance(field_value, field_type), (
-                        f"Field {field_name} should be {field_type}"
-                    )
+                    assert isinstance(
+                        field_value, field_type
+                    ), f"Field {field_name} should be {field_type}"
                     check_structure_matches(field_value, field_type, is_metadata=False)
             else:
                 # This is a leaf field
                 if is_metadata:
-                    assert isinstance(field_value, dict), (
-                        f"Leaf field {field_name} should be dict[str, list[str]] in metadata"
-                    )
-                    for key, value in field_value.items():
-                        assert isinstance(key, str), (
-                            f"Keys in {field_name} should be strings"
-                        )
-                        assert isinstance(value, list), (
-                            f"Values in {field_name} should be lists"
-                        )
-                        assert all(isinstance(item, str) for item in value), (
-                            f"List items in {field_name} should be strings"
-                        )
+                    assert isinstance(
+                        field_value, MetadataType
+                    ), f"Leaf field {field_name} should be MetadataType in metadata"
+                    if hasattr(field_value, "value") and field_value.value != None:
+                        assert isinstance(
+                            field_value.value, field_type
+                        ), f"Field {field_name}.value should be {field_type}"
                 else:
                     # For extraction, check against the actual field type
-                    assert isinstance(field_value, field_type), (
-                        f"Field {field_name} should be {field_type}"
-                    )
+                    assert isinstance(
+                        field_value, field_type
+                    ), f"Field {field_name} should be {field_type}"
 
     result = parse(sample_pdf_path, extraction_model=Files)
 
@@ -580,9 +571,7 @@ def test_extraction_metadata_nested(sample_pdf_path):
 def test_extraction_schema_simple(sample_image_path):
     extraction_schema = {
         "type": "object",
-        "properties": {
-            "eye_color": {"type": "string", "description": "Eye color"}
-        }
+        "properties": {"eye_color": {"type": "string", "description": "Eye color"}},
     }
 
     result = parse(sample_image_path, extraction_schema=extraction_schema)
@@ -605,25 +594,43 @@ def test_extraction_schema_nested(sample_pdf_path):
                     "invoices": {
                         "type": "object",
                         "properties": {
-                            "invoices_by_date": {"type": "integer", "description": "Invoices by date"},
-                            "trans_date": {"type": "string", "description": "Transaction date"}
-                        }
+                            "invoices_by_date": {
+                                "type": "integer",
+                                "description": "Invoices by date",
+                            },
+                            "trans_date": {
+                                "type": "string",
+                                "description": "Transaction date",
+                            },
+                        },
                     },
                     "type": {
                         "type": "object",
                         "properties": {
-                            "invoices_by_type": {"type": "integer", "description": "Invoices by type"},
-                            "trans_type": {"type": "string", "description": "Transaction type"}
-                        }
+                            "invoices_by_type": {
+                                "type": "integer",
+                                "description": "Invoices by type",
+                            },
+                            "trans_type": {
+                                "type": "string",
+                                "description": "Transaction type",
+                            },
+                        },
                     },
                     "amount": {
                         "type": "object",
                         "properties": {
-                            "invoices_by_trans_amount": {"type": "integer", "description": "Invoices by transaction amount"},
-                            "trans_amount": {"type": "string", "description": "Transaction amount"}
-                        }
-                    }
-                }
+                            "invoices_by_trans_amount": {
+                                "type": "integer",
+                                "description": "Invoices by transaction amount",
+                            },
+                            "trans_amount": {
+                                "type": "string",
+                                "description": "Transaction amount",
+                            },
+                        },
+                    },
+                },
             },
             "sample_data_file": {
                 "type": "object",
@@ -631,27 +638,45 @@ def test_extraction_schema_nested(sample_pdf_path):
                     "invoices": {
                         "type": "object",
                         "properties": {
-                            "invoices_by_date": {"type": "integer", "description": "Invoices by date"},
-                            "trans_date": {"type": "string", "description": "Transaction date"}
-                        }
+                            "invoices_by_date": {
+                                "type": "integer",
+                                "description": "Invoices by date",
+                            },
+                            "trans_date": {
+                                "type": "string",
+                                "description": "Transaction date",
+                            },
+                        },
                     },
                     "type": {
                         "type": "object",
                         "properties": {
-                            "invoices_by_type": {"type": "integer", "description": "Invoices by type"},
-                            "trans_type": {"type": "string", "description": "Transaction type"}
-                        }
+                            "invoices_by_type": {
+                                "type": "integer",
+                                "description": "Invoices by type",
+                            },
+                            "trans_type": {
+                                "type": "string",
+                                "description": "Transaction type",
+                            },
+                        },
                     },
                     "amount": {
                         "type": "object",
                         "properties": {
-                            "invoices_by_trans_amount": {"type": "integer", "description": "Invoices by transaction amount"},
-                            "trans_amount": {"type": "string", "description": "Transaction amount"}
-                        }
-                    }
-                }
-            }
-        }
+                            "invoices_by_trans_amount": {
+                                "type": "integer",
+                                "description": "Invoices by transaction amount",
+                            },
+                            "trans_amount": {
+                                "type": "string",
+                                "description": "Transaction amount",
+                            },
+                        },
+                    },
+                },
+            },
+        },
     }
 
     result = parse(sample_pdf_path, extraction_schema=extraction_schema)
@@ -662,10 +687,27 @@ def test_extraction_schema_nested(sample_pdf_path):
     assert isinstance(extraction_result.extraction, dict)
     assert "sample_bookmark_file" in extraction_result.extraction
     assert "sample_data_file" in extraction_result.extraction
-    assert "invoices_by_date" in extraction_result.extraction["sample_bookmark_file"]["invoices"]
-    assert "invoices_by_type" in extraction_result.extraction["sample_bookmark_file"]["type"]
-    assert "invoices_by_trans_amount" in extraction_result.extraction["sample_bookmark_file"]["amount"]
-    assert "invoices_by_date" in extraction_result.extraction["sample_data_file"]["invoices"]
-    assert "invoices_by_type" in extraction_result.extraction["sample_data_file"]["type"]
-    assert "invoices_by_trans_amount" in extraction_result.extraction["sample_data_file"]["amount"]
+    assert (
+        "invoices_by_date"
+        in extraction_result.extraction["sample_bookmark_file"]["invoices"]
+    )
+    assert (
+        "invoices_by_type"
+        in extraction_result.extraction["sample_bookmark_file"]["type"]
+    )
+    assert (
+        "invoices_by_trans_amount"
+        in extraction_result.extraction["sample_bookmark_file"]["amount"]
+    )
+    assert (
+        "invoices_by_date"
+        in extraction_result.extraction["sample_data_file"]["invoices"]
+    )
+    assert (
+        "invoices_by_type" in extraction_result.extraction["sample_data_file"]["type"]
+    )
+    assert (
+        "invoices_by_trans_amount"
+        in extraction_result.extraction["sample_data_file"]["amount"]
+    )
     assert isinstance(extraction_result.extraction_metadata, dict)
