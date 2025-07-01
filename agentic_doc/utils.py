@@ -32,7 +32,7 @@ def check_endpoint_and_api_key(endpoint_url: str) -> None:
     headers = {"Authorization": f"Basic {api_key}"}
 
     try:
-        response = requests.get(endpoint_url, headers=headers, timeout=5)
+        response = requests.head(endpoint_url, headers=headers, timeout=5)
     except requests.exceptions.ConnectionError:
         raise ValueError(f'The endpoint URL "{endpoint_url}" is down or invalid.')
 
