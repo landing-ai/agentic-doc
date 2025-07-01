@@ -90,7 +90,7 @@ def test_check_endpoint_and_api_key_failures(
             mock_resp.status_code = mock_response_status
             mock_requests_get = MagicMock(return_value=mock_resp)
 
-        with patch("agentic_doc.utils.requests.get", mock_requests_get):
+        with patch("agentic_doc.utils.requests.head", mock_requests_get):
             with pytest.raises(expected_exception) as exc_info:
                 check_endpoint_and_api_key("https://example123.com")
 

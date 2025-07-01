@@ -16,6 +16,7 @@ from pydantic_core import Url
 from tqdm import tqdm
 import jsonschema
 from pypdf import PdfReader
+import os
 
 from agentic_doc.common import (
     Document,
@@ -86,6 +87,7 @@ def parse(
     Returns:
         List[ParsedDocument]
     """
+    settings.vision_agent_api_key = os.getenv("VISION_AGENT_API_KEY", "")
     check_endpoint_and_api_key(_ENDPOINT_URL)
 
     # Convert input to list of document paths

@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "agentic-doc"
-version = "0.2.10"
+version = "0.3.0"
 description = "A Python library that wraps around VisionAgent document extraction REST API to make documents extraction easy."
 authors = ["Landing AI <dev@landing.ai>"]
 readme = "README.md"
