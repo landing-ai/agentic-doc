@@ -106,7 +106,7 @@ jobs:
           git config user.email "dev@landing.ai"
       - name: Bump up version
         run: |
-          poetry version patch
+          poetry version ${{ github.ref_name }}
           git add pyproject.toml
           new_version=`poetry version`
           git commit -m "[skip ci] chore(release): ${new_version}"
