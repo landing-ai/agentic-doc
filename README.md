@@ -2,7 +2,7 @@
 
 # Agentic Document Extraction – Python Library
 
-![ci_status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci_cd.yml/badge.svg)
+![ci_status](https://github.com/landing-ai/agentic-doc/actions/workflows/main.yml/badge.svg)
 [![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/RVcW3j9RgR)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
