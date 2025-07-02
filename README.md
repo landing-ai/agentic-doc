@@ -118,7 +118,7 @@ class ExtractedFields(BaseModel):
 results = parse("mydoc.pdf", extraction_model=ExtractedFields)
 fields = results[0].extraction
 metadata = results[0].extraction_metadata
-print(f"Field value: {fields.employee_name}, confidence: {metadata.employee_name.confidence}")
+print(f"Field value: {fields.employee_name}, confidence: {metadata.employee_name.experimental_confidence}")
 ```
 
 
