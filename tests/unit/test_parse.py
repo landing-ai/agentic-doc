@@ -1604,6 +1604,30 @@ class TestParseFunctionConsolidated:
                 extraction_schema=extraction_schema,
             )
 
+    def test_parse_with_neither_extraction_model_nor_schema(
+        self, temp_dir, mock_parsed_document
+    ):
+        """Test parsing without any extraction model or schema."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        with patch(
+            "agentic_doc.parse.parse_and_save_document",
+            return_value=mock_parsed_document,
+        ) as mock_parse:
+            result = parse(test_file)
+            assert all(isinstance(res, ParsedDocument) for res in result)
+            mock_parse.assert_called_once_with(
+                test_file,
+                include_marginalia=True,
+                include_metadata_in_markdown=True,
+                grounding_save_dir=None,
+                result_save_dir=None,
+                extraction_model=None,
+                extraction_schema=None,
+            )
+
     def test_parse_additional_extraction_metadata(
         self, sample_image_path, mock_parsed_document
     ):
