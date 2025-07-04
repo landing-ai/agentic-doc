@@ -189,7 +189,7 @@ def _convert_to_parsed_documents(
         if isinstance(result, ParsedDocument):
             parsed_docs.append(result)
         elif isinstance(result, Path):
-            with open(result) as f:
+            with open(result, encoding="utf-8") as f:
                 data = json.load(f)
             parsed_doc: ParsedDocument[T] = ParsedDocument.model_validate(data)
             if result_save_dir:
