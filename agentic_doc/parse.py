@@ -16,7 +16,6 @@ from pydantic_core import Url
 from tqdm import tqdm
 import jsonschema
 from pypdf import PdfReader
-import os
 
 from agentic_doc.common import (
     Document,
@@ -27,7 +26,7 @@ from agentic_doc.common import (
     Timer,
     create_metadata_model,
 )
-from agentic_doc.config import settings
+from agentic_doc.config import settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
 from agentic_doc.utils import (
     check_endpoint_and_api_key,
@@ -63,6 +62,7 @@ def parse(
     connector_pattern: Optional[str] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> List[ParsedDocument[T]]:
     """
     Universal parse function that can handle single documents, lists of documents,
@@ -89,6 +89,15 @@ def parse(
     """
     global _ENDPOINT_URL
     _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
+    if config.include_marginalia:
+        include_marginalia = config.include_marginalia
+    if config.include_metadata_in_markdown:
+        include_metadata_in_markdown = config.include_metadata_in_markdown
+    if config.extraction_model:
+        extraction_model = config.extraction_model
+    if config.extraction_schema:
+        extraction_schema = config.extraction_schema
+
     check_endpoint_and_api_key(_ENDPOINT_URL)
 
     # Convert input to list of document paths
@@ -112,6 +121,7 @@ def parse(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        config=config,
     )
 
     # Convert results to ParsedDocument objects
@@ -211,6 +221,7 @@ def _parse_document_list(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> Union[List[ParsedDocument[T]], List[Path]]:
     """Helper function to parse a list of documents."""
     documents_list = list(documents)
@@ -223,6 +234,7 @@ def _parse_document_list(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            config=config,
         )
     else:
         return parse_documents(
@@ -232,30 +244,8 @@ def _parse_document_list(
             grounding_save_dir=grounding_save_dir,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            config=config,
         )
-
-
-def _parse_document_without_save(
-    document: Union[str, Path, Url],
-    include_marginalia: bool,
-    include_metadata_in_markdown: bool,
-    grounding_save_dir: Union[str, Path, None],
-    extraction_model: Optional[type[T]],
-    extraction_schema: Optional[dict[str, Any]] = None,
-) -> ParsedDocument[T]:
-    """Wrapper to ensure parse_and_save_document returns ParsedDocument when no save dir."""
-    result = parse_and_save_document(
-        document,
-        include_marginalia=include_marginalia,
-        include_metadata_in_markdown=include_metadata_in_markdown,
-        result_save_dir=None,
-        grounding_save_dir=grounding_save_dir,
-        extraction_model=extraction_model,
-        extraction_schema=extraction_schema,
-    )
-    # When result_save_dir is None, parse_and_save_document returns ParsedDocument[T]
-    assert isinstance(result, ParsedDocument)
-    return result
 
 
 def parse_documents(
@@ -266,6 +256,7 @@ def parse_documents(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> list[ParsedDocument[T]]:
     """
     Parse a list of documents using the Landing AI Agentic Document Analysis API.
@@ -285,6 +276,7 @@ def parse_documents(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        config=config,
     )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
@@ -296,27 +288,29 @@ def parse_documents(
         )
 
 
-def _parse_document_with_save(
+
+def _parse_document_without_save(
     document: Union[str, Path, Url],
     include_marginalia: bool,
     include_metadata_in_markdown: bool,
-    result_save_dir: Union[str, Path],
     grounding_save_dir: Union[str, Path, None],
     extraction_model: Optional[type[T]],
     extraction_schema: Optional[dict[str, Any]] = None,
-) -> Path:
-    """Wrapper to ensure parse_and_save_document returns Path when save dir provided."""
+    config: Optional[ParseConfig] = None,
+) -> ParsedDocument[T]:
+    """Wrapper to ensure parse_and_save_document returns ParsedDocument when no save dir."""
     result = parse_and_save_document(
         document,
         include_marginalia=include_marginalia,
         include_metadata_in_markdown=include_metadata_in_markdown,
-        result_save_dir=result_save_dir,
+        result_save_dir=None,
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        config=config,
     )
-    # When result_save_dir is provided, parse_and_save_document returns Path
-    assert isinstance(result, Path)
+    # When result_save_dir is None, parse_and_save_document returns ParsedDocument[T]
+    assert isinstance(result, ParsedDocument)
     return result
 
 
@@ -329,6 +323,7 @@ def parse_and_save_documents(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> list[Path]:
     """
     Parse a list of documents and save the results to a local directory.
@@ -352,6 +347,7 @@ def parse_and_save_documents(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        config=config,
     )
     with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
         return list(
@@ -363,6 +359,31 @@ def parse_and_save_documents(
         )
 
 
+def _parse_document_with_save(
+    document: Union[str, Path, Url],
+    include_marginalia: bool,
+    include_metadata_in_markdown: bool,
+    result_save_dir: Union[str, Path],
+    grounding_save_dir: Union[str, Path, None],
+    extraction_model: Optional[type[T]],
+    extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
+) -> Path:
+    """Wrapper to ensure parse_and_save_document returns Path when save dir provided."""
+    result = parse_and_save_document(
+        document,
+        include_marginalia=include_marginalia,
+        include_metadata_in_markdown=include_metadata_in_markdown,
+        result_save_dir=result_save_dir,
+        grounding_save_dir=grounding_save_dir,
+        extraction_model=extraction_model,
+        extraction_schema=extraction_schema,
+        config=config,
+    )
+    # When result_save_dir is provided, parse_and_save_document returns Path
+    assert isinstance(result, Path)
+    return result
+
 def parse_and_save_document(
     document: Union[str, Path, Url],
     *,
@@ -372,6 +393,7 @@ def parse_and_save_document(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> Union[Path, ParsedDocument[T]]:
     """
     Parse a document and save the results to a local directory.
@@ -405,6 +427,7 @@ def parse_and_save_document(
                 include_metadata_in_markdown=include_metadata_in_markdown,
                 extraction_model=extraction_model,
                 extraction_schema=extraction_schema,
+                config=config,
             )
         elif file_type == "pdf":
             result = _parse_pdf(
@@ -413,6 +436,7 @@ def parse_and_save_document(
                 include_metadata_in_markdown=include_metadata_in_markdown,
                 extraction_model=extraction_model,
                 extraction_schema=extraction_schema,
+                config=config,
             )
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
@@ -443,6 +467,7 @@ def _parse_pdf(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     with tempfile.TemporaryDirectory() as temp_dir:
         if extraction_model or extraction_schema is not None:
@@ -450,15 +475,15 @@ def _parse_pdf(
             with open(file_path, "rb") as file:
                 reader = PdfReader(file)
                 total_pages = len(reader.pages)
-            if total_pages > settings.extraction_split_size:
+            split_size = config.extraction_split_size if config and config.extraction_split_size else settings.extraction_split_size
+            if total_pages > split_size:
                 raise ValueError(
                     f"Document has {total_pages} pages, which exceeds the maximum of {settings.extraction_split_size} pages "
                     "allowed when using field extraction. "
-                    f"Please use a document with {settings.extraction_split_size} pages or fewer."
+                    f"Please use a document with {split_size} pages or fewer."
                 )
-            split_size = settings.extraction_split_size
         else:
-            split_size = settings.split_size
+            split_size = config.split_size if config and config.split_size else settings.split_size
 
         parts = split_pdf(file_path, temp_dir, split_size)
         file_path = Path(file_path)
@@ -480,6 +505,7 @@ def _parse_image(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     try:
         result_raw = _send_parsing_request(
@@ -746,7 +772,7 @@ def _send_parsing_request(
                 data["fields_schema"] = json.dumps(extraction_schema)
 
             headers = {
-                "Authorization": f"Basic {_VA_API_KEY}",
+                "Authorization": f"Basic {settings.vision_agent_api_key}",
                 "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
             }
 
