@@ -87,7 +87,8 @@ def parse(
     Returns:
         List[ParsedDocument]
     """
-    settings.vision_agent_api_key = os.getenv("VISION_AGENT_API_KEY", "")
+    global _ENDPOINT_URL
+    _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
     check_endpoint_and_api_key(_ENDPOINT_URL)
 
     # Convert input to list of document paths
@@ -745,7 +746,7 @@ def _send_parsing_request(
                 data["fields_schema"] = json.dumps(extraction_schema)
 
             headers = {
-                "Authorization": f"Basic {settings.vision_agent_api_key}",
+                "Authorization": f"Basic {_VA_API_KEY}",
                 "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
             }
 
