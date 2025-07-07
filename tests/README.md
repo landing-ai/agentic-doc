@@ -31,6 +31,9 @@ pytest tests/unit/test_parse_document.py
 
 # Run a specific test
 pytest tests/unit/test_parse_document.py::TestParseAndSaveDocument::test_parse_single_page_pdf
+
+# For integration test, you need VA API Key
+vision_agent_api_key=xxxx poetry run pytest tests/integ/test_parse_integ.py::test_parse_and_save_documents_multiple_inputs
 ```
 
 ## Adding New Tests

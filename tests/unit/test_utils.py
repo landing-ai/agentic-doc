@@ -807,6 +807,67 @@ def test_crop_image_boundary_conditions():
     assert crop_small.shape[2] == 3
 
 
+def test_crop_image_coordinate_clamping():
+    # Test coordinate clamping for out-of-bounds coordinates
+    img = np.ones((100, 100, 3), dtype=np.uint8) * 255  # White image
+
+    # Test with negative coordinates - should be clamped to 0
+    bbox_negative = ChunkGroundingBox(l=-0.1, t=-0.2, r=0.5, b=0.5)
+    crop_negative = _crop_image(img, bbox_negative)
+    assert isinstance(crop_negative, np.ndarray)
+    assert crop_negative.shape[2] == 3
+    assert crop_negative.shape[0] > 0 and crop_negative.shape[1] > 0
+
+    # Test with coordinates > 1 - should be clamped to 1
+    bbox_over_one = ChunkGroundingBox(l=0.5, t=0.5, r=1.2, b=1.3)
+    crop_over_one = _crop_image(img, bbox_over_one)
+    assert isinstance(crop_over_one, np.ndarray)
+    assert crop_over_one.shape[2] == 3
+    assert crop_over_one.shape[0] > 0 and crop_over_one.shape[1] > 0
+
+    # Test with mixed invalid coordinates
+    bbox_mixed = ChunkGroundingBox(l=-0.5, t=0.2, r=1.5, b=0.8)
+    crop_mixed = _crop_image(img, bbox_mixed)
+    assert isinstance(crop_mixed, np.ndarray)
+    assert crop_mixed.shape[2] == 3
+    assert crop_mixed.shape[0] > 0 and crop_mixed.shape[1] > 0
+
+    # Test with all coordinates out of bounds (should still work)
+    bbox_all_invalid = ChunkGroundingBox(l=-1.0, t=-1.0, r=2.0, b=2.0)
+    crop_all_invalid = _crop_image(img, bbox_all_invalid)
+    assert isinstance(crop_all_invalid, np.ndarray)
+    assert crop_all_invalid.shape[2] == 3
+    # Should crop the entire image when clamped
+    assert crop_all_invalid.shape == (100, 100, 3)
+
+    # Test with extreme values that result in valid crops after clamping
+    bbox_extreme = ChunkGroundingBox(l=-999.0, t=-500.0, r=0.5, b=1000.0)
+    crop_extreme = _crop_image(img, bbox_extreme)
+    assert isinstance(crop_extreme, np.ndarray)
+    assert crop_extreme.shape[2] == 3
+    assert crop_extreme.shape[0] > 0 and crop_extreme.shape[1] > 0
+
+    # Test edge case where clamping results in zero-size crop (top == bottom)
+    bbox_zero_height = ChunkGroundingBox(
+        l=0.2, t=500.0, r=0.8, b=600.0
+    )  # Both t and b clamp to 1.0
+    crop_zero_height = _crop_image(img, bbox_zero_height)
+    assert isinstance(crop_zero_height, np.ndarray)
+    assert crop_zero_height.shape[2] == 3
+    # May have zero height when top == bottom after clamping
+    assert crop_zero_height.shape[0] >= 0 and crop_zero_height.shape[1] > 0
+
+    # Test edge case where clamping results in zero-size crop (left == right)
+    bbox_zero_width = ChunkGroundingBox(
+        l=500.0, t=0.2, r=600.0, b=0.8
+    )  # Both l and r clamp to 1.0
+    crop_zero_width = _crop_image(img, bbox_zero_width)
+    assert isinstance(crop_zero_width, np.ndarray)
+    assert crop_zero_width.shape[2] == 3
+    # May have zero width when left == right after clamping
+    assert crop_zero_width.shape[0] > 0 and crop_zero_width.shape[1] >= 0
+
+
 def test_save_groundings_as_images_with_empty_chunks(temp_dir):
     # Test saving groundings when there are no chunks
     img_path = temp_dir / "test.jpg"

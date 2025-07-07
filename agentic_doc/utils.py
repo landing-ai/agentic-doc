@@ -175,9 +175,27 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
 
     # Convert normalized coordinates to absolute coordinates
     height, width = image.shape[:2]
-    assert (
-        0 <= xmin_f <= 1 and 0 <= ymin_f <= 1 and 0 <= xmax_f <= 1 and 0 <= ymax_f <= 1
-    )
+
+    # Throw warning if coordinates are out of bounds
+    if (
+        xmin_f < 0
+        or ymin_f < 0
+        or xmax_f > 1
+        or ymax_f > 1
+        or xmin_f > xmax_f
+        or ymin_f > ymax_f
+    ):
+        _LOGGER.warning(
+            "Coordinates are out of bounds",
+            bbox=bbox,
+        )
+
+    # Clamp coordinates to valid range [0, 1]
+    xmin_f = max(0, min(1, xmin_f))
+    ymin_f = max(0, min(1, ymin_f))
+    xmax_f = max(0, min(1, xmax_f))
+    ymax_f = max(0, min(1, ymax_f))
+
     xmin = math.floor(xmin_f * width)
     xmax = math.ceil(xmax_f * width)
     ymin = math.floor(ymin_f * height)
