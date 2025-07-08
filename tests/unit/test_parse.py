@@ -1672,7 +1672,7 @@ class TestParseFunctionConsolidated:
                 },
                 "errors": [],
             }
-            
+
             result = parse(sample_image_path, extraction_model=PersonInfo)
 
             # Verify extraction is correctly typed
@@ -1747,9 +1747,6 @@ class TestParseFunctionConsolidated:
                 split_size=8,
                 extraction_split_size=20
             )
-
-            print(sample_image_path)
-            print("FRIENDA")
             
             result = parse(sample_image_path, config=config_true_values)
             
