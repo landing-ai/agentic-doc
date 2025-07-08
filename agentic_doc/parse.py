@@ -26,7 +26,7 @@ from agentic_doc.common import (
     Timer,
     create_metadata_model,
 )
-from agentic_doc.config import get_settings, ParseConfig
+from agentic_doc.config import Settings, get_settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
 from agentic_doc.utils import (
     check_endpoint_and_api_key,
@@ -39,8 +39,11 @@ from agentic_doc.utils import (
 )
 
 _LOGGER = structlog.getLogger(__name__)
-_ENDPOINT_URL = f"{get_settings().endpoint_host}/v1/tools/agentic-document-analysis"
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
+
+
+def _get_endpoint_url(settings: Settings) -> str:
+    return f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
 
 
 def parse(
@@ -87,8 +90,7 @@ def parse(
     Returns:
         List[ParsedDocument]
     """
-    global _ENDPOINT_URL
-    _ENDPOINT_URL = f"{get_settings().endpoint_host}/v1/tools/agentic-document-analysis"
+    settings = get_settings()
     if config and config.include_marginalia:
         include_marginalia = config.include_marginalia
     if config and config.include_metadata_in_markdown:
@@ -99,11 +101,11 @@ def parse(
         extraction_schema = config.extraction_schema
 
     check_endpoint_and_api_key(
-        _ENDPOINT_URL,
+        _get_endpoint_url(settings),
         api_key=(
             config.api_key
             if config and config.api_key
-            else get_settings().vision_agent_api_key
+            else settings.vision_agent_api_key
         ),
     )
 
@@ -476,6 +478,7 @@ def _parse_pdf(
     extraction_schema: Optional[dict[str, Any]] = None,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
+    settings = get_settings()
     with tempfile.TemporaryDirectory() as temp_dir:
         if extraction_model or extraction_schema is not None:
             total_pages = 0
@@ -485,11 +488,11 @@ def _parse_pdf(
             split_size = (
                 config.extraction_split_size
                 if config and config.extraction_split_size
-                else get_settings().extraction_split_size
+                else settings.extraction_split_size
             )
             if total_pages > split_size:
                 raise ValueError(
-                    f"Document has {total_pages} pages, which exceeds the maximum of {get_settings().extraction_split_size} pages "
+                    f"Document has {total_pages} pages, which exceeds the maximum of {settings.extraction_split_size} pages "
                     "allowed when using field extraction. "
                     f"Please use a document with {split_size} pages or fewer."
                 )
@@ -497,7 +500,7 @@ def _parse_pdf(
             split_size = (
                 config.split_size
                 if config and config.split_size
-                else get_settings().split_size
+                else settings.split_size
             )
 
         parts = split_pdf(file_path, temp_dir, split_size)
@@ -736,6 +739,7 @@ def _parse_doc_parts(
         )
 
 
+# TODO: read retry settings at runtime (not at import time)
 @tenacity.retry(
     wait=tenacity.wait_exponential_jitter(
         exp_base=1.5, initial=1, max=get_settings().max_retry_wait_time, jitter=10
@@ -765,6 +769,7 @@ def _send_parsing_request(
     Returns:
         dict[str, Any]: The parsed document data.
     """
+    settings = get_settings()
     with Timer() as timer:
         file_type = "pdf" if Path(file_path).suffix.lower() == ".pdf" else "image"
         # TODO: check if the file extension is a supported image type
@@ -796,7 +801,7 @@ def _send_parsing_request(
             api_key = (
                 config.api_key
                 if config and config.api_key
-                else get_settings().vision_agent_api_key
+                else settings.vision_agent_api_key
             )
             headers = {
                 "Authorization": f"Basic {api_key}",
@@ -804,7 +809,7 @@ def _send_parsing_request(
             }
 
             response = httpx.post(
-                _ENDPOINT_URL,
+                _get_endpoint_url(settings),
                 files=files,
                 data=data,
                 headers=headers,
