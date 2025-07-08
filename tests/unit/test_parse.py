@@ -33,6 +33,7 @@ from agentic_doc.parse import (
     parse_documents,
 )
 
+from agentic_doc.config import ParseConfig
 
 @pytest.fixture(autouse=True)
 def patch_check_api_key():
@@ -1639,7 +1640,7 @@ class TestParseFunctionConsolidated:
             )
 
     def test_parse_additional_extraction_metadata(
-        self, sample_image_path, mock_parsed_document
+        self, sample_image_path
     ):
         """Test parsing with additional extraction metadata returned from the API"""
         class PersonInfo(BaseModel):
@@ -1671,7 +1672,7 @@ class TestParseFunctionConsolidated:
                 },
                 "errors": [],
             }
-
+            
             result = parse(sample_image_path, extraction_model=PersonInfo)
 
             # Verify extraction is correctly typed
@@ -1692,3 +1693,261 @@ class TestParseFunctionConsolidated:
             assert metadata.age.chunk_references == ["id2"]
 
 
+    def test_parse_with_config_integration(self, sample_image_path, sample_pdf_path, monkeypatch):
+        import unittest.mock
+        from unittest.mock import MagicMock
+        
+        monkeypatch.setenv("VISION_AGENT_API_KEY", "env_test_key")
+        monkeypatch.setenv("SPLIT_SIZE", "5")
+        monkeypatch.setenv("EXTRACTION_SPLIT_SIZE", "15")
+        
+        mock_response_data = {
+            "data": {
+                "markdown": "# Test Document\n\nThis is a test document.",
+                "chunks": [
+                    {
+                        "text": "Test Document",
+                        "chunk_type": "text",
+                        "chunk_id": "test_chunk_1",
+                        "grounding": [
+                            {
+                                "page": 0,
+                                "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                                "image_path": None
+                            }
+                        ]
+                    }
+                ]
+            },
+            "errors": [],
+            "extraction_error": None
+        }
+        
+        captured_requests = []
+        
+        def mock_post(*args, **kwargs):
+            captured_requests.append({
+                "url": args[0] if args else kwargs.get("url"),
+                "data": kwargs.get("data", {}),
+                "headers": kwargs.get("headers", {}),
+                "files": kwargs.get("files", {})
+            })
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = mock_response_data
+            mock_response.raise_for_status.return_value = None
+            return mock_response
+        
+        with unittest.mock.patch("httpx.post", side_effect=mock_post), \
+            unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
+            config_true_values = ParseConfig(
+                api_key="config_test_key",
+                include_marginalia=True,
+                include_metadata_in_markdown=True,
+                split_size=8,
+                extraction_split_size=20
+            )
+
+            print(sample_image_path)
+            print("FRIENDA")
+            
+            result = parse(sample_image_path, config=config_true_values)
+            
+            assert len(result) == 1
+            assert result[0].markdown == "# Test Document\n\nThis is a test document."
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["data"]["include_marginalia"] is True
+            assert request["data"]["include_metadata_in_markdown"] is True
+            assert request["headers"]["Authorization"] == "Basic config_test_key"
+            
+            captured_requests.clear()
+            
+            partial_config = ParseConfig(
+                include_marginalia=True,
+                api_key="partial_config_key"
+            )
+            
+            result = parse(sample_image_path, config=partial_config)
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["data"]["include_marginalia"] is True
+            assert request["data"]["include_metadata_in_markdown"] is True
+            assert request["headers"]["Authorization"] == "Basic partial_config_key"
+            
+            captured_requests.clear()
+            
+            result = parse(sample_image_path, include_marginalia=False, include_metadata_in_markdown=False)
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["data"]["include_marginalia"] is False
+            assert request["data"]["include_metadata_in_markdown"] is False
+            assert request["headers"]["Authorization"] == "Basic env_test_key"
+            
+            captured_requests.clear()
+            
+            config_with_settings_override = ParseConfig(
+                api_key="final_config_key",
+                include_marginalia=True
+            )
+            
+            result = parse(
+                sample_image_path, 
+                config=config_with_settings_override,
+                include_marginalia=False,
+                include_metadata_in_markdown=False
+            )
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["data"]["include_marginalia"] is True
+            assert request["data"]["include_metadata_in_markdown"] is False
+            assert request["headers"]["Authorization"] == "Basic final_config_key"
+            
+            captured_requests.clear()
+            
+        with unittest.mock.patch("httpx.post", side_effect=mock_post), \
+            unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
+            config_with_api_key_precedence = ParseConfig(
+                api_key="precedence_test_key"
+            )
+            
+            result = parse(sample_image_path, config=config_with_api_key_precedence)
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["headers"]["Authorization"] == "Basic precedence_test_key"
+            
+            captured_requests.clear()
+            
+            result = parse(sample_image_path)
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["headers"]["Authorization"] == "Basic env_test_key"
+            
+            captured_requests.clear()
+            
+        with unittest.mock.patch("httpx.post", side_effect=mock_post), \
+            unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
+            with unittest.mock.patch("agentic_doc.parse.split_pdf") as mock_split_pdf:
+                mock_split_pdf.return_value = [
+                    type('Document', (), {
+                        'file_path': sample_pdf_path,
+                        'start_page_idx': 0,
+                        'end_page_idx': 0
+                    })()
+                ]
+                
+                config_with_split_size = ParseConfig(
+                    api_key="split_size_test_key",
+                    split_size=25
+                )
+                
+                result = parse(sample_pdf_path, config=config_with_split_size)
+                
+                assert len(result) == 1
+                mock_split_pdf.assert_called_once()
+                split_size_arg = mock_split_pdf.call_args[0][2]
+                assert split_size_arg == 25
+                
+                captured_requests.clear()
+                mock_split_pdf.reset_mock()
+                
+                result = parse(sample_pdf_path)
+                
+                assert len(result) == 1
+                
+                captured_requests.clear()
+                
+        with unittest.mock.patch("httpx.post", side_effect=mock_post), \
+            unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
+            with unittest.mock.patch("agentic_doc.parse.split_pdf") as mock_split_pdf:
+                mock_split_pdf.return_value = [
+                    type('Document', (), {
+                        'file_path': sample_pdf_path,
+                        'start_page_idx': 0,
+                        'end_page_idx': 0
+                    })()
+                ]
+                
+                class TestExtractionModel:
+                    @staticmethod
+                    def model_json_schema():
+                        return {"type": "object", "properties": {"test_field": {"type": "string"}}}
+                    @staticmethod
+                    def model_validate(data):
+                        return type('ExtractionResult', (), {"test_field": "test_value"})()
+                
+                config_with_extraction_split_size = ParseConfig(
+                    api_key="extraction_split_size_test_key",
+                    extraction_split_size=30
+                )
+                
+                result = parse(sample_pdf_path, extraction_model=TestExtractionModel, config=config_with_extraction_split_size)
+                
+                assert len(result) == 1
+                mock_split_pdf.assert_called_once()
+                extraction_split_size_arg = mock_split_pdf.call_args[0][2]
+                assert extraction_split_size_arg == 30
+                
+                captured_requests.clear()
+                mock_split_pdf.reset_mock()
+                
+                result = parse(sample_pdf_path, extraction_model=TestExtractionModel)
+                
+                assert len(result) == 1
+                mock_split_pdf.assert_called_once()
+                extraction_split_size_arg = mock_split_pdf.call_args[0][2]
+                assert extraction_split_size_arg == 15
+                
+                captured_requests.clear()
+                
+        with unittest.mock.patch("httpx.post", side_effect=mock_post), \
+            unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
+            settings_config = ParseConfig(
+                api_key="settings_test_key",
+                include_marginalia=None,
+                include_metadata_in_markdown=None
+            )
+            
+            result = parse(sample_image_path, config=settings_config, include_marginalia=True, include_metadata_in_markdown=False)
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["data"]["include_marginalia"] is True
+            assert request["data"]["include_metadata_in_markdown"] is False
+            assert request["headers"]["Authorization"] == "Basic settings_test_key"
+            
+            captured_requests.clear()
+            
+            none_config = ParseConfig(
+                api_key="none_test_key",
+                include_marginalia=None,
+                include_metadata_in_markdown=None
+            )
+            
+            result = parse(sample_image_path, config=none_config)
+            
+            assert len(result) == 1
+            assert len(captured_requests) == 1
+            
+            request = captured_requests[0]
+            assert request["data"]["include_marginalia"] is True
+            assert request["data"]["include_metadata_in_markdown"] is True
+            assert request["headers"]["Authorization"] == "Basic none_test_key"

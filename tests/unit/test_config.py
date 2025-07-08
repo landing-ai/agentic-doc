@@ -213,22 +213,19 @@ def test_parse_config_partial_instantiation():
 
 def test_parse_config_settings_integration():
     from agentic_doc.config import ParseConfig, Settings
-    
-    # Test that ParseConfig can hold settings-related values
+
     config = ParseConfig(
         api_key="config_api_key",
         split_size=20,
         extraction_split_size=30
     )
     
-    # Test that settings still work independently
     custom_settings = Settings(
         vision_agent_api_key="settings_api_key",
         split_size=25,
         extraction_split_size=35
     )
-    
-    # Verify values are independent
+
     assert config.api_key == "config_api_key"
     assert config.split_size == 20
     assert config.extraction_split_size == 30
@@ -249,18 +246,16 @@ def test_parse_config_precedence_logic():
         extraction_split_size=18
     )
     
-    # Simulate the precedence logic from parse function
     include_marginalia = config.include_marginalia if config.include_marginalia is not None else True
     include_metadata_in_markdown = config.include_metadata_in_markdown if config.include_metadata_in_markdown is not None else True
     split_size = config.split_size if config.split_size is not None else 10
     extraction_split_size = config.extraction_split_size if config.extraction_split_size is not None else 50
     
-    assert include_marginalia is False  # From config
-    assert include_metadata_in_markdown is True  # From config
-    assert split_size == 12  # From config
-    assert extraction_split_size == 18  # From config
+    assert include_marginalia is False
+    assert include_metadata_in_markdown is True 
+    assert split_size == 12
+    assert extraction_split_size == 18
     
-    # Test with None values - should use defaults
     config_none = ParseConfig()
     
     include_marginalia_none = config_none.include_marginalia if config_none.include_marginalia is not None else True
@@ -268,203 +263,7 @@ def test_parse_config_precedence_logic():
     split_size_none = config_none.split_size if config_none.split_size is not None else 10
     extraction_split_size_none = config_none.extraction_split_size if config_none.extraction_split_size is not None else 50
     
-    assert include_marginalia_none is True  # Default
-    assert include_metadata_in_markdown_none is True  # Default
-    assert split_size_none == 10  # Default
-    assert extraction_split_size_none == 50  # Default
-
-
-def test_parse_config_env_var_interaction(monkeypatch):
-    from agentic_doc.config import ParseConfig, get_settings
-    
-    # Set environment variables for settings
-    monkeypatch.setenv("VISION_AGENT_API_KEY", "env_api_key")
-    monkeypatch.setenv("SPLIT_SIZE", "8")
-    monkeypatch.setenv("EXTRACTION_SPLIT_SIZE", "16")
-    
-    # Create a config that partially overrides env vars
-    config = ParseConfig(
-        api_key="config_api_key",  # Override env var
-        split_size=22,  # Override env var
-        # extraction_split_size left as None - should use env var
-    )
-    
-    # Get settings to verify env vars are loaded
-    settings = get_settings()
-    assert settings.vision_agent_api_key == "env_api_key"
-    assert settings.split_size == 8
-    assert settings.extraction_split_size == 16
-    
-    # Test precedence: config overrides env vars, but None values fall back to settings
-    assert config.api_key == "config_api_key"  # Config overrides env
-    assert config.split_size == 22  # Config overrides env
-    assert config.extraction_split_size is None  # Will use settings value (16)
-    
-    # Simulate the logic from parse function
-    final_split_size = config.split_size if config.split_size is not None else settings.split_size
-    final_extraction_split_size = config.extraction_split_size if config.extraction_split_size is not None else settings.extraction_split_size
-    
-    assert final_split_size == 22  # From config
-    assert final_extraction_split_size == 16  # From env var via settings
-
-
-def test_parse_config_behavior_with_defaults():
-    from agentic_doc.config import ParseConfig, Settings
-    
-    # Create config with some values
-    config = ParseConfig(
-        api_key="config_only_key",
-        split_size=33
-    )
-    
-    # Create fresh settings instance - this will load from .env or defaults
-    settings = Settings()
-    
-    # Test that config values are preserved and None values use defaults
-    assert config.api_key == "config_only_key"
-    assert config.split_size == 33
-    assert config.extraction_split_size is None
-    
-    # Test the core behavior: config values override, None values fall back to settings
-    final_api_key = config.api_key if config.api_key is not None else settings.vision_agent_api_key
-    final_split_size = config.split_size if config.split_size is not None else settings.split_size
-    final_extraction_split_size = config.extraction_split_size if config.extraction_split_size is not None else settings.extraction_split_size
-    
-    assert final_api_key == "config_only_key"  # From config
-    assert final_split_size == 33  # From config
-    assert final_extraction_split_size == settings.extraction_split_size  # From settings (could be env or default)
-
-
-def test_parse_config_mixed_env_and_config_scenarios(monkeypatch):
-    from agentic_doc.config import ParseConfig, get_settings
-    
-    # Set some env vars but not others
-    monkeypatch.setenv("VISION_AGENT_API_KEY", "env_mixed_key")
-    monkeypatch.setenv("SPLIT_SIZE", "7")
-    # EXTRACTION_SPLIT_SIZE not set - should use default
-    
-    # Test various config scenarios
-    
-    # Scenario 1: Config overrides everything
-    config1 = ParseConfig(
-        api_key="override_key",
-        split_size=11,
-        extraction_split_size=21
-    )
-    
-    settings = get_settings()
-    assert settings.vision_agent_api_key == "env_mixed_key"
-    assert settings.split_size == 7
-    assert settings.extraction_split_size == 50  # Default
-    
-    # Config values should be independent
-    assert config1.api_key == "override_key"
-    assert config1.split_size == 11
-    assert config1.extraction_split_size == 21
-    
-    # Scenario 2: Config partially overrides
-    config2 = ParseConfig(
-        split_size=99
-        # api_key and extraction_split_size are None
-    )
-    
-    assert config2.api_key is None
-    assert config2.split_size == 99
-    assert config2.extraction_split_size is None
-    
-    # Final values would be: config if not None, else settings
-    final_api_key = config2.api_key if config2.api_key is not None else settings.vision_agent_api_key
-    final_split_size = config2.split_size if config2.split_size is not None else settings.split_size
-    final_extraction_split_size = config2.extraction_split_size if config2.extraction_split_size is not None else settings.extraction_split_size
-    
-    assert final_api_key == "env_mixed_key"  # From env var
-    assert final_split_size == 99  # From config
-    assert final_extraction_split_size == 50  # From settings default
-
-
-def test_parse_config_api_key_precedence(monkeypatch):
-    from agentic_doc.config import ParseConfig, get_settings, settings
-    
-    # Set environment API key
-    monkeypatch.setenv("VISION_AGENT_API_KEY", "env_api_key_test")
-    
-    # Test 1: Config API key overrides environment
-    config_with_key = ParseConfig(api_key="config_api_key_test")
-    settings_instance = get_settings()
-    
-    assert settings_instance.vision_agent_api_key == "env_api_key_test"
-    assert config_with_key.api_key == "config_api_key_test"
-    
-    # Config should take precedence
-    final_api_key = config_with_key.api_key if config_with_key.api_key is not None else settings_instance.vision_agent_api_key
-    assert final_api_key == "config_api_key_test"
-    
-    # Test 2: No config API key - should use environment
-    config_no_key = ParseConfig()
-    assert config_no_key.api_key is None
-    
-    final_api_key_no_config = config_no_key.api_key if config_no_key.api_key is not None else settings_instance.vision_agent_api_key
-    assert final_api_key_no_config == "env_api_key_test"
-
-
-def test_parse_config_api_key_with_settings_override(monkeypatch):
-    from agentic_doc.config import ParseConfig, get_settings, settings
-    
-    # Clear environment API key
-    monkeypatch.delenv("VISION_AGENT_API_KEY", raising=False)
-    
-    # Set API key through settings global object (legacy method)
-    settings.vision_agent_api_key = "settings_override_key"
-    
-    # Test that config still takes precedence over settings override
-    config_with_key = ParseConfig(api_key="config_precedence_key")
-    settings_instance = get_settings()
-    
-    assert settings_instance.vision_agent_api_key == "settings_override_key"
-    assert config_with_key.api_key == "config_precedence_key"
-    
-    # Config should take precedence
-    final_api_key = config_with_key.api_key if config_with_key.api_key is not None else settings_instance.vision_agent_api_key
-    assert final_api_key == "config_precedence_key"
-    
-    # Test with no config API key - should use settings override
-    config_no_key = ParseConfig()
-    assert config_no_key.api_key is None
-    
-    final_api_key_no_config = config_no_key.api_key if config_no_key.api_key is not None else settings_instance.vision_agent_api_key
-    assert final_api_key_no_config == "settings_override_key"
-
-
-def test_parse_config_api_key_empty_string():
-    from agentic_doc.config import ParseConfig
-    
-    # Test with empty string API key
-    config_empty = ParseConfig(api_key="")
-    assert config_empty.api_key == ""
-    
-    # Test with None API key
-    config_none = ParseConfig(api_key=None)
-    assert config_none.api_key is None
-    
-    # Test with whitespace API key
-    config_whitespace = ParseConfig(api_key="   ")
-    assert config_whitespace.api_key == "   "
-
-
-def test_parse_config_api_key_type_validation():
-    from agentic_doc.config import ParseConfig
-    
-    # Test that non-string API keys are handled appropriately
-    # (ParseConfig doesn't do type validation, but we test the behavior)
-    
-    # Valid string
-    config_valid = ParseConfig(api_key="valid_key_123")
-    assert config_valid.api_key == "valid_key_123"
-    
-    # None is valid
-    config_none = ParseConfig(api_key=None)
-    assert config_none.api_key is None
-    
-    # Empty string is valid
-    config_empty = ParseConfig(api_key="")
-    assert config_empty.api_key == ""
+    assert include_marginalia_none is True
+    assert include_metadata_in_markdown_none is True
+    assert split_size_none == 10
+    assert extraction_split_size_none == 50
