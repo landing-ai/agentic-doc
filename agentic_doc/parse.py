@@ -26,7 +26,7 @@ from agentic_doc.common import (
     Timer,
     create_metadata_model,
 )
-from agentic_doc.config import settings, ParseConfig
+from agentic_doc.config import get_settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
 from agentic_doc.utils import (
     check_endpoint_and_api_key,
@@ -39,7 +39,7 @@ from agentic_doc.utils import (
 )
 
 _LOGGER = structlog.getLogger(__name__)
-_ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
+_ENDPOINT_URL = f"{get_settings().endpoint_host}/v1/tools/agentic-document-analysis"
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
 
 
@@ -88,17 +88,24 @@ def parse(
         List[ParsedDocument]
     """
     global _ENDPOINT_URL
-    _ENDPOINT_URL = f"{settings.endpoint_host}/v1/tools/agentic-document-analysis"
-    if config.include_marginalia:
+    _ENDPOINT_URL = f"{get_settings().endpoint_host}/v1/tools/agentic-document-analysis"
+    if config and config.include_marginalia:
         include_marginalia = config.include_marginalia
-    if config.include_metadata_in_markdown:
+    if config and config.include_metadata_in_markdown:
         include_metadata_in_markdown = config.include_metadata_in_markdown
-    if config.extraction_model:
+    if config and config.extraction_model:
         extraction_model = config.extraction_model
-    if config.extraction_schema:
+    if config and config.extraction_schema:
         extraction_schema = config.extraction_schema
 
-    check_endpoint_and_api_key(_ENDPOINT_URL)
+    check_endpoint_and_api_key(
+        _ENDPOINT_URL,
+        api_key=(
+            config.api_key
+            if config and config.api_key
+            else get_settings().vision_agent_api_key
+        ),
+    )
 
     # Convert input to list of document paths
     doc_paths = _get_document_paths(documents, connector_path, connector_pattern)
@@ -278,7 +285,7 @@ def parse_documents(
         extraction_schema=extraction_schema,
         config=config,
     )
-    with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
+    with ThreadPoolExecutor(max_workers=get_settings().batch_size) as executor:
         return list(
             tqdm(
                 executor.map(_parse_func, documents),
@@ -286,7 +293,6 @@ def parse_documents(
                 desc="Parsing documents",
             )
         )
-
 
 
 def _parse_document_without_save(
@@ -349,7 +355,7 @@ def parse_and_save_documents(
         extraction_schema=extraction_schema,
         config=config,
     )
-    with ThreadPoolExecutor(max_workers=settings.batch_size) as executor:
+    with ThreadPoolExecutor(max_workers=get_settings().batch_size) as executor:
         return list(
             tqdm(
                 executor.map(_parse_func, documents),
@@ -383,6 +389,7 @@ def _parse_document_with_save(
     # When result_save_dir is provided, parse_and_save_document returns Path
     assert isinstance(result, Path)
     return result
+
 
 def parse_and_save_document(
     document: Union[str, Path, Url],
@@ -475,15 +482,23 @@ def _parse_pdf(
             with open(file_path, "rb") as file:
                 reader = PdfReader(file)
                 total_pages = len(reader.pages)
-            split_size = config.extraction_split_size if config and config.extraction_split_size else settings.extraction_split_size
+            split_size = (
+                config.extraction_split_size
+                if config and config.extraction_split_size
+                else get_settings().extraction_split_size
+            )
             if total_pages > split_size:
                 raise ValueError(
-                    f"Document has {total_pages} pages, which exceeds the maximum of {settings.extraction_split_size} pages "
+                    f"Document has {total_pages} pages, which exceeds the maximum of {get_settings().extraction_split_size} pages "
                     "allowed when using field extraction. "
                     f"Please use a document with {split_size} pages or fewer."
                 )
         else:
-            split_size = config.split_size if config and config.split_size else settings.split_size
+            split_size = (
+                config.split_size
+                if config and config.split_size
+                else get_settings().split_size
+            )
 
         parts = split_pdf(file_path, temp_dir, split_size)
         file_path = Path(file_path)
@@ -494,6 +509,7 @@ def _parse_pdf(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            config=config,
         )
         return _merge_part_results(part_results)
 
@@ -514,6 +530,7 @@ def _parse_image(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            config=config,
         )
         result_raw = {
             **result_raw["data"],
@@ -617,6 +634,7 @@ def _parse_doc_in_parallel(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> list[ParsedDocument[T]]:
     _parse_func: Callable[[Document], ParsedDocument[T]] = partial(
         _parse_doc_parts,
@@ -624,8 +642,9 @@ def _parse_doc_in_parallel(
         include_metadata_in_markdown=include_metadata_in_markdown,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        config=config,
     )
-    with ThreadPoolExecutor(max_workers=settings.max_workers) as executor:
+    with ThreadPoolExecutor(max_workers=get_settings().max_workers) as executor:
         return list(
             tqdm(
                 executor.map(_parse_func, doc_parts),
@@ -642,6 +661,7 @@ def _parse_doc_parts(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     try:
         _LOGGER.info(f"Start parsing document part: '{doc}'")
@@ -651,6 +671,7 @@ def _parse_doc_parts(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            config=config,
         )
         _LOGGER.info(f"Successfully parsed document part: '{doc}'")
         result_data = {
@@ -717,9 +738,9 @@ def _parse_doc_parts(
 
 @tenacity.retry(
     wait=tenacity.wait_exponential_jitter(
-        exp_base=1.5, initial=1, max=settings.max_retry_wait_time, jitter=10
+        exp_base=1.5, initial=1, max=get_settings().max_retry_wait_time, jitter=10
     ),
-    stop=tenacity.stop_after_attempt(settings.max_retries),
+    stop=tenacity.stop_after_attempt(get_settings().max_retries),
     retry=tenacity.retry_if_exception_type(RetryableError),
     after=log_retry_failure,
 )
@@ -730,6 +751,7 @@ def _send_parsing_request(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    config: Optional[ParseConfig] = None,
 ) -> dict[str, Any]:
     """
     Send a parsing request to the Landing AI Agentic Document Analysis API.
@@ -771,8 +793,13 @@ def _send_parsing_request(
             elif extraction_schema is not None:
                 data["fields_schema"] = json.dumps(extraction_schema)
 
+            api_key = (
+                config.api_key
+                if config and config.api_key
+                else get_settings().vision_agent_api_key
+            )
             headers = {
-                "Authorization": f"Basic {settings.vision_agent_api_key}",
+                "Authorization": f"Basic {api_key}",
                 "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
             }
 

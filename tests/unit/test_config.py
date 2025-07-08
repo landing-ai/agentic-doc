@@ -9,13 +9,14 @@ from agentic_doc.common import ChunkType
 from agentic_doc.config import (
     _COLOR_MAP,
     _MAX_PARALLEL_TASKS,
+    get_settings,
     Settings,
     VisualizationConfig,
 )
 
 
 def test_default_config():
-    settings = Settings()
+    settings = get_settings()
     assert settings.retry_logging_style == "log_msg"
     assert settings.batch_size > 0
     assert settings.max_workers > 0
@@ -35,7 +36,7 @@ def test_custom_config(monkeypatch):
     monkeypatch.setenv("ENDPOINT_HOST", "https://custom-endpoint.example.com")
     monkeypatch.setenv("PDF_TO_IMAGE_DPI", "150")
 
-    settings = Settings()
+    settings = get_settings()
 
     # Verify settings were loaded from environment variables
     assert settings.batch_size == 10

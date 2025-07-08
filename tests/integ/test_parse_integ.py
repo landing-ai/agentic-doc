@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from agentic_doc.common import ChunkType, ParsedDocument, MetadataType
-from agentic_doc.config import settings
+from agentic_doc.config import settings, get_settings
 from agentic_doc.parse import (
     parse,
     parse_and_save_document,
@@ -121,7 +121,7 @@ def test_parse_single_image(sample_image_path):
 
 
 @pytest.mark.skipif(
-    not settings.vision_agent_api_key,
+    not get_settings().vision_agent_api_key,
     reason="API key not set, skipping integration test that requires actual API call",
 )
 def test_parse_and_save_document_with_url(results_dir):
@@ -227,7 +227,7 @@ def test_parse_complex_pdf_with_table_and_image(complex_pdf, results_dir):
 
 
 @pytest.mark.skipif(
-    not settings.vision_agent_api_key,
+    not get_settings().vision_agent_api_key,
     reason="API key not set, skipping integration test that requires actual API call",
 )
 def test_parse_multiple_documents_batch(

@@ -90,6 +90,7 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
             result_save_dir=None,
             extraction_model=None,
             extraction_schema=None,
+            config=None,
         )
 
 
@@ -120,6 +121,7 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
             grounding_save_dir=temp_dir,
             extraction_model=None,
             extraction_schema=None,
+            config=None,
         )
 
         # Check the results
@@ -251,6 +253,7 @@ def test_parse_image(temp_dir, mock_parsed_document):
             include_metadata_in_markdown=True,
             extraction_model=None,
             extraction_schema=None,
+            config=None,
         )
 
         # Check that the result is a ParsedDocument with the expected values
@@ -455,6 +458,7 @@ def test_parse_doc_parts_success(mock_parsed_document):
             include_metadata_in_markdown=True,
             extraction_model=None,
             extraction_schema=None,
+            config=None,
         )
 
         # Check the result
@@ -916,6 +920,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=None,
                 extraction_schema=None,
+                config=None,
             )
 
     def test_parse_with_bytes(self, mock_parsed_document):
@@ -938,6 +943,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=None,
                 extraction_schema=None,
+                config=None,
             )
 
     def test_parse_list_with_save_dir(self, temp_dir, mock_parsed_document):
@@ -985,6 +991,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=None,
                 extraction_schema=None,
+                config=None,
             )
 
     def test_parse_with_extraction_model(self, temp_dir, mock_parsed_document):
@@ -1011,6 +1018,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=EmployeeFields,
                 extraction_schema=None,
+                config=None,
             )
 
     def test_extraction_metadata_with_simple_model(self, sample_image_path):
@@ -1357,6 +1365,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=None,
                 extraction_schema=extraction_schema,
+                config=None,
             )
 
     def test_parse_with_extraction_schema_validation(self, sample_image_path):
@@ -1626,6 +1635,7 @@ class TestParseFunctionConsolidated:
                 result_save_dir=None,
                 extraction_model=None,
                 extraction_schema=None,
+                config=None,
             )
 
     def test_parse_additional_extraction_metadata(
