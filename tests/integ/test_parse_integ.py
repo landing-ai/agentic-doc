@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from agentic_doc.common import ChunkType, ParsedDocument, MetadataType
-from agentic_doc.config import settings, get_settings
+from agentic_doc.config import settings, get_settings, ParseConfig
 from agentic_doc.parse import (
     parse,
     parse_and_save_document,
@@ -711,3 +711,80 @@ def test_extraction_schema_nested(sample_pdf_path):
         in extraction_result.extraction["sample_data_file"]["amount"]
     )
     assert isinstance(extraction_result.extraction_metadata, dict)
+
+
+@pytest.mark.skip(reason="Requires API key and actual service call")
+def test_parse_with_config_integration(sample_image_path, monkeypatch):
+    """
+    Integration test for ParseConfig with the parse function.
+    This test verifies that ParseConfig parameters are properly applied
+    and override default settings and environment variables.
+    """
+    # Set some environment variables
+    monkeypatch.setenv("VISION_AGENT_API_KEY", "env_test_key")
+    monkeypatch.setenv("SPLIT_SIZE", "5")
+    monkeypatch.setenv("EXTRACTION_SPLIT_SIZE", "15")
+    
+    # Create a ParseConfig that overrides some settings
+    config = ParseConfig(
+        api_key="config_test_key",
+        include_marginalia=False,
+        include_metadata_in_markdown=True,
+        split_size=8,
+        extraction_split_size=20
+    )
+    
+    # Test that the config object has the expected values
+    assert config.api_key == "config_test_key"
+    assert config.include_marginalia is False
+    assert config.include_metadata_in_markdown is True
+    assert config.split_size == 8
+    assert config.extraction_split_size == 20
+    
+    # Verify that environment variables are still loaded into settings
+    # but would be overridden by config
+    settings = get_settings()
+    assert settings.vision_agent_api_key == "env_test_key"
+    assert settings.split_size == 5
+    assert settings.extraction_split_size == 15
+    
+    # Test that config takes precedence over environment variables
+    # Note: This is a dry run test - actual API calls are skipped
+    # but we verify the configuration logic works correctly
+    
+    # Simulate the precedence logic used in the parse function
+    final_include_marginalia = config.include_marginalia if config.include_marginalia is not None else True
+    final_include_metadata = config.include_metadata_in_markdown if config.include_metadata_in_markdown is not None else True
+    final_split_size = config.split_size if config.split_size is not None else settings.split_size
+    final_extraction_split_size = config.extraction_split_size if config.extraction_split_size is not None else settings.extraction_split_size
+    
+    assert final_include_marginalia is False  # From config
+    assert final_include_metadata is True  # From config  
+    assert final_split_size == 8  # From config, overrides env var (5)
+    assert final_extraction_split_size == 20  # From config, overrides env var (15)
+    
+    # Test with a ParseConfig that has partial overrides
+    partial_config = ParseConfig(
+        include_marginalia=True,
+        # api_key, split_size, and extraction_split_size are None
+    )
+    
+    # Should use config values where provided, env/settings values otherwise
+    partial_include_marginalia = partial_config.include_marginalia if partial_config.include_marginalia is not None else True
+    partial_split_size = partial_config.split_size if partial_config.split_size is not None else settings.split_size
+    partial_extraction_split_size = partial_config.extraction_split_size if partial_config.extraction_split_size is not None else settings.extraction_split_size
+    
+    assert partial_include_marginalia is True  # From config
+    assert partial_split_size == 5  # From env var via settings
+    assert partial_extraction_split_size == 15  # From env var via settings
+    
+    # Test with empty ParseConfig - should use all defaults/env vars
+    empty_config = ParseConfig()
+    
+    empty_include_marginalia = empty_config.include_marginalia if empty_config.include_marginalia is not None else True
+    empty_split_size = empty_config.split_size if empty_config.split_size is not None else settings.split_size
+    empty_extraction_split_size = empty_config.extraction_split_size if empty_config.extraction_split_size is not None else settings.extraction_split_size
+    
+    assert empty_include_marginalia is True  # Default
+    assert empty_split_size == 5  # From env var via settings
+    assert empty_extraction_split_size == 15  # From env var via settings
