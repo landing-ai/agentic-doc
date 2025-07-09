@@ -104,17 +104,25 @@ jobs:
         run: |
           git config user.name "Landing AI Bot"
           git config user.email "dev@landing.ai"
-      - name: Bump up version
+
+      - name: Publish to PyPI
         run: |
           TAG=${{ github.ref_name }}
-          git checkout main
+          poetry version ${TAG#v}
+          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
+          poetry publish --build -vvv
+
+      - name: Checkout main code to bump version
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Bump up version on main
+        run: |
+          TAG=${{ github.ref_name }}
           poetry version ${TAG#v}
           new_version=`poetry version`
           git add pyproject.toml
           git commit -m "[skip ci] chore(release): ${new_version}"
           git push -f
-          git checkout -
-      - name: Publish to PyPI
-        run: |
-          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
-          poetry publish --build -vvv
