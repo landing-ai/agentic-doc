@@ -124,5 +124,4 @@ jobs:
           poetry version ${TAG#v}
           new_version=`poetry version`
           git add pyproject.toml
-          git commit -m "[skip ci] chore(release): ${new_version}"
-          git push -f
+          git commit -m "[skip ci] chore(release): ${new_version}" && git push -f || true
