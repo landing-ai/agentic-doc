@@ -107,10 +107,10 @@ jobs:
       - name: Bump up version
         run: |
           TAG=${{ github.ref_name }}
-          poetry version ${TAG#v}
-          git add pyproject.toml
-          new_version=`poetry version`
           git checkout main
+          poetry version ${TAG#v}
+          new_version=`poetry version`
+          git add pyproject.toml
           git commit -m "[skip ci] chore(release): ${new_version}"
           git push -f
           git checkout -
