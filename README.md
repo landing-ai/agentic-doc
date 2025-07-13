@@ -316,8 +316,8 @@ viz_config = VisualizationConfig(
     font_scale=0.7,  # Larger text
     # Custom colors for different chunk types
     color_map={
-        ChunkType.TITLE: (0, 0, 255),  # Red for titles
-        ChunkType.TEXT: (255, 0, 0),  # Blue for regular text
+        ChunkType.TITLE: (0, 0, 255),  # Blue for titles
+        ChunkType.TEXT: (255, 0, 0),  # Red for regular text
         # ... other chunk types ...
     }
 )
