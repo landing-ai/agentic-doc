@@ -16,9 +16,9 @@ The LandingAI **Agentic Document Extraction** API pulls structured data out of
 
 This Python library wraps that API to provide:
 
-* **Long‑document support** – process 100+ page PDFs in a single call  
-* **Auto‑retry / paging** – handles concurrency, time‑outs, and rate limits  
-* **Helper utilities** – bounding‑box snippets, visual debuggers, and more  
+* **Long‑document support** – process 100+ page PDFs in a single call
+* **Auto‑retry / paging** – handles concurrency, time‑outs, and rate limits
+* **Helper utilities** – bounding‑box snippets, visual debuggers, and more
 
 ### Features
 
@@ -118,7 +118,7 @@ class ExtractedFields(BaseModel):
 results = parse("mydoc.pdf", extraction_model=ExtractedFields)
 fields = results[0].extraction
 metadata = results[0].extraction_metadata
-print(f"Field value: {fields.employee_name}, confidence: {metadata.employee_name.experimental_confidence}")
+print(f"Field value: {fields.employee_name}, confidence: {metadata.employee_name.confidence}")
 ```
 
 
@@ -407,11 +407,11 @@ The `RETRY_LOGGING_STYLE` setting controls how the library logs the retry attemp
 ## Troubleshooting & FAQ
 
 ### Common Issues
-- **API Key Errors:**  
+- **API Key Errors:**
   Ensure your API key is correctly set as an environment variable.
-- **Rate Limits:**  
+- **Rate Limits:**
   The library automatically retries requests if you hit the API rate limit. Adjust `BATCH_SIZE` or `MAX_WORKERS` if you encounter frequent rate limit errors.
-- **Parsing Failures:**  
+- **Parsing Failures:**
   If a document fails to parse, an error chunk will be included in the result, detailing the error message and page index.
 - **URL Access Issues:**
   If you're having trouble accessing documents from URLs, check that the URLs are publicly accessible and point to supported file types (PDF or images).

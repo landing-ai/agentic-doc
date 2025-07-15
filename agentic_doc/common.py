@@ -66,7 +66,7 @@ VT = TypeVar("VT")
 class MetadataType(BaseModel, Generic[VT]):
     value: Optional[VT] = None
     chunk_references: List[str]
-    experimental_confidence: Optional[float] = None
+    confidence: Optional[float] = None
 
 
 def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
