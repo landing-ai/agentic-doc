@@ -3,8 +3,6 @@ name: CI - Integration Tests
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened, labeled]
@@ -44,12 +42,7 @@ jobs:
             echo "approved=true" >> $GITHUB_OUTPUT
             echo "✅ Push to main branch - automatically approved" >> $GITHUB_STEP_SUMMARY
           
-          # For pull_request events (internal PRs)
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "approved=true" >> $GITHUB_OUTPUT
-            echo "✅ Internal PR - automatically approved" >> $GITHUB_STEP_SUMMARY
-          
-          # For pull_request_target events (external PRs)
+          # For pull_request_target events
           elif [ "${{ github.event_name }}" == "pull_request_target" ]; then
             # Check if it's from a fork
             if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
@@ -88,7 +81,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           
-      - name: Merge PR for testing (pull_request_target only)
+      - name: Merge PR for testing
         if: github.event_name == 'pull_request_target'
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -96,6 +89,7 @@ jobs:
           git fetch origin ${{ github.event.pull_request.base.ref }}:base-branch
           git checkout base-branch
           git merge ${{ github.event.pull_request.head.sha }} --no-edit
+
       
       - uses: actions/setup-python@v4
         with:
@@ -127,7 +121,7 @@ jobs:
           poetry run pytest -n auto -s -vvv tests/integ
           
       - name: Comment PR
-        if: (github.event_name == 'pull_request_target' || github.event_name == 'pull_request') && failure()
+        if: github.event_name == 'pull_request_target' && failure()
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
