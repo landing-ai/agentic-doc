@@ -3,8 +3,9 @@ name: Main Branch CI
 on:
   push:
     branches: [main]
-  pull_request:
+  pull_request_target:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
 
 env:
   VISION_AGENT_API_KEY: "PLACEHOLDER"
@@ -22,6 +23,8 @@ jobs:
       RUNTIME_TAG: ci_job
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -53,14 +56,47 @@ jobs:
         run: |
           poetry run pytest -s -vvv tests/unit
 
+  authorize:
+    name: Authorize
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.decision.outputs.approved }}
+    steps:
+      - name: Check if PR is from fork
+        id: check-fork
+        run: |
+          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            echo "is_fork=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_fork=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Decision
+        id: decision
+        run: |
+          if [ "${{ steps.check-fork.outputs.is_fork }}" == "false" ]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+          else
+            if [[ "${{ contains(github.event.pull_request.labels.*.name, 'safe to test') }}" == "true" ]]; then
+              echo "approved=true" >> $GITHUB_OUTPUT
+            else
+              echo "approved=false" >> $GITHUB_OUTPUT
+              echo "⚠️ This PR is from a fork and needs the 'safe to test' label to run integration tests" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
   integ_test:
     name: Integ Test
+    needs: authorize
+    if: needs.authorize.outputs.decision == 'true'
     runs-on: ubuntu-latest
     env:
       RUNTIME_TAG: ci_job
       VISION_AGENT_API_KEY: ${{ secrets.VISION_AGENT_API_KEY }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: 3.12
