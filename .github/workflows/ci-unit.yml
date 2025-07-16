@@ -3,6 +3,9 @@ name: Main Branch CI
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
   pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened, labeled]
@@ -22,36 +25,48 @@ jobs:
     env:
       RUNTIME_TAG: ci_job
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # For pull_request events, checkout the PR branch
+          # For pull_request_target events, checkout the PR head
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+      
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+      
       - name: Install Python Poetry
         uses: abatilo/actions-poetry@v2.1.0
         with:
           poetry-version: 1.4.2
+      
       - name: Configure poetry
         shell: bash
         run: poetry config virtualenvs.in-project true
+      
       - name: Print Python environment information
         run: |
           poetry env info
           poetry --version
           poetry run pip -V
+      
       - name: Install dependencies
         run: |
           poetry install --all-extras
+      
       - name: Linting
         run: |
           poetry run flake8 . --exclude .venv,examples,tests --count --show-source --statistics
+      
       - name: Check Format
         run: |
           poetry run black --check --diff --color agentic_doc/
+      
       - name: Type Checking
         run: |
           poetry run mypy agentic_doc
+      
       - name: Test with pytest
         run: |
           poetry run pytest -s -vvv tests/unit
@@ -61,13 +76,31 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       decision: ${{ steps.decision.outputs.approved }}
+      is_fork: ${{ steps.check-fork.outputs.is_fork }}
     steps:
+      - name: Debug Info
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Head repo: ${{ github.event.pull_request.head.repo.full_name || 'N/A' }}"
+          echo "Base repo: ${{ github.event.pull_request.base.repo.full_name || 'N/A' }}"
+          echo "Labels: ${{ toJson(github.event.pull_request.labels.*.name) }}"
+      
       - name: Check if PR is from fork
         id: check-fork
         run: |
-          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
-            echo "is_fork=true" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For pull_request events, it's always from the same repo (internal)
+            echo "is_fork=false" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "pull_request_target" ]; then
+            # For pull_request_target events, check if it's from a fork
+            if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+              echo "is_fork=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_fork=false" >> $GITHUB_OUTPUT
+            fi
           else
+            # For push events, not applicable
             echo "is_fork=false" >> $GITHUB_OUTPUT
           fi
       
@@ -75,10 +108,14 @@ jobs:
         id: decision
         run: |
           if [ "${{ steps.check-fork.outputs.is_fork }}" == "false" ]; then
+            # Internal PR or push - always approved
             echo "approved=true" >> $GITHUB_OUTPUT
+            echo "✅ Internal PR - automatically approved" >> $GITHUB_STEP_SUMMARY
           else
+            # External fork - check for 'safe to test' label
             if [[ "${{ contains(github.event.pull_request.labels.*.name, 'safe to test') }}" == "true" ]]; then
               echo "approved=true" >> $GITHUB_OUTPUT
+              echo "✅ External fork PR approved with 'safe to test' label" >> $GITHUB_STEP_SUMMARY
             else
               echo "approved=false" >> $GITHUB_OUTPUT
               echo "⚠️ This PR is from a fork and needs the 'safe to test' label to run integration tests" >> $GITHUB_STEP_SUMMARY
@@ -94,27 +131,36 @@ jobs:
       RUNTIME_TAG: ci_job
       VISION_AGENT_API_KEY: ${{ secrets.VISION_AGENT_API_KEY }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # For pull_request events, checkout the PR branch
+          # For pull_request_target events, checkout the PR head
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+      
       - uses: actions/setup-python@v4
         with:
           python-version: 3.12
+      
       - name: Install Python Poetry
         uses: abatilo/actions-poetry@v2.1.0
         with:
           poetry-version: 1.4.2
+      
       - name: Configure poetry
         shell: bash
         run: poetry config virtualenvs.in-project true
+      
       - name: Print Python environment information
         run: |
           poetry env info
           poetry --version
           poetry run pip -V
+      
       - name: Install dependencies
         run: |
           poetry install --all-extras
+      
       - name: Integ Test with pytest
         run: |
           poetry run pytest -n auto -s -vvv tests/integ

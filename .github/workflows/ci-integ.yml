@@ -1,0 +1,130 @@
+name: CI - Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled]
+
+env:
+  PYTHONUTF8: 1
+
+jobs:
+  comment_on_fork_pr:
+    name: Comment on fork PR
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository && !contains(github.event.pull_request.labels.*.name, 'safe to test')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on fork PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '👋 Thanks for your contribution! This PR is from a fork and requires manual review before integration tests can run.\n\nA maintainer will review your code and add the `safe to test` label if the changes are safe to test with our infrastructure.'
+            })
+
+  authorize:
+    name: Authorize
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.decision.outputs.approved }}
+    steps:
+      - name: Check authorization
+        id: decision
+        run: |
+          # For push events (only happens on main branch)
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+            echo "✅ Push to main branch - automatically approved" >> $GITHUB_STEP_SUMMARY
+          
+          # For pull_request_target events
+          elif [ "${{ github.event_name }}" == "pull_request_target" ]; then
+            # Check if it's from a fork
+            if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+              # External fork - check for 'safe to test' label
+              if [[ "${{ contains(github.event.pull_request.labels.*.name, 'safe to test') }}" == "true" ]]; then
+                echo "approved=true" >> $GITHUB_OUTPUT
+                echo "✅ External fork PR approved with 'safe to test' label" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "approved=false" >> $GITHUB_OUTPUT
+                echo "⚠️ This PR is from a fork and needs the 'safe to test' label to run integration tests" >> $GITHUB_STEP_SUMMARY
+                echo "A maintainer must review the code and add the 'safe to test' label if the changes are safe to test." >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              # Internal PR - automatically approved
+              echo "approved=true" >> $GITHUB_OUTPUT
+              echo "✅ Internal PR - automatically approved" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "approved=false" >> $GITHUB_OUTPUT
+          fi
+
+  integ_test:
+    name: Integration Test
+    needs: authorize
+    if: needs.authorize.outputs.decision == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    env:
+      RUNTIME_TAG: ci_job
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          
+      - name: Merge PR for testing
+        if: github.event_name == 'pull_request_target'
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-branch
+          git merge pr-branch --no-edit
+      
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+      
+      - name: Install Python Poetry
+        uses: abatilo/actions-poetry@v2.1.0
+        with:
+          poetry-version: 1.4.2
+      
+      - name: Configure poetry
+        shell: bash
+        run: poetry config virtualenvs.in-project true
+      
+      - name: Print Python environment information
+        run: |
+          poetry env info
+          poetry --version
+          poetry run pip -V
+      
+      - name: Install dependencies
+        run: |
+          poetry install --all-extras
+      
+      - name: Integration Test with pytest
+        env:
+          VISION_AGENT_API_KEY: ${{ secrets.VISION_AGENT_API_KEY }}
+        run: |
+          poetry run pytest -n auto -s -vvv tests/integ
+          
+      - name: Comment PR
+        if: github.event_name == 'pull_request_target' && failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Integration tests failed. Please check the logs.'
+            })
