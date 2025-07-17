@@ -239,7 +239,7 @@ This is useful when documents are already loaded into memory (e.g., from an API 
 
 ## Main Features
 
-With this library, you can do things that are otherwise hard to do with the Agentic Document Extraction API alone.
+With this library, you can do tasks that are otherwise hard to do with the Agentic Document Extraction API alone.
 This section describes some of the key features this library offers.
 
 ### Parse Large PDF Files
