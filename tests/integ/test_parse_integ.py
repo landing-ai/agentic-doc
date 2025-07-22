@@ -288,6 +288,34 @@ def test_parse_documents_error_handling_mixed_valid_invalid(
     with pytest.raises(FileNotFoundError):
         parse_and_save_documents(input_files, result_save_dir=results_dir)
 
+def test_field_extraction_with_results_save_dir(sample_pdf_path, results_dir):
+    class ExtractedFields(BaseModel):
+        employee_name: str = Field(description="")
+
+    schema = {
+        "properties": {
+            "employee_name": {
+                "description": "",
+                "title": "Employee Name", 
+                "type": "string"
+            }
+        },
+        "required": ["employee_name"],
+        "title": "ExtractedFields",
+        "type": "object"
+    }
+    
+    result1 = parse(sample_pdf_path, extraction_schema=schema, result_save_dir=results_dir)
+    result2 = parse(sample_pdf_path, extraction_model=ExtractedFields, result_save_dir=results_dir)
+    
+    assert hasattr(result1[0], 'extraction')
+    assert hasattr(result1[0], 'extraction_metadata')
+    assert hasattr(result2[0], 'extraction')
+    assert hasattr(result2[0], 'extraction_metadata')
+    assert 'employee_name' in result1[0].extraction
+    assert 'employee_name' in result1[0].extraction_metadata
+    assert hasattr(result2[0].extraction, 'employee_name')
+    assert hasattr(result2[0].extraction_metadata, 'employee_name')
 
 def test_parse_pdf_chunks_have_sequential_pages(sample_pdf_path, results_dir):
     # Test that PDF chunks are correctly ordered by page
@@ -711,3 +739,38 @@ def test_extraction_schema_nested(sample_pdf_path):
         in extraction_result.extraction["sample_data_file"]["amount"]
     )
     assert isinstance(extraction_result.extraction_metadata, dict)
+
+
+@pytest.mark.skipif(
+    not get_settings().vision_agent_api_key,
+    reason="API key not set, skipping integration test that requires actual API call",
+)
+def test_xml_output_integration(sample_image_path, results_dir):
+    """Integration test for XML output functionality."""
+    # Test with XML output enabled
+    xml_config = ParseConfig(output_xml=True)
+    xml_result = parse(sample_image_path, result_save_dir=results_dir, config=xml_config)
+    
+    # Test with JSON output (default)  
+    json_config = ParseConfig(output_xml=False)
+    json_result = parse(sample_image_path, result_save_dir=results_dir, config=json_config)
+    
+    # Both should return valid ParsedDocument objects with same structure
+    assert len(xml_result) == 1
+    assert len(json_result) == 1
+    
+    xml_doc = xml_result[0]
+    json_doc = json_result[0]
+    
+    # Core structure should be identical
+    assert xml_doc.doc_type == json_doc.doc_type
+    assert xml_doc.start_page_idx == json_doc.start_page_idx 
+    assert xml_doc.end_page_idx == json_doc.end_page_idx
+    assert len(xml_doc.chunks) == len(json_doc.chunks)
+    assert len(xml_doc.errors) == len(json_doc.errors)
+    
+    # Chunk structure should match
+    for xml_chunk, json_chunk in zip(xml_doc.chunks, json_doc.chunks):
+        assert xml_chunk.chunk_type == json_chunk.chunk_type
+        assert xml_chunk.chunk_id == json_chunk.chunk_id
+        assert len(xml_chunk.grounding) == len(json_chunk.grounding)

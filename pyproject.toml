@@ -38,6 +38,8 @@ jsonschema = "^4.24.0"
 types-jsonschema = "^4.24.0.20250528"
 requests = "^2.32.4"
 protobuf = "^6.31.1"
+dicttoxml = "^1.7.16"
+xmltodict = "^0.14.2"
 
 
 [tool.poetry.group.dev.dependencies]

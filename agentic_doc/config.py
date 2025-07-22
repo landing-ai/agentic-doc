@@ -3,6 +3,7 @@ import logging
 from typing import Literal, Any, Optional, Iterator
 import cv2
 import structlog
+from dataclasses import dataclass
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from agentic_doc.common import ChunkType, T
@@ -19,28 +20,16 @@ _COLOR_MAP = {
 }
 
 
+@dataclass
 class ParseConfig:
-    """
-    Configuration class for the parse function.
-    """
-
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        include_marginalia: Optional[bool] = None,
-        include_metadata_in_markdown: Optional[bool] = None,
-        extraction_model: Optional[type[T]] = None,
-        extraction_schema: Optional[dict[str, Any]] = None,
-        split_size: Optional[int] = None,
-        extraction_split_size: Optional[int] = None,
-    ) -> None:
-        self.api_key = api_key
-        self.include_marginalia = include_marginalia
-        self.include_metadata_in_markdown = include_metadata_in_markdown
-        self.extraction_model = extraction_model
-        self.extraction_schema = extraction_schema
-        self.split_size = split_size
-        self.extraction_split_size = extraction_split_size
+    api_key: Optional[str] = None
+    include_marginalia: Optional[bool] = None
+    include_metadata_in_markdown: Optional[bool] = None
+    extraction_model: Optional[type[T]] = None
+    extraction_schema: Optional[dict[str, Any]] = None
+    split_size: Optional[int] = None
+    extraction_split_size: Optional[int] = None
+    output_xml: bool = False
 
 
 class SettingsOverrides:

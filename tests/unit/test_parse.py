@@ -27,6 +27,7 @@ from agentic_doc.parse import (
     _parse_image,
     _parse_pdf,
     _send_parsing_request,
+    fix_xml_dict,
     parse,
     parse_and_save_document,
     parse_and_save_documents,
@@ -1948,3 +1949,134 @@ class TestParseFunctionConsolidated:
             assert request["data"]["include_marginalia"] is True
             assert request["data"]["include_metadata_in_markdown"] is True
             assert request["headers"]["Authorization"] == "Basic none_test_key"
+
+
+class TestXMLParsing:
+    """Test XML parsing functionality."""
+
+    def test_fix_xml_dict_with_empty_elements(self):
+        """Test fix_xml_dict handles empty XML elements correctly."""
+        # Test empty errors list
+        data = {"errors": None}
+        result = fix_xml_dict(data)
+        assert result["errors"] == []
+
+        # Test empty extraction dict
+        data = {"extraction": None}
+        result = fix_xml_dict(data)
+        assert result["extraction"] == {}
+
+        # Test empty grounding list
+        data = {"chunks": [{"grounding": None}]}
+        result = fix_xml_dict(data)
+        assert result["chunks"][0]["grounding"] == []
+
+    def test_fix_xml_dict_with_single_item(self):
+        """Test fix_xml_dict converts single item to list correctly."""
+        data = {"chunks": {"item": {"text": "test", "chunk_id": "1"}}}
+        result = fix_xml_dict(data)
+        assert isinstance(result["chunks"], list)
+        assert len(result["chunks"]) == 1
+        assert result["chunks"][0]["text"] == "test"
+
+    def test_fix_xml_dict_with_multiple_items(self):
+        """Test fix_xml_dict handles multiple items correctly."""
+        data = {
+            "chunks": {
+                "item": [
+                    {"text": "test1", "chunk_id": "1"},
+                    {"text": "test2", "chunk_id": "2"}
+                ]
+            }
+        }
+        result = fix_xml_dict(data)
+        assert isinstance(result["chunks"], list)
+        assert len(result["chunks"]) == 2
+        assert result["chunks"][0]["text"] == "test1"
+        assert result["chunks"][1]["text"] == "test2"
+
+    def test_fix_xml_dict_preserves_other_fields(self):
+        """Test fix_xml_dict preserves non-XML-specific fields."""
+        data = {
+            "markdown": "# Test",
+            "start_page_idx": 0,
+            "end_page_idx": 1,
+            "doc_type": "pdf"
+        }
+        result = fix_xml_dict(data)
+        assert result == data
+
+    def test_fix_xml_dict_skips_xml_attributes(self):
+        """Test fix_xml_dict skips XML attributes."""
+        data = {
+            "@type": "test_type",
+            "@id": "123",
+            "actual_field": "value"
+        }
+        result = fix_xml_dict(data)
+        assert "@type" not in result
+        assert "@id" not in result
+        assert result["actual_field"] == "value"
+
+    def test_xml_roundtrip_consistency(self, temp_dir):
+        """Test that XML roundtrip maintains data consistency."""
+        import json
+        import tempfile
+        from dicttoxml import dicttoxml
+        from agentic_doc.parse import _convert_to_parsed_documents
+        from agentic_doc.config import ParseConfig
+
+        # Sample parsed document data
+        original_data = {
+            "markdown": "# Test Document",
+            "chunks": [
+                {
+                    "text": "Test content",
+                    "chunk_type": "text",
+                    "chunk_id": "test-1",
+                    "grounding": [
+                        {
+                            "page": 0,
+                            "box": {"l": 0.1, "t": 0.1, "r": 0.9, "b": 0.2},
+                            "image_path": None
+                        }
+                    ]
+                }
+            ],
+            "extraction": None,
+            "extraction_metadata": None,
+            "start_page_idx": 0,
+            "end_page_idx": 0,
+            "doc_type": "pdf",
+            "result_path": None,
+            "errors": [],
+            "extraction_error": None
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir = Path(temp_dir)
+            
+            # Save as XML
+            xml_path = temp_dir / "test.xml"
+            xml_bytes = dicttoxml(original_data, attr_type=False)
+            xml_path.write_text(xml_bytes.decode('utf-8'))
+            
+            # Read back from XML with our fix
+            xml_config = ParseConfig(output_xml=True)
+            xml_parsed = _convert_to_parsed_documents([xml_path], None, config=xml_config)
+            xml_doc = xml_parsed[0]
+            
+            # Compare key fields
+            assert len(original_data["chunks"]) == len(xml_doc.chunks)
+            assert original_data["doc_type"] == xml_doc.doc_type
+            assert original_data["start_page_idx"] == xml_doc.start_page_idx
+            assert original_data["end_page_idx"] == xml_doc.end_page_idx
+            assert len(original_data["errors"]) == len(xml_doc.errors)
+            
+            # Compare chunk structure
+            orig_chunk = original_data["chunks"][0]
+            xml_chunk = xml_doc.chunks[0]
+            assert orig_chunk["text"] == xml_chunk.text
+            assert orig_chunk["chunk_type"] == xml_chunk.chunk_type
+            assert orig_chunk["chunk_id"] == xml_chunk.chunk_id
+            assert len(orig_chunk["grounding"]) == len(xml_chunk.grounding)
