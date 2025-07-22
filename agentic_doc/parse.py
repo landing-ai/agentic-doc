@@ -30,12 +30,11 @@ from agentic_doc.config import Settings, get_settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
 from agentic_doc.utils import (
     check_endpoint_and_api_key,
-    download_file,
     get_file_type,
-    is_valid_httpurl,
     log_retry_failure,
     save_groundings_as_images,
     split_pdf,
+    _doc_to_path
 )
 
 _LOGGER = structlog.getLogger(__name__)
@@ -415,17 +414,7 @@ def parse_and_save_document(
         Path | ParsedDocument: The file path to the saved result or the parsed document data.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
-        if isinstance(document, str) and is_valid_httpurl(document):
-            document = Url(document)
-
-        if isinstance(document, Url):
-            output_file_path = Path(temp_dir) / Path(str(document)).name
-            download_file(document, str(output_file_path))
-            document = output_file_path
-        else:
-            document = Path(document)
-            if isinstance(document, Path) and not document.exists():
-                raise FileNotFoundError(f"File not found: {document}")
+        document = _doc_to_path(document, temp_dir)
 
         file_type = get_file_type(document)
 

@@ -15,6 +15,7 @@ from PIL import Image
 from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
+import tempfile
 
 from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
 from agentic_doc.config import VisualizationConfig, get_settings
@@ -61,48 +62,56 @@ def get_file_type(file_path: Path) -> Literal["pdf", "image"]:
 
 
 def save_groundings_as_images(
-    file_path: Path,
+    file_path: Union[str, Path, Url],
     chunks: list[Chunk],
-    save_dir: Path,
+    save_dir: Union[str, Path],
     inplace: bool = True,
+    filter_by: list[str] = None
 ) -> dict[str, list[Path]]:
     """
     Save the chunks as images based on the bounding box in each chunk.
 
     Args:
-        file_path (Path): The path to the input document file.
+        file_path (str | Path | Url): The path to the input document file.
         chunks (list[Chunk]): The chunks to save or update.
-        save_dir (Path): The directory to save the images of the chunks.
+        save_dir (Path | str): The directory to save the images of the chunks.
         inplace (bool): Whether to update the input chunks in place.
+        filter_by (list[str]): List of chunk types to filter by. If provided, only chunks of the given types will be saved.
 
     Returns:
         dict[str, Path]: The dictionary of saved image paths. The key is the chunk id and the value is the path to the saved image.
     """
-    file_type = get_file_type(file_path)
-    _LOGGER.info(
-        f"Saving {len(chunks)} chunks as images to '{save_dir}'",
-        file_path=file_path,
-        file_type=file_type,
-    )
-    result: dict[str, list[Path]] = {}
-    save_dir.mkdir(parents=True, exist_ok=True)
-    if file_type == "image":
-        img = cv2.imread(str(file_path))
-        return _crop_groundings(img, chunks, save_dir, inplace)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = _doc_to_path(file_path, temp_dir)
+        save_dir = Path(save_dir)
+        file_type = get_file_type(file_path)
+        _LOGGER.info(
+            f"Saving {len(chunks)} chunks as images to '{save_dir}'",
+            file_path=file_path,
+            file_type=file_type,
+        )
+        result: dict[str, list[Path]] = {}
+        save_dir.mkdir(parents=True, exist_ok=True)
+        if filter_by:
+            filter_by = [filter.lower() for filter in filter_by]
+            chunks = [chunk for chunk in chunks if chunk.chunk_type.lower() in filter_by]
+        if file_type == "image":
+            img = cv2.imread(str(file_path))
+            return _crop_groundings(img, chunks, save_dir, inplace)
 
-    assert file_type == "pdf"
-    chunks_by_page_idx = defaultdict(list)
-    for chunk in chunks:
-        page_idx = chunk.grounding[0].page
-        chunks_by_page_idx[page_idx].append(chunk)
+        assert file_type == "pdf"
+        chunks_by_page_idx = defaultdict(list)
+        for chunk in chunks:
+            page_idx = chunk.grounding[0].page
+            chunks_by_page_idx[page_idx].append(chunk)
 
-    with pymupdf.open(file_path) as pdf_doc:
-        for page_idx, chunks in sorted(chunks_by_page_idx.items()):
-            page_img = page_to_image(pdf_doc, page_idx)
-            page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
-            result.update(page_result)
+        with pymupdf.open(file_path) as pdf_doc:
+            for page_idx, chunks in sorted(chunks_by_page_idx.items()):
+                page_img = page_to_image(pdf_doc, page_idx)
+                page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
+                result.update(page_result)
 
-    return result
+        return result
 
 
 def page_to_image(
@@ -118,6 +127,7 @@ def page_to_image(
     # Ensure the image has 3 channels (sometimes it may include an alpha channel)
     if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
         img = img[..., :3]
+    img = img[:, :, ::-1]
 
     return img
 
@@ -208,6 +218,22 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
     result: np.ndarray = image[ymin:ymax, xmin:xmax]
     return result
 
+
+def _doc_to_path(document: Union[str, Path, Url], temp_storage_dir: str) -> Path:
+    if isinstance(document, str) and is_valid_httpurl(document):
+        document = Url(document)
+
+    if isinstance(document, Url):
+        output_file_path = Path(temp_storage_dir) / Path(str(document)).name
+        download_file(document, str(output_file_path))
+        document = output_file_path
+    else:
+        document = Path(document)
+        if isinstance(document, Path) and not document.exists():
+            raise FileNotFoundError(f"File not found: {document}")
+        
+    return document
+        
 
 def split_pdf(
     input_pdf_path: Union[str, Path],
