@@ -471,7 +471,7 @@ def download_file(file_url: Url, output_filepath: str) -> None:
     with httpx.stream("GET", str(file_url), timeout=None) as response:
         if response.status_code != 200:
             raise Exception(
-                f"Download failed for '{file_url}'. Status code: {response.status_code} {response.text}"
+                f"Download failed for '{file_url}'. Status code: {response.status_code}"
             )
 
         with open(output_filepath, "wb") as f:
