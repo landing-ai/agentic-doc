@@ -66,7 +66,7 @@ def save_groundings_as_images(
     chunks: list[Chunk],
     save_dir: Union[str, Path],
     inplace: bool = True,
-    filter_by: list[str] = None
+    filter_by: Optional[list[str]] = None,
 ) -> dict[str, list[Path]]:
     """
     Save the chunks as images based on the bounding box in each chunk.
@@ -76,7 +76,7 @@ def save_groundings_as_images(
         chunks (list[Chunk]): The chunks to save or update.
         save_dir (Path | str): The directory to save the images of the chunks.
         inplace (bool): Whether to update the input chunks in place.
-        filter_by (list[str]): List of chunk types to filter by. If provided, only chunks of the given types will be saved.
+        filter_by (list[str] | None): List of chunk types to filter by. If provided, only chunks of the given types will be saved. (optional)
 
     Returns:
         dict[str, Path]: The dictionary of saved image paths. The key is the chunk id and the value is the path to the saved image.
@@ -94,7 +94,9 @@ def save_groundings_as_images(
         save_dir.mkdir(parents=True, exist_ok=True)
         if filter_by:
             filter_by = [filter.lower() for filter in filter_by]
-            chunks = [chunk for chunk in chunks if chunk.chunk_type.lower() in filter_by]
+            chunks = [
+                chunk for chunk in chunks if chunk.chunk_type.lower() in filter_by
+            ]
         if file_type == "image":
             img = cv2.imread(str(file_path))
             return _crop_groundings(img, chunks, save_dir, inplace)
@@ -231,9 +233,9 @@ def _doc_to_path(document: Union[str, Path, Url], temp_storage_dir: str) -> Path
         document = Path(document)
         if isinstance(document, Path) and not document.exists():
             raise FileNotFoundError(f"File not found: {document}")
-        
+
     return document
-        
+
 
 def split_pdf(
     input_pdf_path: Union[str, Path],

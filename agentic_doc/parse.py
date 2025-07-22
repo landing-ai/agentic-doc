@@ -34,7 +34,7 @@ from agentic_doc.utils import (
     log_retry_failure,
     save_groundings_as_images,
     split_pdf,
-    _doc_to_path
+    _doc_to_path,
 )
 
 _LOGGER = structlog.getLogger(__name__)
