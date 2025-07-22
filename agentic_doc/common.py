@@ -19,6 +19,7 @@ import httpx
 from pydantic import BaseModel, Field, create_model, computed_field
 from collections import defaultdict
 
+
 class ChunkType(str, Enum):
     table = "table"
     figure = "figure"
@@ -139,13 +140,12 @@ class ParsedDocument(BaseModel, Generic[T]):
     extraction_error: Optional[str] = None
 
     @computed_field
-    @property
     def pages(self) -> List[Dict[str, Any]]:
         chunks_by_page = defaultdict(list)
         for chunk in self.chunks:
             if chunk.grounding:
                 chunks_by_page[chunk.grounding[0].page].append(chunk)
-        
+
         return [
             {"markdown": "\n\n".join(c.text for c in chunks), "chunks": chunks}
             for _, chunks in sorted(chunks_by_page.items())
