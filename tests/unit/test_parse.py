@@ -417,6 +417,67 @@ def test_merge_next_part():
     assert current_doc.chunks[1].grounding[0].page == 1
 
 
+def test_pages():
+    doc1 = ParsedDocument(
+        markdown="# Document 1",
+        chunks=[
+            Chunk(
+                text="Document 1 Chunk 1",
+                chunk_type=ChunkType.text,
+                chunk_id="1",
+                grounding=[
+                    ChunkGrounding(
+                        page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    )
+                ],
+            ),
+            Chunk(
+                text="Document 1 Chunk 2",
+                chunk_type=ChunkType.text,
+                chunk_id="1",
+                grounding=[
+                    ChunkGrounding(
+                        page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    )
+                ],
+            )
+        ],
+        start_page_idx=0,
+        end_page_idx=0,
+        doc_type="pdf",
+    )
+
+    doc2 = ParsedDocument(
+        markdown="# Document 2",
+        chunks=[
+            Chunk(
+                text="Document 2",
+                chunk_type=ChunkType.text,
+                chunk_id="2",
+                grounding=[
+                    ChunkGrounding(
+                        page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    )
+                ],
+            )
+        ],
+        start_page_idx=1,
+        end_page_idx=1,
+        doc_type="pdf",
+    )
+
+    result = _merge_part_results([doc1, doc2])
+
+    assert len(result.pages) == 2
+    assert result.pages[0]['markdown'] == 'Document 1 Chunk 1\n\nDocument 1 Chunk 2'
+    assert result.pages[1]['markdown'] == 'Document 2'
+    assert len(result.pages[0]['chunks']) == 2
+    assert len(result.pages[1]['chunks']) == 1
+    assert result.pages[0]['chunks'][0].text == 'Document 1 Chunk 1'
+    assert result.pages[1]['chunks'][0].text == 'Document 2'
+    assert result.pages[0]['chunks'][0].chunk_id == '1'
+    assert result.pages[1]['chunks'][0].chunk_id == '2'
+
 def test_parse_doc_in_parallel(mock_parsed_document):
     # Create Document objects for testing
     doc_parts = [
