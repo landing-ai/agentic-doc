@@ -288,6 +288,34 @@ def test_parse_documents_error_handling_mixed_valid_invalid(
     with pytest.raises(FileNotFoundError):
         parse_and_save_documents(input_files, result_save_dir=results_dir)
 
+def test_field_extraction_with_results_save_dir(sample_pdf_path, results_dir):
+    class ExtractedFields(BaseModel):
+        employee_name: str = Field(description="")
+
+    schema = {
+        "properties": {
+            "employee_name": {
+                "description": "",
+                "title": "Employee Name", 
+                "type": "string"
+            }
+        },
+        "required": ["employee_name"],
+        "title": "ExtractedFields",
+        "type": "object"
+    }
+    
+    result1 = parse(sample_pdf_path, extraction_schema=schema, result_save_dir=results_dir)
+    result2 = parse(sample_pdf_path, extraction_model=ExtractedFields, result_save_dir=results_dir)
+    
+    assert hasattr(result1[0], 'extraction')
+    assert hasattr(result1[0], 'extraction_metadata')
+    assert hasattr(result2[0], 'extraction')
+    assert hasattr(result2[0], 'extraction_metadata')
+    assert 'employee_name' in result1[0].extraction
+    assert 'employee_name' in result1[0].extraction_metadata
+    assert hasattr(result2[0].extraction, 'employee_name')
+    assert hasattr(result2[0].extraction_metadata, 'employee_name')
 
 def test_parse_pdf_chunks_have_sequential_pages(sample_pdf_path, results_dir):
     # Test that PDF chunks are correctly ordered by page
