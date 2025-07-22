@@ -16,8 +16,8 @@ from pydantic_core import Url
 from tqdm import tqdm
 import jsonschema
 from pypdf import PdfReader
-from dicttoxml import dicttoxml
-import xmltodict
+from dicttoxml import dicttoxml  # type: ignore[import-untyped]
+import xmltodict  # type: ignore[import-untyped]
 
 from agentic_doc.common import (
     Document,
@@ -203,18 +203,18 @@ def _get_documents_from_bytes(doc_bytes: bytes) -> List[Path]:
     return [temp_file_path]
 
 
-def fix_xml_dict(data, parent_key=None):
+def fix_xml_dict(data: Any, parent_key: Optional[str] = None) -> Any:
     """Convert XML dict structure back to original JSON structure"""
     if isinstance(data, dict):
         # Handle xmltodict's list conversion - when XML has multiple items with same tag
-        if 'item' in data and isinstance(data['item'], list):
-            return [fix_xml_dict(item) for item in data['item']]
-        elif 'item' in data:  # Single item case
-            return [fix_xml_dict(data['item'])]
+        if "item" in data and isinstance(data["item"], list):
+            return [fix_xml_dict(item) for item in data["item"]]
+        elif "item" in data:  # Single item case
+            return [fix_xml_dict(data["item"])]
         else:
             result = {}
             for k, v in data.items():
-                if k == '@type' or k.startswith('@'):  # Skip XML attributes
+                if k == "@type" or k.startswith("@"):  # Skip XML attributes
                     continue
                 result[k] = fix_xml_dict(v, k)
             return result
@@ -222,13 +222,14 @@ def fix_xml_dict(data, parent_key=None):
         return [fix_xml_dict(item) for item in data]
     elif data is None:
         # Handle fields that should be empty lists when None
-        if parent_key in ['errors', 'grounding', 'chunks']:
+        if parent_key in ["errors", "grounding", "chunks"]:
             return []
-        elif parent_key in ['extraction', 'extraction_metadata']:
+        elif parent_key in ["extraction", "extraction_metadata"]:
             return {}
         return None
     else:
         return data
+
 
 def _convert_to_parsed_documents(
     parse_results: Union[List[ParsedDocument[T]], List[Path]],
@@ -244,10 +245,10 @@ def _convert_to_parsed_documents(
         if isinstance(result, ParsedDocument):
             parsed_docs.append(result)
         elif isinstance(result, Path):
-            if config.output_xml:
-                with open(result, 'r') as f:
+            if config and config.output_xml:
+                with open(result, "r") as f:
                     data = xmltodict.parse(f.read())
-                    data = fix_xml_dict(data['root'])
+                    data = fix_xml_dict(data["root"])
             else:
                 with open(result, encoding="utf-8") as f:
                     data = json.load(f)
@@ -523,8 +524,10 @@ def parse_and_save_document(
         result_save_dir.mkdir(parents=True, exist_ok=True)
         if config and config.output_xml:
             save_path = result_save_dir / f"{result_name}.xml"
-            xml_bytes = dicttoxml(json.loads(dump_parsed_doc_json(result)), attr_type=False)
-            save_path.write_text(xml_bytes.decode('utf-8'))
+            xml_bytes = dicttoxml(
+                json.loads(dump_parsed_doc_json(result)), attr_type=False
+            )
+            save_path.write_text(xml_bytes.decode("utf-8"))
         else:
             save_path = result_save_dir / f"{result_name}.json"
             json_str = dump_parsed_doc_json(result)

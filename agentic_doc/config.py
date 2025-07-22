@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal, Any, Optional, Iterator
+from typing import Literal, Any, Optional, Iterator, Generic
 import cv2
 import structlog
 from dataclasses import dataclass
@@ -21,7 +21,7 @@ _COLOR_MAP = {
 
 
 @dataclass
-class ParseConfig:
+class ParseConfig(Generic[T]):
     api_key: Optional[str] = None
     include_marginalia: Optional[bool] = None
     include_metadata_in_markdown: Optional[bool] = None
