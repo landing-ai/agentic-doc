@@ -16,6 +16,7 @@ from pydantic_core import Url
 from tqdm import tqdm
 import jsonschema
 from pypdf import PdfReader
+from dicttoxml import dicttoxml
 
 from agentic_doc.common import (
     Document,
@@ -462,8 +463,15 @@ def parse_and_save_document(
 
         result_save_dir = Path(result_save_dir)
         result_save_dir.mkdir(parents=True, exist_ok=True)
-        save_path = result_save_dir / f"{result_name}.json"
-        save_path.write_text(result.model_dump_json(), encoding="utf-8")
+        if config and config.output_xml:
+            save_path = result_save_dir / f"{result_name}.xml"
+            xml_bytes = dicttoxml(result.model_dump(), custom_root='root', attr_type=False)
+            xml_string = xml_bytes.decode('utf-8')
+            save_path.write_text(xml_string, encoding="utf-8")
+            print(xml_string)
+        else:
+            save_path = result_save_dir / f"{result_name}.json"
+            save_path.write_text(result.model_dump_json(), encoding="utf-8")
         _LOGGER.info(f"Saved the parsed result to '{save_path}'")
 
         return save_path
