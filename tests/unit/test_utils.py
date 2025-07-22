@@ -686,8 +686,17 @@ def test_save_groundings_with_filter_by(temp_dir):
         assert "22222" in result
         assert "33333" not in result
 
-        # Check that write_bytes was called for only the figure chunk
         assert mock_write.call_count == 1
+
+        result = save_groundings_as_images(pdf_path, chunks, save_dir, filter_by=[ChunkType.figure])
+
+        # Check that the result contains the chunk_ids
+        assert "11111" not in result
+        assert "22222" in result
+        assert "33333" not in result
+
+        # Check that write_bytes was called for only the figure chunk (twice since we ran called the function twice)
+        assert mock_write.call_count == 2
 
 
 def test_read_img_rgb():
