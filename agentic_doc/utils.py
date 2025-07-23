@@ -2,7 +2,7 @@ import math
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, Any
 from urllib.parse import urlparse
 
 import cv2
@@ -15,8 +15,17 @@ from PIL import Image
 from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
+from dicttoxml import dicttoxml  # type: ignore[import-untyped]
+import json
+import logging
 
-from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
+from agentic_doc.common import (
+    Chunk,
+    ChunkGroundingBox,
+    Document,
+    ParsedDocument,
+    dump_parsed_doc_json,
+)
 from agentic_doc.config import VisualizationConfig, get_settings
 
 _LOGGER = structlog.getLogger(__name__)
@@ -458,3 +467,37 @@ def is_valid_httpurl(url: str) -> bool:
         return parsed_url.scheme in ["http", "https"]
     except Exception:
         return False
+
+
+def _fix_xml_dict(data: Any, parent_key: Optional[str] = None) -> Any:
+    """Convert XML dict structure back to original JSON structure"""
+    if isinstance(data, dict):
+        # Handle xmltodict's list conversion - when XML has multiple items with same tag
+        if "item" in data and isinstance(data["item"], list):
+            return [_fix_xml_dict(item) for item in data["item"]]
+        elif "item" in data:  # Single item case
+            return [_fix_xml_dict(data["item"])]
+        else:
+            result = {}
+            for k, v in data.items():
+                if k == "@type" or k.startswith("@"):  # Skip XML attributes
+                    continue
+                result[k] = _fix_xml_dict(v, k)
+            return result
+    elif isinstance(data, list):
+        return [_fix_xml_dict(item) for item in data]
+    elif data is None:
+        # Handle fields that should be empty lists when None
+        if parent_key in ["errors", "grounding", "chunks"]:
+            return []
+        elif parent_key in ["extraction", "extraction_metadata"]:
+            return {}
+        return None
+    else:
+        return data
+
+
+def _convert_pydantic_to_xml(result: ParsedDocument) -> Any:
+    logging.getLogger("dicttoxml").setLevel(logging.WARNING)
+    data = json.loads(dump_parsed_doc_json(result))
+    return dicttoxml(data, custom_root="document", attr_type=False)
