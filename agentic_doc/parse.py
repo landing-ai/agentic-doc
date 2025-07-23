@@ -203,23 +203,23 @@ def _get_documents_from_bytes(doc_bytes: bytes) -> List[Path]:
     return [temp_file_path]
 
 
-def fix_xml_dict(data: Any, parent_key: Optional[str] = None) -> Any:
+def _fix_xml_dict(data: Any, parent_key: Optional[str] = None) -> Any:
     """Convert XML dict structure back to original JSON structure"""
     if isinstance(data, dict):
         # Handle xmltodict's list conversion - when XML has multiple items with same tag
         if "item" in data and isinstance(data["item"], list):
-            return [fix_xml_dict(item) for item in data["item"]]
+            return [_fix_xml_dict(item) for item in data["item"]]
         elif "item" in data:  # Single item case
-            return [fix_xml_dict(data["item"])]
+            return [_fix_xml_dict(data["item"])]
         else:
             result = {}
             for k, v in data.items():
                 if k == "@type" or k.startswith("@"):  # Skip XML attributes
                     continue
-                result[k] = fix_xml_dict(v, k)
+                result[k] = _fix_xml_dict(v, k)
             return result
     elif isinstance(data, list):
-        return [fix_xml_dict(item) for item in data]
+        return [_fix_xml_dict(item) for item in data]
     elif data is None:
         # Handle fields that should be empty lists when None
         if parent_key in ["errors", "grounding", "chunks"]:
@@ -248,7 +248,7 @@ def _convert_to_parsed_documents(
             if config and config.output_xml:
                 with open(result, "r") as f:
                     data = xmltodict.parse(f.read())
-                    data = fix_xml_dict(data["root"])
+                    data = _fix_xml_dict(data["root"])
             else:
                 with open(result, encoding="utf-8") as f:
                     data = json.load(f)

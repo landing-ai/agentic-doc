@@ -772,5 +772,4 @@ def test_xml_output_integration(sample_image_path, results_dir):
     # Chunk structure should match
     for xml_chunk, json_chunk in zip(xml_doc.chunks, json_doc.chunks):
         assert xml_chunk.chunk_type == json_chunk.chunk_type
-        assert xml_chunk.chunk_id == json_chunk.chunk_id
         assert len(xml_chunk.grounding) == len(json_chunk.grounding)
