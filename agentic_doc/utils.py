@@ -113,7 +113,7 @@ def save_groundings_as_images(
                 page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
                 result.update(page_result)
 
-        return result
+    return result
 
 
 def page_to_image(
@@ -250,16 +250,18 @@ def split_pdf(
         output_dir (str | Path): Directory where mini PDF files will be saved.
         split_size (int): Maximum number of pages per mini PDF file (default is 10).
     """
-    input_pdf_path = _doc_to_path(input_pdf_path)
-    assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
-    assert (
-        0 < split_size <= 100
-    ), "split_size must be greater than 0 and less than or equal to 100"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_pdf_path = _doc_to_path(input_pdf_path, temp_dir)
+        assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
+        assert (
+            0 < split_size <= 100
+        ), "split_size must be greater than 0 and less than or equal to 100"
 
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_dir = str(output_dir)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_dir = str(output_dir)
 
-    pdf_reader = PdfReader(input_pdf_path)
+        pdf_reader = PdfReader(input_pdf_path)
+
     total_pages = len(pdf_reader.pages)
     _LOGGER.info(
         f"Splitting PDF: '{input_pdf_path}' into {total_pages // split_size} parts under '{output_dir}'"
@@ -328,26 +330,28 @@ def viz_parsed_document(
         viz_config = VisualizationConfig()
 
     viz_result_np: list[np.ndarray] = []
-    file_path = _doc_to_path(file_path)
-    file_type = get_file_type(file_path)
-    _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
-    if file_type == "image":
-        img = _read_img_rgb(str(file_path))
-        viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
-        viz_result_np.append(viz_np)
-    else:
-        with pymupdf.open(file_path) as pdf_doc:
-            for page_idx in range(
-                parsed_document.start_page_idx, parsed_document.end_page_idx + 1
-            ):
-                img = page_to_image(pdf_doc, page_idx)
-                chunks = [
-                    chunk
-                    for chunk in parsed_document.chunks
-                    if chunk.grounding[0].page == page_idx
-                ]
-                viz_np = viz_chunks(img, chunks, viz_config)
-                viz_result_np.append(viz_np)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = _doc_to_path(file_path, temp_dir)
+        file_type = get_file_type(file_path)
+        _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
+        if file_type == "image":
+            img = _read_img_rgb(str(file_path))
+            viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
+            viz_result_np.append(viz_np)
+        else:
+            with pymupdf.open(file_path) as pdf_doc:
+                for page_idx in range(
+                    parsed_document.start_page_idx, parsed_document.end_page_idx + 1
+                ):
+                    img = page_to_image(pdf_doc, page_idx)
+                    chunks = [
+                        chunk
+                        for chunk in parsed_document.chunks
+                        if chunk.grounding[0].page == page_idx
+                    ]
+                    viz_np = viz_chunks(img, chunks, viz_config)
+                    viz_result_np.append(viz_np)
 
     if output_dir:
         output_dir = Path(output_dir)
