@@ -238,7 +238,7 @@ def _doc_to_path(document: Union[str, Path, Url], temp_storage_dir: str) -> Path
 
 
 def split_pdf(
-    input_pdf_path: Union[str, Path],
+    input_pdf_path: Union[str, Path, Url],
     output_dir: Union[str, Path],
     split_size: int = 10,
 ) -> list[Document]:
@@ -250,7 +250,7 @@ def split_pdf(
         output_dir (str | Path): Directory where mini PDF files will be saved.
         split_size (int): Maximum number of pages per mini PDF file (default is 10).
     """
-    input_pdf_path = Path(input_pdf_path)
+    input_pdf_path = _doc_to_path(input_pdf_path)
     assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
     assert (
         0 < split_size <= 100
@@ -318,17 +318,17 @@ def log_retry_failure(retry_state: RetryCallState) -> None:
 
 
 def viz_parsed_document(
-    file_path: Union[str, Path],
+    file_path: Union[str, Path, Url],
     parsed_document: ParsedDocument,
     *,
-    output_dir: Union[str, Path, None] = None,
+    output_dir: Optional[Union[str, Path]] = None,
     viz_config: Union[VisualizationConfig, None] = None,
 ) -> list[Image.Image]:
     if viz_config is None:
         viz_config = VisualizationConfig()
 
     viz_result_np: list[np.ndarray] = []
-    file_path = Path(file_path)
+    file_path = _doc_to_path(file_path)
     file_type = get_file_type(file_path)
     _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
     if file_type == "image":
@@ -362,7 +362,7 @@ def viz_parsed_document(
 def viz_chunks(
     img: np.ndarray,
     chunks: list[Chunk],
-    viz_config: Union[VisualizationConfig, None] = None,
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> np.ndarray:
     if viz_config is None:
         viz_config = VisualizationConfig()
