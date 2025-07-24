@@ -133,7 +133,7 @@ def parse(
     )
 
     # Convert results to ParsedDocument objects
-    return _convert_to_parsed_documents(parse_results, result_save_dir)
+    return _convert_to_parsed_documents(parse_results, result_save_dir, doc_paths)
 
 
 def _get_document_paths(
@@ -200,12 +200,14 @@ def _get_documents_from_bytes(doc_bytes: bytes) -> List[Path]:
 def _convert_to_parsed_documents(
     parse_results: Union[List[ParsedDocument[T]], List[Path]],
     result_save_dir: Optional[Union[str, Path]],
+    doc_paths: Sequence[Union[str, Path, Url]],
 ) -> List[ParsedDocument[T]]:
     """Convert parse results to ParsedDocument objects."""
     parsed_docs = []
 
-    for result in parse_results:
+    for i, result in enumerate(parse_results):
         if isinstance(result, ParsedDocument):
+            result.filename = str(doc_paths[i])
             parsed_docs.append(result)
         elif isinstance(result, Path):
             with open(result, encoding="utf-8") as f:
@@ -213,6 +215,7 @@ def _convert_to_parsed_documents(
             parsed_doc: ParsedDocument[T] = ParsedDocument.model_validate(data)
             if result_save_dir:
                 parsed_doc.result_path = result
+            parsed_doc.filename = str(doc_paths[i])
             parsed_docs.append(parsed_doc)
         else:
             raise ValueError(f"Unexpected result type: {type(result)}")
