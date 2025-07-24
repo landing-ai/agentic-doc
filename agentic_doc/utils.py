@@ -362,7 +362,7 @@ def viz_parsed_document(
                     str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np
                 )
 
-    return [Image.fromarray(viz_np) for viz_np in viz_result_np]
+        return [Image.fromarray(viz_np) for viz_np in viz_result_np]
 
 
 def viz_chunks(
