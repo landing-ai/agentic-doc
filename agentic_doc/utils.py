@@ -353,12 +353,12 @@ def viz_parsed_document(
                     viz_np = viz_chunks(img, chunks, viz_config)
                     viz_result_np.append(viz_np)
 
-    if output_dir:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        for i, viz_np in enumerate(viz_result_np):
-            viz_np = cv2.cvtColor(viz_np, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np)
+        if output_dir:
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            for i, viz_np in enumerate(viz_result_np):
+                viz_np = cv2.cvtColor(viz_np, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np)
 
     return [Image.fromarray(viz_np) for viz_np in viz_result_np]
 
