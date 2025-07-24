@@ -340,6 +340,9 @@ def test_viz_parsed_document_pdf(temp_dir, mock_multi_page_parsed_document):
 
         pdf_path = temp_dir / "test.pdf"
         output_dir = temp_dir / "viz_output"
+        
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-1.7\n")
 
         # Test visualization with saving
         images = viz_parsed_document(
