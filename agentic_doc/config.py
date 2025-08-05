@@ -102,7 +102,7 @@ class Settings(BaseSettings):
         ge=1,
     )
     max_retries: int = Field(
-        default=100,
+        default=3,
         description="Maximum number of retries for a failed request",
         ge=0,
     )
