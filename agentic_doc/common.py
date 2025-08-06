@@ -137,6 +137,7 @@ class ParsedDocument(BaseModel, Generic[T]):
     result_path: Optional[Path] = None
     errors: list[PageError] = Field(default_factory=list)
     extraction_error: Optional[str] = None
+    filename: Optional[str] = None
 
 
 class RetryableError(Exception):

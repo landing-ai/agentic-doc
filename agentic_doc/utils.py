@@ -15,6 +15,7 @@ from PIL import Image
 from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
+import tempfile
 
 from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
 from agentic_doc.config import VisualizationConfig, get_settings
@@ -61,46 +62,56 @@ def get_file_type(file_path: Path) -> Literal["pdf", "image"]:
 
 
 def save_groundings_as_images(
-    file_path: Path,
+    file_path: Union[str, Path, Url],
     chunks: list[Chunk],
-    save_dir: Path,
+    save_dir: Union[str, Path],
     inplace: bool = True,
+    filter_by: Optional[list[str]] = None,
 ) -> dict[str, list[Path]]:
     """
     Save the chunks as images based on the bounding box in each chunk.
 
     Args:
-        file_path (Path): The path to the input document file.
+        file_path (str | Path | Url): The path to the input document file.
         chunks (list[Chunk]): The chunks to save or update.
-        save_dir (Path): The directory to save the images of the chunks.
+        save_dir (Path | str): The directory to save the images of the chunks.
         inplace (bool): Whether to update the input chunks in place.
+        filter_by (list[str] | None): List of chunk types to filter by. If provided, only chunks of the given types will be saved. (optional)
 
     Returns:
         dict[str, Path]: The dictionary of saved image paths. The key is the chunk id and the value is the path to the saved image.
     """
-    file_type = get_file_type(file_path)
-    _LOGGER.info(
-        f"Saving {len(chunks)} chunks as images to '{save_dir}'",
-        file_path=file_path,
-        file_type=file_type,
-    )
-    result: dict[str, list[Path]] = {}
-    save_dir.mkdir(parents=True, exist_ok=True)
-    if file_type == "image":
-        img = cv2.imread(str(file_path))
-        return _crop_groundings(img, chunks, save_dir, inplace)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = _doc_to_path(file_path, temp_dir)
+        save_dir = Path(save_dir)
+        file_type = get_file_type(file_path)
+        _LOGGER.info(
+            f"Saving {len(chunks)} chunks as images to '{save_dir}'",
+            file_path=file_path,
+            file_type=file_type,
+        )
+        result: dict[str, list[Path]] = {}
+        save_dir.mkdir(parents=True, exist_ok=True)
+        if filter_by:
+            filter_by = [filter.lower() for filter in filter_by]
+            chunks = [
+                chunk for chunk in chunks if chunk.chunk_type.lower() in filter_by
+            ]
+        if file_type == "image":
+            img = cv2.imread(str(file_path))
+            return _crop_groundings(img, chunks, save_dir, inplace)
 
-    assert file_type == "pdf"
-    chunks_by_page_idx = defaultdict(list)
-    for chunk in chunks:
-        page_idx = chunk.grounding[0].page
-        chunks_by_page_idx[page_idx].append(chunk)
+        assert file_type == "pdf"
+        chunks_by_page_idx = defaultdict(list)
+        for chunk in chunks:
+            page_idx = chunk.grounding[0].page
+            chunks_by_page_idx[page_idx].append(chunk)
 
-    with pymupdf.open(file_path) as pdf_doc:
-        for page_idx, chunks in sorted(chunks_by_page_idx.items()):
-            page_img = page_to_image(pdf_doc, page_idx)
-            page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
-            result.update(page_result)
+        with pymupdf.open(file_path) as pdf_doc:
+            for page_idx, chunks in sorted(chunks_by_page_idx.items()):
+                page_img = page_to_image(pdf_doc, page_idx)
+                page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
+                result.update(page_result)
 
     return result
 
@@ -118,6 +129,7 @@ def page_to_image(
     # Ensure the image has 3 channels (sometimes it may include an alpha channel)
     if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
         img = img[..., :3]
+    img = img[:, :, ::-1]
 
     return img
 
@@ -209,8 +221,24 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
     return result
 
 
+def _doc_to_path(document: Union[str, Path, Url], temp_storage_dir: str) -> Path:
+    if isinstance(document, str) and is_valid_httpurl(document):
+        document = Url(document)
+
+    if isinstance(document, Url):
+        output_file_path = Path(temp_storage_dir) / Path(str(document)).name
+        download_file(document, str(output_file_path))
+        document = output_file_path
+    else:
+        document = Path(document)
+        if isinstance(document, Path) and not document.exists():
+            raise FileNotFoundError(f"File not found: {document}")
+
+    return document
+
+
 def split_pdf(
-    input_pdf_path: Union[str, Path],
+    input_pdf_path: Union[str, Path, Url],
     output_dir: Union[str, Path],
     split_size: int = 10,
 ) -> list[Document]:
@@ -222,16 +250,18 @@ def split_pdf(
         output_dir (str | Path): Directory where mini PDF files will be saved.
         split_size (int): Maximum number of pages per mini PDF file (default is 10).
     """
-    input_pdf_path = Path(input_pdf_path)
-    assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
-    assert (
-        0 < split_size <= 100
-    ), "split_size must be greater than 0 and less than or equal to 100"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_pdf_path = _doc_to_path(input_pdf_path, temp_dir)
+        assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
+        assert (
+            0 < split_size <= 100
+        ), "split_size must be greater than 0 and less than or equal to 100"
 
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    output_dir = str(output_dir)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_dir = str(output_dir)
 
-    pdf_reader = PdfReader(input_pdf_path)
+        pdf_reader = PdfReader(input_pdf_path)
+
     total_pages = len(pdf_reader.pages)
     _LOGGER.info(
         f"Splitting PDF: '{input_pdf_path}' into {total_pages // split_size} parts under '{output_dir}'"
@@ -290,51 +320,55 @@ def log_retry_failure(retry_state: RetryCallState) -> None:
 
 
 def viz_parsed_document(
-    file_path: Union[str, Path],
+    file_path: Union[str, Path, Url],
     parsed_document: ParsedDocument,
     *,
-    output_dir: Union[str, Path, None] = None,
+    output_dir: Optional[Union[str, Path]] = None,
     viz_config: Union[VisualizationConfig, None] = None,
 ) -> list[Image.Image]:
     if viz_config is None:
         viz_config = VisualizationConfig()
 
     viz_result_np: list[np.ndarray] = []
-    file_path = Path(file_path)
-    file_type = get_file_type(file_path)
-    _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
-    if file_type == "image":
-        img = _read_img_rgb(str(file_path))
-        viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
-        viz_result_np.append(viz_np)
-    else:
-        with pymupdf.open(file_path) as pdf_doc:
-            for page_idx in range(
-                parsed_document.start_page_idx, parsed_document.end_page_idx + 1
-            ):
-                img = page_to_image(pdf_doc, page_idx)
-                chunks = [
-                    chunk
-                    for chunk in parsed_document.chunks
-                    if chunk.grounding[0].page == page_idx
-                ]
-                viz_np = viz_chunks(img, chunks, viz_config)
-                viz_result_np.append(viz_np)
 
-    if output_dir:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        for i, viz_np in enumerate(viz_result_np):
-            viz_np = cv2.cvtColor(viz_np, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        file_path = _doc_to_path(file_path, temp_dir)
+        file_type = get_file_type(file_path)
+        _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
+        if file_type == "image":
+            img = _read_img_rgb(str(file_path))
+            viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
+            viz_result_np.append(viz_np)
+        else:
+            with pymupdf.open(file_path) as pdf_doc:
+                for page_idx in range(
+                    parsed_document.start_page_idx, parsed_document.end_page_idx + 1
+                ):
+                    img = page_to_image(pdf_doc, page_idx)
+                    chunks = [
+                        chunk
+                        for chunk in parsed_document.chunks
+                        if chunk.grounding[0].page == page_idx
+                    ]
+                    viz_np = viz_chunks(img, chunks, viz_config)
+                    viz_result_np.append(viz_np)
 
-    return [Image.fromarray(viz_np) for viz_np in viz_result_np]
+        if output_dir:
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            for i, viz_np in enumerate(viz_result_np):
+                viz_np = cv2.cvtColor(viz_np, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(
+                    str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np
+                )
+
+        return [Image.fromarray(viz_np) for viz_np in viz_result_np]
 
 
 def viz_chunks(
     img: np.ndarray,
     chunks: list[Chunk],
-    viz_config: Union[VisualizationConfig, None] = None,
+    viz_config: Optional[VisualizationConfig] = None,
 ) -> np.ndarray:
     if viz_config is None:
         viz_config = VisualizationConfig()
@@ -443,7 +477,7 @@ def download_file(file_url: Url, output_filepath: str) -> None:
     with httpx.stream("GET", str(file_url), timeout=None) as response:
         if response.status_code != 200:
             raise Exception(
-                f"Download failed for '{file_url}'. Status code: {response.status_code} {response.text}"
+                f"Download failed for '{file_url}'. Status code: {response.status_code}"
             )
 
         with open(output_filepath, "wb") as f:

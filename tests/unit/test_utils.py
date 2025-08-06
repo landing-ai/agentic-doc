@@ -340,6 +340,9 @@ def test_viz_parsed_document_pdf(temp_dir, mock_multi_page_parsed_document):
 
         pdf_path = temp_dir / "test.pdf"
         output_dir = temp_dir / "viz_output"
+        
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-1.7\n")
 
         # Test visualization with saving
         images = viz_parsed_document(
@@ -612,6 +615,91 @@ def test_save_groundings_as_images_pdf(temp_dir):
 
         # Check that write_bytes was called for each chunk
         assert mock_write.call_count == 3
+
+
+def test_save_groundings_with_filter_by(temp_dir):
+    # Create a dummy PDF file
+    pdf_path = temp_dir / "test.pdf"
+    with open(pdf_path, "wb") as f:
+        f.write(b"%PDF-1.7\n")
+
+    # Create a directory to save the groundings
+    save_dir = temp_dir / "groundings"
+
+    # Create custom chunks with different page indices
+    chunks = [
+        Chunk(
+            text="Title",
+            chunk_type=ChunkType.text,
+            chunk_id="11111",
+            grounding=[
+                ChunkGrounding(
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                )
+            ],
+        ),
+        Chunk(
+            text="Page content",
+            chunk_type=ChunkType.figure,
+            chunk_id="22222",
+            grounding=[
+                ChunkGrounding(
+                    page=0, box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
+                )
+            ],
+        ),
+        Chunk(
+            text="Header",
+            chunk_type=ChunkType.text,
+            chunk_id="33333",
+            grounding=[
+                ChunkGrounding(
+                    page=1, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                )
+            ],
+        ),
+    ]
+
+    # Mock the required functions to avoid filesystem operations
+    mock_buffer = MagicMock()
+    mock_buffer.tobytes.return_value = b"mock_png_data"
+
+    with patch("agentic_doc.utils.get_file_type", return_value="pdf"), patch(
+        "agentic_doc.utils.pymupdf.open"
+    ) as mock_pymupdf_open, patch(
+        "agentic_doc.utils.page_to_image",
+        return_value=np.zeros((100, 100, 3), dtype=np.uint8),
+    ), patch(
+        "cv2.imencode", return_value=(True, mock_buffer)
+    ), patch(
+        "pathlib.Path.write_bytes"
+    ) as mock_write, patch(
+        "pathlib.Path.mkdir", return_value=None
+    ):
+
+        # Mock the context manager returned by pymupdf.open
+        mock_pdf_doc = MagicMock()
+        mock_pymupdf_open.return_value.__enter__.return_value = mock_pdf_doc
+
+        # Call the function
+        result = save_groundings_as_images(pdf_path, chunks, save_dir, filter_by=['figure'])
+
+        # Check that the result contains the chunk_ids
+        assert "11111" not in result
+        assert "22222" in result
+        assert "33333" not in result
+
+        assert mock_write.call_count == 1
+
+        result = save_groundings_as_images(pdf_path, chunks, save_dir, filter_by=[ChunkType.figure])
+
+        # Check that the result contains the chunk_ids
+        assert "11111" not in result
+        assert "22222" in result
+        assert "33333" not in result
+
+        # Check that write_bytes was called for only the figure chunk (twice since we ran called the function twice)
+        assert mock_write.call_count == 2
 
 
 def test_read_img_rgb():
