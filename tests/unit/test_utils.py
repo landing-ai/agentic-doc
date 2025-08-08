@@ -946,64 +946,62 @@ def test_get_chunk_from_reference():
     assert get_chunk_from_reference("999", chunks) == None
 
 
-def test_pdf_color_space_conversion():
+def test_pdf_color_space_conversion(temp_dir):
     """Test that PDF-derived RGB images are correctly converted to BGR for saving."""
-    # Create an RGB image that simulates page_to_image output
-    rgb_img = np.zeros((100, 100, 3), dtype=np.uint8)
-    rgb_img[25:75, 25:75] = [255, 0, 0]  # Red square in RGB format
+    # Create a simple PDF with red colored content using reportlab
+    pdf_path = temp_dir / "colored_test.pdf"
     
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.colors import red
+    from reportlab.lib.pagesizes import letter
+    
+    # Create a simple PDF with a red rectangle
+    c = canvas.Canvas(str(pdf_path), pagesize=letter)
+    width, height = letter
+    
+    # Draw a red rectangle in the middle of the page
+    c.setFillColor(red)
+    rect_x = width * 0.3  
+    rect_y = height * 0.4
+    rect_width = width * 0.4
+    rect_height = height * 0.2
+    c.rect(rect_x, rect_y, rect_width, rect_height, fill=1, stroke=0)
+    c.save()
+    
+    # Create a chunk that targets the red rectangle area
     chunk = Chunk(
-        text="Test",
+        text="Red Rectangle",
         chunk_type=ChunkType.text,
         chunk_id="test_color",
         grounding=[
             ChunkGrounding(
                 page=0, 
-                box=ChunkGroundingBox(l=0.2, t=0.2, r=0.8, b=0.8)
+                # Target the area where we placed the red rectangle
+                box=ChunkGroundingBox(l=0.3, t=0.4, r=0.7, b=0.6)
             )
         ],
     )
     
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-        
-        # Mock page_to_image to return our test RGB image
-        def mock_page_to_image(pdf_doc, page_idx, dpi=96):
-            return rgb_img
-            
-        # Mock pymupdf.open 
-        class MockPdfDoc:
-            def __enter__(self):
-                return self
-            def __exit__(self, *args):
-                pass
-        
-        # Create a fake PDF file
-        fake_pdf = temp_path / "test.pdf"
-        fake_pdf.write_bytes(b"%PDF-1.7\n")
-        
-        with patch('agentic_doc.utils.page_to_image', side_effect=mock_page_to_image), \
-             patch('agentic_doc.utils.pymupdf.open', return_value=MockPdfDoc()), \
-             patch('agentic_doc.utils.get_file_type', return_value='pdf'):
-            
-            # Test the actual save_groundings_as_images function
-            result = save_groundings_as_images(fake_pdf, [chunk], temp_path)
-            
-            # Check that the file was saved
-            assert "test_color" in result
-            saved_file = result["test_color"][0]
-            assert saved_file.exists()
-            
-            # Read back the saved image
-            saved_img = cv2.imread(str(saved_file))
-            assert saved_img is not None
-            
-            # Check that the center pixel is red in BGR format
-            # RGB red [255,0,0] should be converted to BGR red [0,0,255] before saving
-            h, w = saved_img.shape[:2]
-            center_pixel = saved_img[h//2, w//2]
-            
-            # The red pixel should be [0, 0, 255] in BGR format after correct conversion
-            assert center_pixel[2] > 200  # Strong red component
-            assert center_pixel[0] < 50   # Low blue component  
-            assert center_pixel[1] < 50   # Low green component
+    # Test the actual save_groundings_as_images function without mocking pymupdf.open
+    result = save_groundings_as_images(pdf_path, [chunk], temp_dir)
+    
+    # Check that the file was saved
+    assert "test_color" in result
+    saved_file = result["test_color"][0]
+    assert saved_file.exists()
+    
+    # Read back the saved image and verify color space conversion
+    saved_img = cv2.imread(str(saved_file))
+    assert saved_img is not None
+    
+    # Look for red pixels in BGR format (where red = [0, 0, 255])
+    # Since it's a PDF-derived image, we expect the RGB->BGR conversion to work correctly
+    red_pixels = np.all(saved_img == [0, 0, 255], axis=2)
+    red_pixel_count = np.sum(red_pixels)
+    
+    # Also check for "reddish" pixels (high red component, low others) to account for anti-aliasing
+    red_mask = (saved_img[:, :, 2] > 200) & (saved_img[:, :, 1] < 100) & (saved_img[:, :, 0] < 100)
+    reddish_count = np.sum(red_mask)
+    
+    # The test passes if we find red pixels, confirming correct RGB->BGR conversion
+    assert red_pixel_count > 1000 or reddish_count > 1000, f"Expected to find red pixels indicating correct color space conversion, but found {red_pixel_count} pure red and {reddish_count} reddish pixels"
