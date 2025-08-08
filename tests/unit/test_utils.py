@@ -1005,3 +1005,62 @@ def test_pdf_color_space_conversion(temp_dir):
     
     # The test passes if we find red pixels, confirming correct RGB->BGR conversion
     assert red_pixel_count > 1000 or reddish_count > 1000, f"Expected to find red pixels indicating correct color space conversion, but found {red_pixel_count} pure red and {reddish_count} reddish pixels"
+
+
+def test_image_color_space_preservation(temp_dir):
+    """Test that image files maintain correct colors when saved through save_groundings_as_images."""
+    # Create a test image with known red color using PIL
+    img_path = temp_dir / "red_test_image.png"
+    
+    # Create a 200x200 image with a red rectangle in the center
+    from PIL import Image, ImageDraw
+    
+    # Create white background
+    img = Image.new("RGB", (200, 200), color=(255, 255, 255))  # White background
+    draw = ImageDraw.Draw(img)
+    
+    # Draw a red rectangle in the center
+    rect_coords = [60, 80, 140, 120]  # x1, y1, x2, y2
+    draw.rectangle(rect_coords, fill=(255, 0, 0))  # Pure red rectangle
+    
+    # Save the image
+    img.save(img_path)
+    
+    # Create a chunk that targets the red rectangle area (normalized coordinates)
+    chunk = Chunk(
+        text="Red Rectangle",
+        chunk_type=ChunkType.text,
+        chunk_id="test_image_color",
+        grounding=[
+            ChunkGrounding(
+                page=0,
+                # Target the red rectangle area (60,80,140,120) normalized to (200,200) image
+                box=ChunkGroundingBox(l=0.3, t=0.4, r=0.7, b=0.6)
+            )
+        ],
+    )
+    
+    # Test save_groundings_as_images with the image file
+    result = save_groundings_as_images(img_path, [chunk], temp_dir)
+    
+    # Check that the file was saved
+    assert "test_image_color" in result
+    saved_file = result["test_image_color"][0]
+    assert saved_file.exists()
+    
+    # Read back the saved image and verify colors are preserved
+    saved_img = cv2.imread(str(saved_file))
+    assert saved_img is not None
+    
+    # Look for red pixels in BGR format (where red = [0, 0, 255])
+    # For image files, cv2.imread reads in BGR format and cv2.imencode expects BGR format,
+    # so colors should be preserved correctly
+    red_pixels = np.all(saved_img == [0, 0, 255], axis=2)
+    red_pixel_count = np.sum(red_pixels)
+    
+    # Also check for "reddish" pixels (high red component, low others) to account for compression artifacts
+    red_mask = (saved_img[:, :, 2] > 200) & (saved_img[:, :, 1] < 100) & (saved_img[:, :, 0] < 100)
+    reddish_count = np.sum(red_mask)
+    
+    # The test passes if we find red pixels, confirming correct color preservation
+    assert red_pixel_count > 100 or reddish_count > 100, f"Expected to find red pixels indicating correct color preservation, but found {red_pixel_count} pure red and {reddish_count} reddish pixels"
