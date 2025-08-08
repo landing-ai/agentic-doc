@@ -944,3 +944,66 @@ def test_get_chunk_from_reference():
     result = get_chunk_from_reference("1", chunks)
     assert result["text"] == "Name: Bob Johnson"
     assert get_chunk_from_reference("999", chunks) == None
+
+
+def test_pdf_color_space_conversion():
+    """Test that PDF-derived RGB images are correctly converted to BGR for saving."""
+    # Create an RGB image that simulates page_to_image output
+    rgb_img = np.zeros((100, 100, 3), dtype=np.uint8)
+    rgb_img[25:75, 25:75] = [255, 0, 0]  # Red square in RGB format
+    
+    chunk = Chunk(
+        text="Test",
+        chunk_type=ChunkType.text,
+        chunk_id="test_color",
+        grounding=[
+            ChunkGrounding(
+                page=0, 
+                box=ChunkGroundingBox(l=0.2, t=0.2, r=0.8, b=0.8)
+            )
+        ],
+    )
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Mock page_to_image to return our test RGB image
+        def mock_page_to_image(pdf_doc, page_idx, dpi=96):
+            return rgb_img
+            
+        # Mock pymupdf.open 
+        class MockPdfDoc:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+        
+        # Create a fake PDF file
+        fake_pdf = temp_path / "test.pdf"
+        fake_pdf.write_bytes(b"%PDF-1.7\n")
+        
+        with patch('agentic_doc.utils.page_to_image', side_effect=mock_page_to_image), \
+             patch('agentic_doc.utils.pymupdf.open', return_value=MockPdfDoc()), \
+             patch('agentic_doc.utils.get_file_type', return_value='pdf'):
+            
+            # Test the actual save_groundings_as_images function
+            result = save_groundings_as_images(fake_pdf, [chunk], temp_path)
+            
+            # Check that the file was saved
+            assert "test_color" in result
+            saved_file = result["test_color"][0]
+            assert saved_file.exists()
+            
+            # Read back the saved image
+            saved_img = cv2.imread(str(saved_file))
+            assert saved_img is not None
+            
+            # Check that the center pixel is red in BGR format
+            # RGB red [255,0,0] should be converted to BGR red [0,0,255] before saving
+            h, w = saved_img.shape[:2]
+            center_pixel = saved_img[h//2, w//2]
+            
+            # The red pixel should be [0, 0, 255] in BGR format after correct conversion
+            assert center_pixel[2] > 200  # Strong red component
+            assert center_pixel[0] < 50   # Low blue component  
+            assert center_pixel[1] < 50   # Low green component
