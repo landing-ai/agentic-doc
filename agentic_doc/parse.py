@@ -25,6 +25,7 @@ from agentic_doc.common import (
     T,
     Timer,
     create_metadata_model,
+    dump_parsed_doc_json,
 )
 from agentic_doc.config import Settings, get_settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
@@ -134,7 +135,9 @@ def parse(
     )
 
     # Convert results to ParsedDocument objects
-    return _convert_to_parsed_documents(parse_results, result_save_dir)
+    return _convert_to_parsed_documents(
+        parse_results, result_save_dir, extraction_model, extraction_schema
+    )
 
 
 def _get_document_paths(
@@ -201,6 +204,8 @@ def _get_documents_from_bytes(doc_bytes: bytes) -> List[Path]:
 def _convert_to_parsed_documents(
     parse_results: Union[List[ParsedDocument[T]], List[Path]],
     result_save_dir: Optional[Union[str, Path]],
+    extraction_model: Optional[type[T]] = None,
+    extraction_schema: Optional[dict[str, Any]] = None,
 ) -> List[ParsedDocument[T]]:
     """Convert parse results to ParsedDocument objects."""
     parsed_docs = []
@@ -211,7 +216,26 @@ def _convert_to_parsed_documents(
         elif isinstance(result, Path):
             with open(result, encoding="utf-8") as f:
                 data = json.load(f)
-            parsed_doc: ParsedDocument[T] = ParsedDocument.model_validate(data)
+
+            if extraction_model and "extraction" in data:
+                data["extraction"] = extraction_model.model_validate(data["extraction"])
+            if extraction_schema and "extracted_schema" in data:
+                jsonschema.validate(
+                    instance=data["extracted_schema"],
+                    schema=extraction_schema,
+                )
+                data["extraction"] = data["extracted_schema"]
+            if extraction_model and "extraction_metadata" in data:
+                metadata_model = create_metadata_model(extraction_model)
+                data["extraction_metadata"] = metadata_model.model_validate(
+                    data["extraction_metadata"]
+                )
+            if extraction_schema:
+                parsed_doc: ParsedDocument[Any] = ParsedDocument[Any].model_validate(
+                    data
+                )
+            else:
+                parsed_doc = ParsedDocument.model_validate(data)
             if result_save_dir:
                 parsed_doc.result_path = result
             parsed_docs.append(parsed_doc)
@@ -463,7 +487,8 @@ def parse_and_save_document(
         result_save_dir = Path(result_save_dir)
         result_save_dir.mkdir(parents=True, exist_ok=True)
         save_path = result_save_dir / f"{result_name}.json"
-        save_path.write_text(result.model_dump_json(), encoding="utf-8")
+        json_str = dump_parsed_doc_json(result)
+        save_path.write_text(json_str, encoding="utf-8")
         _LOGGER.info(f"Saved the parsed result to '{save_path}'")
 
         return save_path
@@ -739,7 +764,6 @@ def _parse_doc_parts(
         )
 
 
-# TODO: read retry settings at runtime (not at import time)
 @tenacity.retry(
     wait=tenacity.wait_exponential_jitter(
         exp_base=1.5, initial=1, max=get_settings().max_retry_wait_time, jitter=10
