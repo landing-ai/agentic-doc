@@ -25,6 +25,8 @@ from agentic_doc.common import (
     T,
     Timer,
     create_metadata_model,
+    FigureCaptioningType,
+    SplitType,
 )
 from agentic_doc.config import Settings, get_settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
@@ -65,6 +67,9 @@ def parse(
     connector_pattern: Optional[str] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> List[ParsedDocument[T]]:
     """
@@ -86,11 +91,25 @@ def parse(
         connector_pattern: Pattern to filter files (when using connectors)
         extraction_model: Pydantic model schema for field extraction (optional)
         extraction_schema: JSON schema for field extraction (optional)
+        figure_captioning_type: How to caption figures (verbose, transcribe, or custom)
+        figure_captioning_prompt: Custom prompt for figure captioning (required when type is custom)
+        split: How to return markdown content (full or page)
 
     Returns:
         List[ParsedDocument]
     """
     settings = get_settings()
+
+    # Validate figure captioning parameters
+    if (
+        figure_captioning_type == FigureCaptioningType.custom
+        and not figure_captioning_prompt
+    ):
+        raise ValueError(
+            "figure_captioning_prompt must be provided when figure_captioning_type is 'custom'."
+        )
+
+    # Apply config overrides if provided
     if config and config.include_marginalia:
         include_marginalia = config.include_marginalia
     if config and config.include_metadata_in_markdown:
@@ -99,6 +118,12 @@ def parse(
         extraction_model = config.extraction_model
     if config and config.extraction_schema:
         extraction_schema = config.extraction_schema
+    if config and config.figure_captioning_type:
+        figure_captioning_type = config.figure_captioning_type
+    if config and config.figure_captioning_prompt:
+        figure_captioning_prompt = config.figure_captioning_prompt
+    if config and config.split:
+        split = config.split
 
     check_endpoint_and_api_key(
         _get_endpoint_url(settings),
@@ -130,6 +155,9 @@ def parse(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        figure_captioning_type=figure_captioning_type,
+        figure_captioning_prompt=figure_captioning_prompt,
+        split=split,
         config=config,
     )
 
@@ -230,6 +258,9 @@ def _parse_document_list(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> Union[List[ParsedDocument[T]], List[Path]]:
     """Helper function to parse a list of documents."""
@@ -243,6 +274,9 @@ def _parse_document_list(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            figure_captioning_type=figure_captioning_type,
+            figure_captioning_prompt=figure_captioning_prompt,
+            split=split,
             config=config,
         )
     else:
@@ -253,6 +287,9 @@ def _parse_document_list(
             grounding_save_dir=grounding_save_dir,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            figure_captioning_type=figure_captioning_type,
+            figure_captioning_prompt=figure_captioning_prompt,
+            split=split,
             config=config,
         )
 
@@ -265,6 +302,9 @@ def parse_documents(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> list[ParsedDocument[T]]:
     """
@@ -285,6 +325,9 @@ def parse_documents(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        figure_captioning_type=figure_captioning_type,
+        figure_captioning_prompt=figure_captioning_prompt,
+        split=split,
         config=config,
     )
     with ThreadPoolExecutor(max_workers=get_settings().batch_size) as executor:
@@ -304,6 +347,9 @@ def _parse_document_without_save(
     grounding_save_dir: Union[str, Path, None],
     extraction_model: Optional[type[T]],
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     """Wrapper to ensure parse_and_save_document returns ParsedDocument when no save dir."""
@@ -315,6 +361,9 @@ def _parse_document_without_save(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        figure_captioning_type=figure_captioning_type,
+        figure_captioning_prompt=figure_captioning_prompt,
+        split=split,
         config=config,
     )
     # When result_save_dir is None, parse_and_save_document returns ParsedDocument[T]
@@ -331,6 +380,9 @@ def parse_and_save_documents(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> list[Path]:
     """
@@ -355,6 +407,9 @@ def parse_and_save_documents(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        figure_captioning_type=figure_captioning_type,
+        figure_captioning_prompt=figure_captioning_prompt,
+        split=split,
         config=config,
     )
     with ThreadPoolExecutor(max_workers=get_settings().batch_size) as executor:
@@ -375,6 +430,9 @@ def _parse_document_with_save(
     grounding_save_dir: Union[str, Path, None],
     extraction_model: Optional[type[T]],
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> Path:
     """Wrapper to ensure parse_and_save_document returns Path when save dir provided."""
@@ -386,6 +444,9 @@ def _parse_document_with_save(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        figure_captioning_type=figure_captioning_type,
+        figure_captioning_prompt=figure_captioning_prompt,
+        split=split,
         config=config,
     )
     # When result_save_dir is provided, parse_and_save_document returns Path
@@ -402,6 +463,9 @@ def parse_and_save_document(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> Union[Path, ParsedDocument[T]]:
     """
@@ -436,6 +500,9 @@ def parse_and_save_document(
                 include_metadata_in_markdown=include_metadata_in_markdown,
                 extraction_model=extraction_model,
                 extraction_schema=extraction_schema,
+                figure_captioning_type=figure_captioning_type,
+                figure_captioning_prompt=figure_captioning_prompt,
+                split=split,
                 config=config,
             )
         elif file_type == "pdf":
@@ -445,6 +512,9 @@ def parse_and_save_document(
                 include_metadata_in_markdown=include_metadata_in_markdown,
                 extraction_model=extraction_model,
                 extraction_schema=extraction_schema,
+                figure_captioning_type=figure_captioning_type,
+                figure_captioning_prompt=figure_captioning_prompt,
+                split=split,
                 config=config,
             )
         else:
@@ -476,6 +546,9 @@ def _parse_pdf(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     settings = get_settings()
@@ -512,9 +585,12 @@ def _parse_pdf(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            figure_captioning_type=figure_captioning_type,
+            figure_captioning_prompt=figure_captioning_prompt,
+            split=split,
             config=config,
         )
-        return _merge_part_results(part_results)
+        return _merge_part_results(part_results, split)
 
 
 def _parse_image(
@@ -524,6 +600,9 @@ def _parse_image(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     try:
@@ -533,6 +612,9 @@ def _parse_image(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            figure_captioning_type=figure_captioning_type,
+            figure_captioning_prompt=figure_captioning_prompt,
+            split=split,
             config=config,
         )
         result_raw = {
@@ -544,6 +626,10 @@ def _parse_image(
             "end_page_idx": 0,
             "metadata": result_raw.get("metadata"),
         }
+
+        # Handle split for images - images are always single page
+        if split == SplitType.page and isinstance(result_raw["markdown"], str):
+            result_raw["markdown"] = [result_raw["markdown"]]
 
         # Handle extraction validation and assignment
         if (
@@ -582,8 +668,9 @@ def _parse_image(
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing image '{file_path}' due to: {error_msg}")
+        empty_markdown = [] if split == SplitType.page else ""
         return ParsedDocument(
-            markdown="",
+            markdown=empty_markdown,
             chunks=[],
             extraction_metadata=None,
             extraction=None,
@@ -595,13 +682,16 @@ def _parse_image(
         )
 
 
-def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
+def _merge_part_results(
+    results: list[ParsedDocument[T]], split: SplitType = SplitType.full
+) -> ParsedDocument[T]:
     if not results:
         _LOGGER.warning(
             f"No results to merge: {results}, returning empty ParsedDocument"
         )
+        empty_markdown = [] if split == SplitType.page else ""
         return ParsedDocument(
-            markdown="",
+            markdown=empty_markdown,
             chunks=[],
             extraction_metadata=None,
             extraction=None,
@@ -613,13 +703,39 @@ def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
 
     init_result = copy.deepcopy(results[0])
     for i in range(1, len(results)):
-        _merge_next_part(init_result, results[i])
+        _merge_next_part(init_result, results[i], split)
 
     return init_result
 
 
-def _merge_next_part(curr: ParsedDocument[T], next: ParsedDocument[T]) -> None:
-    curr.markdown += "\n\n" + next.markdown
+def _merge_next_part(
+    curr: ParsedDocument[T],
+    next: ParsedDocument[T],
+    split: SplitType = SplitType.full,
+) -> None:
+    if split == SplitType.page:
+        # When split is page, both curr.markdown and next.markdown should be lists
+        if isinstance(curr.markdown, list) and isinstance(next.markdown, list):
+            curr.markdown.extend(next.markdown)
+        elif isinstance(curr.markdown, str) and isinstance(next.markdown, str):
+            # Convert to list if they're strings (shouldn't happen but handle gracefully)
+            curr.markdown = [curr.markdown] + [next.markdown]
+        elif isinstance(curr.markdown, list) and isinstance(next.markdown, str):
+            curr.markdown.append(next.markdown)
+        elif isinstance(curr.markdown, str) and isinstance(next.markdown, list):
+            curr.markdown = [curr.markdown] + next.markdown
+    else:
+        # When split is full, join with newlines
+        if isinstance(curr.markdown, str) and isinstance(next.markdown, str):
+            curr.markdown += "\n\n" + next.markdown
+        elif isinstance(curr.markdown, list) and isinstance(next.markdown, list):
+            # Join lists and convert to string
+            curr.markdown = "\n\n".join(curr.markdown + next.markdown)
+        elif isinstance(curr.markdown, str) and isinstance(next.markdown, list):
+            curr.markdown = curr.markdown + "\n\n" + "\n\n".join(next.markdown)
+        elif isinstance(curr.markdown, list) and isinstance(next.markdown, str):
+            curr.markdown = "\n\n".join(curr.markdown) + "\n\n" + next.markdown
+
     next_chunks = next.chunks
     for chunk in next_chunks:
         for grounding in chunk.grounding:
@@ -638,6 +754,9 @@ def _parse_doc_in_parallel(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> list[ParsedDocument[T]]:
     _parse_func: Callable[[Document], ParsedDocument[T]] = partial(
@@ -646,6 +765,9 @@ def _parse_doc_in_parallel(
         include_metadata_in_markdown=include_metadata_in_markdown,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        figure_captioning_type=figure_captioning_type,
+        figure_captioning_prompt=figure_captioning_prompt,
+        split=split,
         config=config,
     )
     with ThreadPoolExecutor(max_workers=get_settings().max_workers) as executor:
@@ -665,6 +787,9 @@ def _parse_doc_parts(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     try:
@@ -675,6 +800,9 @@ def _parse_doc_parts(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            figure_captioning_type=figure_captioning_type,
+            figure_captioning_prompt=figure_captioning_prompt,
+            split=split,
             config=config,
         )
         _LOGGER.info(f"Successfully parsed document part: '{doc}'")
@@ -687,6 +815,10 @@ def _parse_doc_parts(
             "doc_type": "pdf",
             "metadata": result.get("metadata"),
         }
+
+        # Handle split for PDF parts
+        if split == SplitType.page and isinstance(result_data["markdown"], str):
+            result_data["markdown"] = [result_data["markdown"]]
 
         if (
             extraction_model
@@ -728,8 +860,9 @@ def _parse_doc_parts(
             PageError(page_num=i, error=error_msg, error_code=-1)
             for i in range(doc.start_page_idx, doc.end_page_idx + 1)
         ]
+        empty_markdown = [] if split == SplitType.page else ""
         return ParsedDocument(
-            markdown="",
+            markdown=empty_markdown,
             chunks=[],
             extraction_metadata=None,
             extraction=None,
@@ -757,6 +890,9 @@ def _send_parsing_request(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    figure_captioning_type: FigureCaptioningType = FigureCaptioningType.verbose,
+    figure_captioning_prompt: Optional[str] = None,
+    split: SplitType = SplitType.full,
     config: Optional[ParseConfig] = None,
 ) -> dict[str, Any]:
     """
@@ -780,6 +916,9 @@ def _send_parsing_request(
             data: dict[str, Any] = {
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
+                "figure_captioning_type": figure_captioning_type.value,
+                "figure_captioning_prompt": figure_captioning_prompt,
+                "split": split.value,
             }
 
             def resolve_refs(obj: Any, defs: Dict[str, Any]) -> Any:
