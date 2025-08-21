@@ -11,6 +11,7 @@ from agentic_doc.common import (
     ChunkGroundingBox,
     ChunkType,
     Document,
+    DocumentMetadata,
     ParsedDocument,
     RetryableError,
     Timer,
@@ -160,6 +161,38 @@ def test_parsed_document():
     assert doc.start_page_idx == 0
     assert doc.end_page_idx == 1
     assert doc.doc_type == "pdf"
+
+    # Test metadata field defaults to None
+    assert doc.metadata is None
+
+    # Test ParsedDocument with metadata
+    metadata = DocumentMetadata(
+        parse_id="12345-abcde",
+        filename="test.pdf",
+        page_count=2,
+        processed_at="2023-08-21T19:00:00Z",
+        processing_time_ms=1500,
+        pages_processed=2,
+        user_id="test@example.com"
+    )
+
+    doc_with_metadata = ParsedDocument(
+        markdown="# Title\n\nContent",
+        chunks=[chunk1, chunk2],
+        start_page_idx=0,
+        end_page_idx=1,
+        doc_type="pdf",
+        metadata=metadata
+    )
+
+    assert doc_with_metadata.metadata is not None
+    assert doc_with_metadata.metadata.parse_id == "12345-abcde"
+    assert doc_with_metadata.metadata.filename == "test.pdf"
+    assert doc_with_metadata.metadata.page_count == 2
+    assert doc_with_metadata.metadata.processed_at == "2023-08-21T19:00:00Z"
+    assert doc_with_metadata.metadata.processing_time_ms == 1500
+    assert doc_with_metadata.metadata.pages_processed == 2
+    assert doc_with_metadata.metadata.user_id == "test@example.com"
 
     # Test with image doc_type
     image_doc = ParsedDocument(
@@ -332,6 +365,44 @@ def test_create_metadata_model():
     assert len(primitive_list_instance.tags) == 2
     assert isinstance(primitive_list_instance.tags[0], MetadataType[str])
     assert "chunk_references" in primitive_list_instance.tags[0].__class__.model_fields
+
+
+def test_document_metadata():
+    # Test DocumentMetadata with all fields
+    metadata = DocumentMetadata(
+        parse_id="12345-abcde-67890",
+        filename="test_document.pdf",
+        page_count=5,
+        processed_at="2023-08-21T19:00:00Z",
+        processing_time_ms=2500,
+        pages_processed=5,
+        user_id="user@example.com"
+    )
+
+    assert metadata.parse_id == "12345-abcde-67890"
+    assert metadata.filename == "test_document.pdf"
+    assert metadata.page_count == 5
+    assert metadata.processed_at == "2023-08-21T19:00:00Z"
+    assert metadata.processing_time_ms == 2500
+    assert metadata.pages_processed == 5
+    assert metadata.user_id == "user@example.com"
+
+    # Test DocumentMetadata with default values
+    empty_metadata = DocumentMetadata()
+    assert empty_metadata.parse_id is None
+    assert empty_metadata.filename is None
+    assert empty_metadata.page_count is None
+    assert empty_metadata.processed_at is None
+    assert empty_metadata.processing_time_ms is None
+    assert empty_metadata.pages_processed is None
+    assert empty_metadata.user_id is None
+
+    # Test serialization/deserialization
+    metadata_dict = metadata.model_dump()
+    metadata2 = DocumentMetadata.model_validate(metadata_dict)
+    assert metadata2.parse_id == metadata.parse_id
+    assert metadata2.filename == metadata.filename
+    assert metadata2.page_count == metadata.page_count
 
 
 def test_extraction_metadata_type_validation():

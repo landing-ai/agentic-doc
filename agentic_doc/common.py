@@ -126,6 +126,16 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
     return create_model(f"{model.__name__}Metadata", **fields)
 
 
+class DocumentMetadata(BaseModel):
+    parse_id: Optional[str] = None
+    filename: Optional[str] = None
+    page_count: Optional[int] = None
+    processed_at: Optional[str] = None
+    processing_time_ms: Optional[int] = None
+    pages_processed: Optional[int] = None
+    user_id: Optional[str] = None
+
+
 class ParsedDocument(BaseModel, Generic[T]):
     markdown: str
     chunks: list[Chunk]
@@ -137,6 +147,7 @@ class ParsedDocument(BaseModel, Generic[T]):
     result_path: Optional[Path] = None
     errors: list[PageError] = Field(default_factory=list)
     extraction_error: Optional[str] = None
+    metadata: Optional[DocumentMetadata] = None
 
 
 class RetryableError(Exception):
