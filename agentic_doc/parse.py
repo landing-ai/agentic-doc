@@ -542,6 +542,7 @@ def _parse_image(
             "doc_type": "image",
             "start_page_idx": 0,
             "end_page_idx": 0,
+            "metadata": result_raw.get("metadata"),
         }
 
         # Handle extraction validation and assignment
@@ -684,6 +685,7 @@ def _parse_doc_parts(
             "start_page_idx": doc.start_page_idx,
             "end_page_idx": doc.end_page_idx,
             "doc_type": "pdf",
+            "metadata": result.get("metadata"),
         }
 
         if (
