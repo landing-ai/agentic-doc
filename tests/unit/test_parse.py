@@ -90,6 +90,7 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
             include_marginalia=True,
             include_metadata_in_markdown=True,
             result_save_dir=None,
+            grounding_save_dir=temp_dir,
             extraction_model=None,
             extraction_schema=None,
             figure_captioning_type=FigureCaptioningType.verbose,
