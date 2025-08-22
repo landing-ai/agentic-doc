@@ -170,8 +170,8 @@ def test_parse_and_save_document_with_local_file(temp_dir, mock_parsed_document)
 def test_parse_and_save_document_with_url(temp_dir, mock_parsed_document):
     # Mock download_file and _parse_pdf functions
     with (
-        patch("agentic_doc.utils.download_file") as mock_download,
-        patch("agentic_doc.utils.get_file_type", return_value="pdf"),
+        patch("agentic_doc.parse.download_file") as mock_download,
+        patch("agentic_doc.parse.get_file_type", return_value="pdf"),
         patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document),
     ):
         # Call function with URL
@@ -192,7 +192,7 @@ def test_parse_and_save_document_with_invalid_file_type(temp_dir):
         f.write("This is not a PDF or image")
 
     # Mock get_file_type to return an unsupported file type
-    with patch("agentic_doc.utils.get_file_type", return_value="txt"):
+    with patch("agentic_doc.parse.get_file_type", return_value="txt"):
         # Call function and check that it raises ValueError
         with pytest.raises(ValueError) as exc_info:
             parse_and_save_document(test_file)
