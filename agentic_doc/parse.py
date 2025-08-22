@@ -65,6 +65,7 @@ def parse(
     connector_pattern: Optional[str] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> List[ParsedDocument[T]]:
     """
@@ -86,6 +87,8 @@ def parse(
         connector_pattern: Pattern to filter files (when using connectors)
         extraction_model: Pydantic model schema for field extraction (optional)
         extraction_schema: JSON schema for field extraction (optional)
+        split_on_schema: Whether to split documents based on the extraction schema
+        config: Optional ParseConfig for additional settings
 
     Returns:
         List[ParsedDocument]
@@ -130,6 +133,7 @@ def parse(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        split_on_schema=split_on_schema,
         config=config,
     )
 
@@ -230,6 +234,7 @@ def _parse_document_list(
     grounding_save_dir: Optional[Union[str, Path]] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> Union[List[ParsedDocument[T]], List[Path]]:
     """Helper function to parse a list of documents."""
@@ -243,6 +248,7 @@ def _parse_document_list(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            split_on_schema=split_on_schema,
             config=config,
         )
     else:
@@ -253,6 +259,7 @@ def _parse_document_list(
             grounding_save_dir=grounding_save_dir,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            split_on_schema=split_on_schema,
             config=config,
         )
 
@@ -265,6 +272,7 @@ def parse_documents(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> list[ParsedDocument[T]]:
     """
@@ -274,6 +282,7 @@ def parse_documents(
         documents (list[str | Path | Url]): The list of documents to parse. Each document can be a local file path, a URL string, or a Pydantic `Url` object.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
         extraction_model (type[BaseModel] | None): Schema for field extraction.
+        split_on_schema (bool): Whether to split documents based on the extraction schema.
     Returns:
         list[ParsedDocument]: The list of parsed documents. The list is sorted by the order of the input documents.
     """
@@ -285,6 +294,7 @@ def parse_documents(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        split_on_schema=split_on_schema,
         config=config,
     )
     with ThreadPoolExecutor(max_workers=get_settings().batch_size) as executor:
@@ -304,6 +314,7 @@ def _parse_document_without_save(
     grounding_save_dir: Union[str, Path, None],
     extraction_model: Optional[type[T]],
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     """Wrapper to ensure parse_and_save_document returns ParsedDocument when no save dir."""
@@ -315,6 +326,7 @@ def _parse_document_without_save(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        split_on_schema=split_on_schema,
         config=config,
     )
     # When result_save_dir is None, parse_and_save_document returns ParsedDocument[T]
@@ -331,6 +343,7 @@ def parse_and_save_documents(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> list[Path]:
     """
@@ -341,6 +354,7 @@ def parse_and_save_documents(
         result_save_dir (str | Path): The local directory to save the results.
         grounding_save_dir (str | Path): The local directory to save the grounding images.
         extraction_model (type[BaseModel] | None): Schema for field extraction.
+        split_on_schema (bool): Whether to split documents based on the extraction schema.
     Returns:
         list[Path]: A list of json file paths to the saved results. The file paths are sorted by the order of the input file paths.
             The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_123456.json".
@@ -355,6 +369,7 @@ def parse_and_save_documents(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        split_on_schema=split_on_schema,
         config=config,
     )
     with ThreadPoolExecutor(max_workers=get_settings().batch_size) as executor:
@@ -375,6 +390,7 @@ def _parse_document_with_save(
     grounding_save_dir: Union[str, Path, None],
     extraction_model: Optional[type[T]],
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> Path:
     """Wrapper to ensure parse_and_save_document returns Path when save dir provided."""
@@ -386,6 +402,7 @@ def _parse_document_with_save(
         grounding_save_dir=grounding_save_dir,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        split_on_schema=split_on_schema,
         config=config,
     )
     # When result_save_dir is provided, parse_and_save_document returns Path
@@ -402,6 +419,7 @@ def parse_and_save_document(
     grounding_save_dir: Union[str, Path, None] = None,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> Union[Path, ParsedDocument[T]]:
     """
@@ -411,6 +429,7 @@ def parse_and_save_document(
         document (str | Path | Url): The document to parse. It can be a local file path, a URL string, or a Pydantic `Url` object.
         result_save_dir (str | Path): The local directory to save the results. If None, the parsed document data is returned.
         extraction_model (type[BaseModel] | None): Schema for field extraction.
+        split_on_schema (bool): Whether to split documents based on the extraction schema.
     Returns:
         Path | ParsedDocument: The file path to the saved result or the parsed document data.
     """
@@ -445,6 +464,7 @@ def parse_and_save_document(
                 include_metadata_in_markdown=include_metadata_in_markdown,
                 extraction_model=extraction_model,
                 extraction_schema=extraction_schema,
+                split_on_schema=split_on_schema,
                 config=config,
             )
         else:
@@ -476,26 +496,18 @@ def _parse_pdf(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     settings = get_settings()
     with tempfile.TemporaryDirectory() as temp_dir:
+        # Determine split size based on extraction schema and split_on_schema flag
         if extraction_model or extraction_schema is not None:
-            total_pages = 0
-            with open(file_path, "rb") as file:
-                reader = PdfReader(file)
-                total_pages = len(reader.pages)
             split_size = (
                 config.extraction_split_size
                 if config and config.extraction_split_size
                 else settings.extraction_split_size
             )
-            if total_pages > split_size:
-                raise ValueError(
-                    f"Document has {total_pages} pages, which exceeds the maximum of {settings.extraction_split_size} pages "
-                    "allowed when using field extraction. "
-                    f"Please use a document with {split_size} pages or fewer."
-                )
         else:
             split_size = (
                 config.split_size
@@ -512,6 +524,7 @@ def _parse_pdf(
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
+            split_on_schema=split_on_schema,
             config=config,
         )
         return _merge_part_results(part_results)
@@ -615,6 +628,9 @@ def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
     for i in range(1, len(results)):
         _merge_next_part(init_result, results[i])
 
+    # When split_on_schema is used, merge extractions from all parts
+    _merge_extractions(init_result, results)
+
     return init_result
 
 
@@ -630,6 +646,42 @@ def _merge_next_part(curr: ParsedDocument[T], next: ParsedDocument[T]) -> None:
     curr.errors.extend(next.errors)
 
 
+def _merge_extractions(merged_result: ParsedDocument[T], all_results: list[ParsedDocument[T]]) -> None:
+    """
+    Merge extraction results from multiple document parts.
+    This is particularly important when split_on_schema=True.
+    """
+    extractions: list[dict[str, Any]] = []
+    extraction_metadata: list[dict[str, Any]] = []
+    extraction_errors: list[str] = []
+
+    for result in all_results:
+        if result.extraction is not None:
+            extractions.append(result.extraction)
+        if result.extraction_metadata is not None:
+            extraction_metadata.append(result.extraction_metadata)
+        if result.extraction_error:
+            extraction_errors.append(result.extraction_error)
+
+    if extractions:
+        # Merge extractions into a dict of lists
+        merged_extraction: dict[str, list[Any]] = {"merged": []}
+        for extraction in extractions:
+            if isinstance(extraction, dict):
+                merged_extraction["merged"].append(extraction)
+        merged_result.extraction = merged_extraction
+
+    if extraction_metadata:
+        # Merge extraction_metadata into a dict of lists
+        merged_metadata: dict[str, list[Any]] = {"merged": []}
+        for metadata in extraction_metadata:
+            if isinstance(metadata, dict):
+                merged_metadata["merged"].append(metadata)
+        merged_result.extraction_metadata = merged_metadata
+    if extraction_errors:
+        merged_result.extraction_error = "; ".join(str(e) for e in extraction_errors if e)
+
+
 def _parse_doc_in_parallel(
     doc_parts: list[Document],
     *,
@@ -638,6 +690,7 @@ def _parse_doc_in_parallel(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> list[ParsedDocument[T]]:
     _parse_func: Callable[[Document], ParsedDocument[T]] = partial(
@@ -646,6 +699,7 @@ def _parse_doc_in_parallel(
         include_metadata_in_markdown=include_metadata_in_markdown,
         extraction_model=extraction_model,
         extraction_schema=extraction_schema,
+        split_on_schema=split_on_schema,
         config=config,
     )
     with ThreadPoolExecutor(max_workers=get_settings().max_workers) as executor:
@@ -665,16 +719,22 @@ def _parse_doc_parts(
     include_metadata_in_markdown: bool = True,
     extraction_model: Optional[type[T]] = None,
     extraction_schema: Optional[dict[str, Any]] = None,
+    split_on_schema: bool = False,
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     try:
         _LOGGER.info(f"Start parsing document part: '{doc}'")
+
+        # When split_on_schema is True, always send the schema with each request
+        send_extraction_model = extraction_model if split_on_schema and extraction_model else None
+        send_extraction_schema = extraction_schema if split_on_schema and extraction_schema else None
+
         result = _send_parsing_request(
             str(doc.file_path),
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
-            extraction_model=extraction_model,
-            extraction_schema=extraction_schema,
+            extraction_model=send_extraction_model,
+            extraction_schema=send_extraction_schema,
             config=config,
         )
         _LOGGER.info(f"Successfully parsed document part: '{doc}'")
