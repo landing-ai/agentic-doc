@@ -33,6 +33,7 @@ class ParseConfig:
         extraction_schema: Optional[dict[str, Any]] = None,
         split_size: Optional[int] = None,
         extraction_split_size: Optional[int] = None,
+        enable_rotation_detection: Optional[bool] = None,
     ) -> None:
         self.api_key = api_key
         self.include_marginalia = include_marginalia
@@ -41,6 +42,7 @@ class ParseConfig:
         self.extraction_schema = extraction_schema
         self.split_size = split_size
         self.extraction_split_size = extraction_split_size
+        self.enable_rotation_detection = enable_rotation_detection
 
 
 class SettingsOverrides:
