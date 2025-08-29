@@ -134,7 +134,9 @@ class DocumentMetadata(BaseModel):
     processing_time_ms: Optional[int] = None
     pages_processed: Optional[int] = None
     user_id: Optional[str] = None
-    pages_rotation_angles: Optional[dict[str, float]] = Field(default_factory=dict)
+    pages_rotation_angles: Optional[dict[str, float]] = Field(
+        default_factory=dict,  # type: ignore[arg-type]
+    )
 
 
 class ParsedDocument(BaseModel, Generic[T]):
