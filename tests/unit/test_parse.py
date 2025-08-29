@@ -578,14 +578,6 @@ def test_send_parsing_dont_send_none_parameters():
 
 
 def test_send_parsing_send_false_parameters():
-    """
-    When sending the requests, "None" ParseConfig params should be
-    treated as "not set in the request", instead of sending "None" or
-    any other default value.
-
-    This should allow us to better control default values from the
-    backend, with client side not overriding it every time.
-    """
     # Create a mock response
     mock_response = MagicMock()
     mock_response.status_code = 200
