@@ -781,6 +781,8 @@ def _send_parsing_request(
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
             }
+            if config and config.enable_rotation_detection is not None:
+                data["enable_rotation_detection"] = config.enable_rotation_detection
 
             def resolve_refs(obj: Any, defs: Dict[str, Any]) -> Any:
                 if isinstance(obj, dict):
