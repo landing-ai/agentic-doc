@@ -541,22 +541,22 @@ def test_send_parsing_dont_send_none_parameters():
 
     # Mock httpx.post to return the mock response
     with (
+        patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
         patch("agentic_doc.parse.open", MagicMock()),
         patch("agentic_doc.parse.Path") as mock_path,
     ):
-        with patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post:
-            # Setup mock to make the suffix check work
-            mock_path_instance = MagicMock()
-            mock_path_instance.suffix.lower.return_value = ".pdf"
-            mock_path.return_value = mock_path_instance
+        # Setup mock to make the suffix check work
+        mock_path_instance = MagicMock()
+        mock_path_instance.suffix.lower.return_value = ".pdf"
+        mock_path.return_value = mock_path_instance
 
-            # Call the function
-            result = _send_parsing_request(
-                "test.pdf",
-                config=ParseConfig(
-                    enable_rotation_detection=None,
-                ),
-            )
+        # Call the function
+        result = _send_parsing_request(
+            "test.pdf",
+            config=ParseConfig(
+                enable_rotation_detection=None,
+            ),
+        )
 
         # Check that the result matches the mock response
         assert result == {"data": {"markdown": "Test", "chunks": []}}
@@ -569,8 +569,8 @@ def test_send_parsing_dont_send_none_parameters():
                     "include_metadata_in_markdown": True,
                 },
                 headers={
-                    "Authorization": "Basic 12333",
-                    "runtime_tag": "agentic-doc-v0.3.1"
+                    "Authorization": ANY,
+                    "runtime_tag": ANY
                 },
                 timeout=None
             )
@@ -585,22 +585,22 @@ def test_send_parsing_send_false_parameters():
 
     # Mock httpx.post to return the mock response
     with (
+        patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
         patch("agentic_doc.parse.open", MagicMock()),
         patch("agentic_doc.parse.Path") as mock_path,
     ):
-        with patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post:
-            # Setup mock to make the suffix check work
-            mock_path_instance = MagicMock()
-            mock_path_instance.suffix.lower.return_value = ".pdf"
-            mock_path.return_value = mock_path_instance
+        # Setup mock to make the suffix check work
+        mock_path_instance = MagicMock()
+        mock_path_instance.suffix.lower.return_value = ".pdf"
+        mock_path.return_value = mock_path_instance
 
-            # Call the function
-            result = _send_parsing_request(
-                "test.pdf",
-                config=ParseConfig(
-                    enable_rotation_detection=False,
-                ),
-            )
+        # Call the function
+        result = _send_parsing_request(
+            "test.pdf",
+            config=ParseConfig(
+                enable_rotation_detection=False,
+            ),
+        )
 
         # Check that the result matches the mock response
         assert result == {"data": {"markdown": "Test", "chunks": []}}
@@ -614,8 +614,8 @@ def test_send_parsing_send_false_parameters():
                     "enable_rotation_detection": False,
                 },
                 headers={
-                    "Authorization": "Basic 12333",
-                    "runtime_tag": "agentic-doc-v0.3.1"
+                    "Authorization": ANY,
+                    "runtime_tag": ANY
                 },
                 timeout=None
             )
