@@ -26,6 +26,17 @@ class ChunkType(str, Enum):
     marginalia = "marginalia"
 
 
+class FigureCaptioningType(str, Enum):
+    verbose = "verbose"
+    transcribe = "transcribe"
+    custom = "custom"
+
+
+class SplitType(str, Enum):
+    full = "full"
+    page = "page"
+
+
 class ChunkGroundingBox(BaseModel):
     """
     A bounding box of a chunk.
@@ -140,7 +151,7 @@ class DocumentMetadata(BaseModel):
 
 
 class ParsedDocument(BaseModel, Generic[T]):
-    markdown: str
+    markdown: Union[str, List[str]]
     chunks: list[Chunk]
     extraction: Optional[Union[T, Dict[str, Any]]] = None
     extraction_metadata: Optional[Union[Dict[str, Any], BaseModel]] = None

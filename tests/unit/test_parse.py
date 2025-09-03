@@ -14,11 +14,14 @@ from agentic_doc.common import (
     Document,
     ParsedDocument,
     MetadataType,
+    FigureCaptioningType,
+    SplitType,
 )
 from agentic_doc.connectors import (
     LocalConnector,
     LocalConnectorConfig,
 )
+from agentic_doc.config import ParseConfig
 from agentic_doc.parse import (
     _merge_next_part,
     _merge_part_results,
@@ -85,10 +88,10 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
         # Check that the grounding_save_dir was passed to parse_and_save_document
         mock_parse.assert_called_once_with(
             "/path/to/document.pdf",
-            grounding_save_dir=temp_dir,
             include_marginalia=True,
             include_metadata_in_markdown=True,
             result_save_dir=None,
+            grounding_save_dir=temp_dir,
             extraction_model=None,
             extraction_schema=None,
             config=None,
@@ -567,6 +570,8 @@ def test_send_parsing_dont_send_none_parameters():
                 data={
                     "include_marginalia": True,
                     "include_metadata_in_markdown": True,
+                    "figure_captioning_type": "verbose",
+                    "split": "full",
                 },
                 headers={
                     "Authorization": ANY,
@@ -611,6 +616,8 @@ def test_send_parsing_send_false_parameters():
                 data={
                     "include_marginalia": True,
                     "include_metadata_in_markdown": True,
+                    "figure_captioning_type": "verbose",
+                    "split": "full",
                     "enable_rotation_detection": False,
                 },
                 headers={
@@ -870,6 +877,7 @@ class TestParseFunctionConsolidated:
             patch(
                 "agentic_doc.parse.save_groundings_as_images"
             ) as mock_save_groundings,
+            patch("agentic_doc.parse.check_endpoint_and_api_key"),
         ):
             result = parse(test_file, grounding_save_dir=grounding_dir)
 
@@ -924,6 +932,7 @@ class TestParseFunctionConsolidated:
                 "agentic_doc.parse._parse_document_list",
                 return_value=[mock_parsed_document],
             ) as mock_parse_list,
+            patch("agentic_doc.parse.check_endpoint_and_api_key"),
         ):
             result = parse(connector, connector_path=str(temp_dir))
 
@@ -2045,3 +2054,267 @@ class TestParseFunctionConsolidated:
             assert request["data"]["include_marginalia"] is True
             assert request["data"]["include_metadata_in_markdown"] is True
             assert request["headers"]["Authorization"] == "Basic none_test_key"
+
+
+class TestFigureCaptioningAndChunking:
+    """Test figure captioning options and split modes."""
+
+    def test_figure_captioning_custom_requires_prompt_validation(self):
+        """Test that custom figure captioning requires a prompt."""
+        config = ParseConfig(
+            figure_captioning_type=FigureCaptioningType.custom
+        )
+        with pytest.raises(ValueError, match="figure_captioning_prompt must be provided when figure_captioning_type is 'custom'"):
+            parse(
+                "dummy.pdf",
+                config=config
+            )
+
+    def test_figure_captioning_verbose_no_prompt_required(self, temp_dir, mock_parsed_document):
+        """Test that verbose figure captioning doesn't require a prompt."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        config = ParseConfig(
+            figure_captioning_type=FigureCaptioningType.verbose
+        )
+        with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
+            # Should not raise ValueError due to missing prompt
+            result = parse(
+                test_file,
+                config=config
+            )
+            assert len(result) == 1
+            assert isinstance(result[0], ParsedDocument)
+
+    def test_send_parsing_request_with_figure_captioning_parameters(self):
+        """Test that figure captioning parameters are sent in the request."""
+        # Mock successful response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"markdown": "test", "chunks": []}}
+
+        with (
+            patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
+            patch("agentic_doc.parse.open", MagicMock()),
+            patch("agentic_doc.parse.Path") as mock_path,
+        ):
+            # Setup mock to make the suffix check work
+            mock_path_instance = MagicMock()
+            mock_path_instance.suffix.lower.return_value = ".pdf"
+            mock_path.return_value = mock_path_instance
+
+            # Call with custom figure captioning
+            config = ParseConfig(
+                figure_captioning_type=FigureCaptioningType.custom,
+                figure_captioning_prompt="Describe figures in detail",
+                split=SplitType.page
+            )
+            result = _send_parsing_request(
+                "test.pdf",
+                config=config
+            )
+
+            # Verify the request was made with correct parameters
+            mock_post.assert_called_once()
+            call_args = mock_post.call_args
+            data = call_args.kwargs['data']
+
+            assert data['figure_captioning_type'] == 'custom'
+            assert data['figure_captioning_prompt'] == 'Describe figures in detail'
+            assert data['split'] == 'page'
+
+    def test_send_parsing_request_with_default_parameters(self):
+        """Test that default values are used correctly."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"markdown": "test", "chunks": []}}
+
+        with (
+            patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
+            patch("agentic_doc.parse.open", MagicMock()),
+            patch("agentic_doc.parse.Path") as mock_path,
+        ):
+            # Setup mock to make the suffix check work
+            mock_path_instance = MagicMock()
+            mock_path_instance.suffix.lower.return_value = ".pdf"
+            mock_path.return_value = mock_path_instance
+
+            # Call with defaults
+            result = _send_parsing_request("test.pdf")
+
+            # Verify defaults are used
+            mock_post.assert_called_once()
+            call_args = mock_post.call_args
+            data = call_args.kwargs['data']
+            assert data['figure_captioning_type'] == 'verbose'  # Default
+            assert 'figure_captioning_prompt' not in data  # Not included when None
+            assert data['split'] == 'full'  # Default
+
+    def test_split_merge_page_mode_functionality(self):
+        """Test that page mode split preserves individual page content."""
+        doc1 = ParsedDocument(
+            markdown=["Page 1 content"],
+            chunks=[],
+            start_page_idx=0,
+            end_page_idx=0,
+            doc_type="pdf",
+            errors=[]
+        )
+        doc2 = ParsedDocument(
+            markdown=["Page 2 content"], 
+            chunks=[],
+            start_page_idx=1,
+            end_page_idx=1,
+            doc_type="pdf",
+            errors=[]
+        )
+
+        _merge_next_part(doc1, doc2, SplitType.page)
+
+        assert isinstance(doc1.markdown, list)
+        assert doc1.markdown == ["Page 1 content", "Page 2 content"]
+
+    def test_split_merge_full_mode_functionality(self):
+        """Test that full mode split joins content with newlines."""
+        doc1 = ParsedDocument(
+            markdown="Page 1 content",
+            chunks=[],
+            start_page_idx=0,
+            end_page_idx=0,
+            doc_type="pdf", 
+            errors=[]
+        )
+        doc2 = ParsedDocument(
+            markdown="Page 2 content",
+            chunks=[],
+            start_page_idx=1,
+            end_page_idx=1,
+            doc_type="pdf",
+            errors=[]
+        )
+
+        _merge_next_part(doc1, doc2, SplitType.full)
+
+        assert isinstance(doc1.markdown, str)
+        assert doc1.markdown == "Page 1 content\n\nPage 2 content"
+
+    def test_merge_part_results_with_page_split(self):
+        """Test that _merge_part_results respects page split mode."""
+        doc1 = ParsedDocument(
+            markdown=["Page 1"],
+            chunks=[],
+            start_page_idx=0,
+            end_page_idx=0,
+            doc_type="pdf",
+            errors=[]
+        )
+        doc2 = ParsedDocument(
+            markdown=["Page 2"],
+            chunks=[],
+            start_page_idx=1,
+            end_page_idx=1,
+            doc_type="pdf",
+            errors=[]
+        )
+
+        result = _merge_part_results([doc1, doc2], SplitType.page)
+
+        assert isinstance(result.markdown, list)
+        assert result.markdown == ["Page 1", "Page 2"]
+
+    def test_merge_part_results_with_full_split(self):
+        """Test that _merge_part_results respects full split mode."""
+        doc1 = ParsedDocument(
+            markdown="Page 1",
+            chunks=[],
+            start_page_idx=0,
+            end_page_idx=0,
+            doc_type="pdf",
+            errors=[]
+        )
+        doc2 = ParsedDocument(
+            markdown="Page 2",
+            chunks=[],
+            start_page_idx=1,
+            end_page_idx=1,
+            doc_type="pdf",
+            errors=[]
+        )
+
+        result = _merge_part_results([doc1, doc2], SplitType.full)
+
+        assert isinstance(result.markdown, str)
+        assert result.markdown == "Page 1\n\nPage 2"
+
+    def test_parse_with_figure_captioning_config_override(self, temp_dir, mock_parsed_document):
+        """Test that ParseConfig sets figure captioning parameters."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        config = ParseConfig(
+            figure_captioning_type=FigureCaptioningType.verbose
+        )
+
+        with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
+            result = parse(
+                test_file,
+                config=config
+            )
+
+            assert len(result) == 1
+            assert isinstance(result[0], ParsedDocument)
+            # The actual parameter validation happens deeper in the stack
+
+    def test_parsed_document_with_list_markdown(self):
+        """Test that ParsedDocument accepts list markdown for page split."""
+        markdown_list = ["Page 1 content", "Page 2 content"]
+        doc = ParsedDocument(
+            markdown=markdown_list,
+            chunks=[],
+            start_page_idx=0,
+            end_page_idx=1,
+            doc_type="pdf",
+            errors=[]
+        )
+
+        assert isinstance(doc.markdown, list)
+        assert doc.markdown == markdown_list
+
+    def test_figure_captioning_transcribe_type_usage(self, temp_dir, mock_parsed_document):
+        """Test using transcribe figure captioning type."""
+        test_file = temp_dir / "test.pdf"  
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        config = ParseConfig(
+            figure_captioning_type=FigureCaptioningType.transcribe
+        )
+        with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
+            result = parse(
+                test_file,
+                config=config
+            )
+
+            assert len(result) == 1
+            assert isinstance(result[0], ParsedDocument)
+
+    def test_split_type_page_usage(self, temp_dir, mock_parsed_document):
+        """Test using page split type."""
+        test_file = temp_dir / "test.pdf"
+        with open(test_file, "wb") as f:
+            f.write(b"%PDF-1.7\n")
+
+        config = ParseConfig(
+            split=SplitType.page
+        )
+        with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
+            result = parse(
+                test_file,
+                config=config
+            )
+
+            assert len(result) == 1
+            assert isinstance(result[0], ParsedDocument)
