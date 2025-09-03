@@ -564,7 +564,9 @@ def _parse_pdf(
             extraction_schema=extraction_schema,
             config=config,
         )
-        split_type = config.split if config and config.split is not None else SplitType.full
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
         return _merge_part_results(part_results, split_type)
 
 
@@ -597,7 +599,9 @@ def _parse_image(
         }
 
         # Handle split for images - images are always single page
-        split_type = config.split if config and config.split is not None else SplitType.full
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
         if split_type == SplitType.page and isinstance(result_raw["markdown"], str):
             result_raw["markdown"] = [result_raw["markdown"]]
 
@@ -638,7 +642,9 @@ def _parse_image(
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing image '{file_path}' due to: {error_msg}")
-        split_type = config.split if config and config.split is not None else SplitType.full
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
         empty_markdown = [] if split_type == SplitType.page else ""
         return ParsedDocument(
             markdown=empty_markdown,
@@ -776,7 +782,9 @@ def _parse_doc_parts(
         }
 
         # Handle split for PDF parts
-        split_type = config.split if config and config.split is not None else SplitType.full
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
         if split_type == SplitType.page and isinstance(result_data["markdown"], str):
             result_data["markdown"] = [result_data["markdown"]]
 
@@ -820,7 +828,9 @@ def _parse_doc_parts(
             PageError(page_num=i, error=error_msg, error_code=-1)
             for i in range(doc.start_page_idx, doc.end_page_idx + 1)
         ]
-        split_type = config.split if config and config.split is not None else SplitType.full
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
         empty_markdown = [] if split_type == SplitType.page else ""
         return ParsedDocument(
             markdown=empty_markdown,
@@ -879,7 +889,9 @@ def _send_parsing_request(
             # Include figure captioning and split parameters from config
             if config:
                 # Use default values when config is provided but parameters are not set
-                figure_captioning_type = config.figure_captioning_type or FigureCaptioningType.verbose
+                figure_captioning_type = (
+                    config.figure_captioning_type or FigureCaptioningType.verbose
+                )
                 figure_captioning_prompt = config.figure_captioning_prompt
                 split = config.split or SplitType.full
 
