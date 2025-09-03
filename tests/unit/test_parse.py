@@ -94,9 +94,6 @@ def test_parse_documents_with_grounding_save_dir(mock_parsed_document, temp_dir)
             grounding_save_dir=temp_dir,
             extraction_model=None,
             extraction_schema=None,
-            figure_captioning_type=FigureCaptioningType.verbose,
-            figure_captioning_prompt=None,
-            split=SplitType.full,
             config=None,
         )
 
