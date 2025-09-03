@@ -125,9 +125,6 @@ def test_parse_and_save_documents_with_url(mock_parsed_document, temp_dir):
             grounding_save_dir=temp_dir,
             extraction_model=None,
             extraction_schema=None,
-            figure_captioning_type=FigureCaptioningType.verbose,
-            figure_captioning_prompt=None,
-            split=SplitType.full,
             config=None,
         )
 
@@ -260,9 +257,6 @@ def test_parse_image(temp_dir, mock_parsed_document):
             include_metadata_in_markdown=True,
             extraction_model=None,
             extraction_schema=None,
-            figure_captioning_type=FigureCaptioningType.verbose,
-            figure_captioning_prompt=None,
-            split=SplitType.full,
             config=None,
         )
 
@@ -468,9 +462,6 @@ def test_parse_doc_parts_success(mock_parsed_document):
             include_metadata_in_markdown=True,
             extraction_model=None,
             extraction_schema=None,
-            figure_captioning_type=FigureCaptioningType.verbose,
-            figure_captioning_prompt=None,
-            split=SplitType.full,
             config=None,
         )
 
@@ -579,6 +570,8 @@ def test_send_parsing_dont_send_none_parameters():
                 data={
                     "include_marginalia": True,
                     "include_metadata_in_markdown": True,
+                    "figure_captioning_type": "verbose",
+                    "split": "full",
                 },
                 headers={
                     "Authorization": ANY,
@@ -623,6 +616,8 @@ def test_send_parsing_send_false_parameters():
                 data={
                     "include_marginalia": True,
                     "include_metadata_in_markdown": True,
+                    "figure_captioning_type": "verbose",
+                    "split": "full",
                     "enable_rotation_detection": False,
                 },
                 headers={
@@ -1033,9 +1028,6 @@ class TestParseFunctionConsolidated:
                 extraction_model=None,
                 extraction_schema=None,
                 config=None,
-                figure_captioning_type=FigureCaptioningType.verbose,
-                figure_captioning_prompt=None,
-                split=SplitType.full,
             )
 
     def test_parse_with_bytes(self, mock_parsed_document):
@@ -1059,9 +1051,6 @@ class TestParseFunctionConsolidated:
                 extraction_model=None,
                 extraction_schema=None,
                 config=None,
-                figure_captioning_type=FigureCaptioningType.verbose,
-                figure_captioning_prompt=None,
-                split=SplitType.full,
             )
 
     def test_parse_list_with_save_dir(self, temp_dir, mock_parsed_document):
@@ -1110,9 +1099,6 @@ class TestParseFunctionConsolidated:
                 extraction_model=None,
                 extraction_schema=None,
                 config=None,
-                figure_captioning_type=FigureCaptioningType.verbose,
-                figure_captioning_prompt=None,
-                split=SplitType.full,
             )
 
     def test_parse_with_extraction_model(self, temp_dir, mock_parsed_document):
@@ -1140,9 +1126,6 @@ class TestParseFunctionConsolidated:
                 extraction_model=EmployeeFields,
                 extraction_schema=None,
                 config=None,
-                figure_captioning_type=FigureCaptioningType.verbose,
-                figure_captioning_prompt=None,
-                split=SplitType.full,
             )
 
     def test_extraction_metadata_with_simple_model(self, sample_image_path):
@@ -1490,9 +1473,6 @@ class TestParseFunctionConsolidated:
                 extraction_model=None,
                 extraction_schema=extraction_schema,
                 config=None,
-                figure_captioning_type=FigureCaptioningType.verbose,
-                figure_captioning_prompt=None,
-                split=SplitType.full,
             )
 
     def test_parse_with_extraction_schema_validation(self, sample_image_path):
@@ -1763,9 +1743,6 @@ class TestParseFunctionConsolidated:
                 extraction_model=None,
                 extraction_schema=None,
                 config=None,
-                figure_captioning_type=FigureCaptioningType.verbose,
-                figure_captioning_prompt=None,
-                split=SplitType.full,
             )
 
     def test_parse_additional_extraction_metadata(
@@ -2085,8 +2062,7 @@ class TestFigureCaptioningAndChunking:
     def test_figure_captioning_custom_requires_prompt_validation(self):
         """Test that custom figure captioning requires a prompt."""
         config = ParseConfig(
-            figure_captioning_type=FigureCaptioningType.custom,
-            figure_captioning_prompt=None
+            figure_captioning_type=FigureCaptioningType.custom
         )
         with pytest.raises(ValueError, match="figure_captioning_prompt must be provided when figure_captioning_type is 'custom'"):
             parse(
@@ -2101,8 +2077,7 @@ class TestFigureCaptioningAndChunking:
             f.write(b"%PDF-1.7\n")
 
         config = ParseConfig(
-            figure_captioning_type=FigureCaptioningType.verbose,
-            figure_captioning_prompt=None
+            figure_captioning_type=FigureCaptioningType.verbose
         )
         with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):
             # Should not raise ValueError due to missing prompt
@@ -2131,11 +2106,14 @@ class TestFigureCaptioningAndChunking:
             mock_path.return_value = mock_path_instance
 
             # Call with custom figure captioning
-            result = _send_parsing_request(
-                "test.pdf",
+            config = ParseConfig(
                 figure_captioning_type=FigureCaptioningType.custom,
                 figure_captioning_prompt="Describe figures in detail",
                 split=SplitType.page
+            )
+            result = _send_parsing_request(
+                "test.pdf",
+                config=config
             )
 
             # Verify the request was made with correct parameters
@@ -2171,7 +2149,7 @@ class TestFigureCaptioningAndChunking:
             call_args = mock_post.call_args
             data = call_args.kwargs['data']
             assert data['figure_captioning_type'] == 'verbose'  # Default
-            assert data['figure_captioning_prompt'] is None
+            assert 'figure_captioning_prompt' not in data  # Not included when None
             assert data['split'] == 'full'  # Default
 
     def test_split_merge_page_mode_functionality(self):
@@ -2277,8 +2255,7 @@ class TestFigureCaptioningAndChunking:
             f.write(b"%PDF-1.7\n")
 
         config = ParseConfig(
-            figure_captioning_type=FigureCaptioningType.transcribe,
-            split=SplitType.page
+            figure_captioning_type=FigureCaptioningType.verbose
         )
 
         with patch("agentic_doc.parse._parse_pdf", return_value=mock_parsed_document):

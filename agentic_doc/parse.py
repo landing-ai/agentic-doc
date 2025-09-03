@@ -882,7 +882,7 @@ def _send_parsing_request(
                 figure_captioning_type = config.figure_captioning_type or FigureCaptioningType.verbose
                 figure_captioning_prompt = config.figure_captioning_prompt
                 split = config.split or SplitType.full
-                
+
                 data["figure_captioning_type"] = figure_captioning_type.value
                 if figure_captioning_prompt is not None:
                     data["figure_captioning_prompt"] = figure_captioning_prompt
