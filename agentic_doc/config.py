@@ -5,7 +5,7 @@ import cv2
 import structlog
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from agentic_doc.common import ChunkType, T
+from agentic_doc.common import ChunkType, FigureCaptioningType, SplitType, T
 import warnings
 
 _LOGGER = structlog.get_logger(__name__)
@@ -33,6 +33,10 @@ class ParseConfig:
         extraction_schema: Optional[dict[str, Any]] = None,
         split_size: Optional[int] = None,
         extraction_split_size: Optional[int] = None,
+        figure_captioning_type: Optional[FigureCaptioningType] = None,
+        figure_captioning_prompt: Optional[str] = None,
+        split: Optional[SplitType] = None,
+        enable_rotation_detection: Optional[bool] = None,
     ) -> None:
         self.api_key = api_key
         self.include_marginalia = include_marginalia
@@ -41,6 +45,10 @@ class ParseConfig:
         self.extraction_schema = extraction_schema
         self.split_size = split_size
         self.extraction_split_size = extraction_split_size
+        self.figure_captioning_type = figure_captioning_type
+        self.figure_captioning_prompt = figure_captioning_prompt
+        self.split = split
+        self.enable_rotation_detection = enable_rotation_detection
 
 
 class SettingsOverrides:
@@ -102,7 +110,7 @@ class Settings(BaseSettings):
         ge=1,
     )
     max_retries: int = Field(
-        default=100,
+        default=3,
         description="Maximum number of retries for a failed request",
         ge=0,
     )

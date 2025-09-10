@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from agentic_doc.common import ChunkType, ParsedDocument, MetadataType
-from agentic_doc.config import settings, get_settings, ParseConfig
+from agentic_doc.config import get_settings
 from agentic_doc.parse import (
     parse,
     parse_and_save_document,

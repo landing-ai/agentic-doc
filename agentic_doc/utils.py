@@ -99,7 +99,9 @@ def save_groundings_as_images(
     with pymupdf.open(file_path) as pdf_doc:
         for page_idx, chunks in sorted(chunks_by_page_idx.items()):
             page_img = page_to_image(pdf_doc, page_idx)
-            page_result = _crop_groundings(page_img, chunks, save_dir, inplace)
+            # Convert RGB to BGR for consistent color space handling
+            page_img_bgr = cv2.cvtColor(page_img, cv2.COLOR_RGB2BGR)
+            page_result = _crop_groundings(page_img_bgr, chunks, save_dir, inplace)
             result.update(page_result)
 
     return result

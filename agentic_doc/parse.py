@@ -26,6 +26,8 @@ from agentic_doc.common import (
     Timer,
     create_metadata_model,
     dump_parsed_doc_json,
+    FigureCaptioningType,
+    SplitType,
 )
 from agentic_doc.config import Settings, get_settings, ParseConfig
 from agentic_doc.connectors import BaseConnector, ConnectorConfig, create_connector
@@ -87,19 +89,31 @@ def parse(
         connector_pattern: Pattern to filter files (when using connectors)
         extraction_model: Pydantic model schema for field extraction (optional)
         extraction_schema: JSON schema for field extraction (optional)
+        config: ParseConfig object containing additional configuration options
 
     Returns:
         List[ParsedDocument]
     """
     settings = get_settings()
-    if config and config.include_marginalia:
-        include_marginalia = config.include_marginalia
-    if config and config.include_metadata_in_markdown:
-        include_metadata_in_markdown = config.include_metadata_in_markdown
-    if config and config.extraction_model:
-        extraction_model = config.extraction_model
-    if config and config.extraction_schema:
-        extraction_schema = config.extraction_schema
+
+    # Apply config overrides if provided
+    if config:
+        if config.include_marginalia is not None:
+            include_marginalia = config.include_marginalia
+        if config.include_metadata_in_markdown is not None:
+            include_metadata_in_markdown = config.include_metadata_in_markdown
+        if config.extraction_model is not None:
+            extraction_model = config.extraction_model
+        if config.extraction_schema is not None:
+            extraction_schema = config.extraction_schema
+
+        if (
+            config.figure_captioning_type == FigureCaptioningType.custom
+            and not config.figure_captioning_prompt
+        ):
+            raise ValueError(
+                "figure_captioning_prompt must be provided when figure_captioning_type is 'custom'."
+            )
 
     check_endpoint_and_api_key(
         _get_endpoint_url(settings),
@@ -301,6 +315,24 @@ def parse_documents(
     Returns:
         list[ParsedDocument]: The list of parsed documents. The list is sorted by the order of the input documents.
     """
+    if config:
+        if config.include_marginalia is not None:
+            include_marginalia = config.include_marginalia
+        if config.include_metadata_in_markdown is not None:
+            include_metadata_in_markdown = config.include_metadata_in_markdown
+        if config.extraction_model is not None:
+            extraction_model = config.extraction_model
+        if config.extraction_schema is not None:
+            extraction_schema = config.extraction_schema
+
+        if (
+            config.figure_captioning_type == FigureCaptioningType.custom
+            and not config.figure_captioning_prompt
+        ):
+            raise ValueError(
+                "figure_captioning_prompt must be provided when figure_captioning_type is 'custom'."
+            )
+
     _LOGGER.info(f"Parsing {len(documents)} documents")
     _parse_func: Callable[[Union[str, Path, Url]], ParsedDocument[T]] = partial(
         _parse_document_without_save,
@@ -369,6 +401,24 @@ def parse_and_save_documents(
         list[Path]: A list of json file paths to the saved results. The file paths are sorted by the order of the input file paths.
             The file name is the original file name with a timestamp appended. E.g. "document.pdf" -> "document_20250313_123456.json".
     """
+    if config:
+        if config.include_marginalia is not None:
+            include_marginalia = config.include_marginalia
+        if config.include_metadata_in_markdown is not None:
+            include_metadata_in_markdown = config.include_metadata_in_markdown
+        if config.extraction_model is not None:
+            extraction_model = config.extraction_model
+        if config.extraction_schema is not None:
+            extraction_schema = config.extraction_schema
+
+        if (
+            config.figure_captioning_type == FigureCaptioningType.custom
+            and not config.figure_captioning_prompt
+        ):
+            raise ValueError(
+                "figure_captioning_prompt must be provided when figure_captioning_type is 'custom'."
+            )
+
     _LOGGER.info(f"Parsing {len(documents)} documents")
 
     _parse_func: Callable[[Union[str, Path, Url]], Path] = partial(
@@ -539,7 +589,10 @@ def _parse_pdf(
             extraction_schema=extraction_schema,
             config=config,
         )
-        return _merge_part_results(part_results)
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
+        return _merge_part_results(part_results, split_type)
 
 
 def _parse_image(
@@ -567,7 +620,15 @@ def _parse_image(
             "doc_type": "image",
             "start_page_idx": 0,
             "end_page_idx": 0,
+            "metadata": result_raw.get("metadata"),
         }
+
+        # Handle split for images - images are always single page
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
+        if split_type == SplitType.page and isinstance(result_raw["markdown"], str):
+            result_raw["markdown"] = [result_raw["markdown"]]
 
         # Handle extraction validation and assignment
         if (
@@ -606,8 +667,12 @@ def _parse_image(
     except Exception as e:
         error_msg = str(e)
         _LOGGER.error(f"Error parsing image '{file_path}' due to: {error_msg}")
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
+        empty_markdown = [] if split_type == SplitType.page else ""
         return ParsedDocument(
-            markdown="",
+            markdown=empty_markdown,
             chunks=[],
             extraction_metadata=None,
             extraction=None,
@@ -619,13 +684,16 @@ def _parse_image(
         )
 
 
-def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
+def _merge_part_results(
+    results: list[ParsedDocument[T]], split: SplitType = SplitType.full
+) -> ParsedDocument[T]:
     if not results:
         _LOGGER.warning(
             f"No results to merge: {results}, returning empty ParsedDocument"
         )
+        empty_markdown = [] if split == SplitType.page else ""
         return ParsedDocument(
-            markdown="",
+            markdown=empty_markdown,
             chunks=[],
             extraction_metadata=None,
             extraction=None,
@@ -637,13 +705,39 @@ def _merge_part_results(results: list[ParsedDocument[T]]) -> ParsedDocument[T]:
 
     init_result = copy.deepcopy(results[0])
     for i in range(1, len(results)):
-        _merge_next_part(init_result, results[i])
+        _merge_next_part(init_result, results[i], split)
 
     return init_result
 
 
-def _merge_next_part(curr: ParsedDocument[T], next: ParsedDocument[T]) -> None:
-    curr.markdown += "\n\n" + next.markdown
+def _merge_next_part(
+    curr: ParsedDocument[T],
+    next: ParsedDocument[T],
+    split: SplitType = SplitType.full,
+) -> None:
+    if split == SplitType.page:
+        # When split is page, both curr.markdown and next.markdown should be lists
+        if isinstance(curr.markdown, list) and isinstance(next.markdown, list):
+            curr.markdown.extend(next.markdown)
+        elif isinstance(curr.markdown, str) and isinstance(next.markdown, str):
+            # Convert to list if they're strings (shouldn't happen but handle gracefully)
+            curr.markdown = [curr.markdown] + [next.markdown]
+        elif isinstance(curr.markdown, list) and isinstance(next.markdown, str):
+            curr.markdown.append(next.markdown)
+        elif isinstance(curr.markdown, str) and isinstance(next.markdown, list):
+            curr.markdown = [curr.markdown] + next.markdown
+    else:
+        # When split is full, join with newlines
+        if isinstance(curr.markdown, str) and isinstance(next.markdown, str):
+            curr.markdown += "\n\n" + next.markdown
+        elif isinstance(curr.markdown, list) and isinstance(next.markdown, list):
+            # Join lists and convert to string
+            curr.markdown = "\n\n".join(curr.markdown + next.markdown)
+        elif isinstance(curr.markdown, str) and isinstance(next.markdown, list):
+            curr.markdown = curr.markdown + "\n\n" + "\n\n".join(next.markdown)
+        elif isinstance(curr.markdown, list) and isinstance(next.markdown, str):
+            curr.markdown = "\n\n".join(curr.markdown) + "\n\n" + next.markdown
+
     next_chunks = next.chunks
     for chunk in next_chunks:
         for grounding in chunk.grounding:
@@ -709,7 +803,15 @@ def _parse_doc_parts(
             "start_page_idx": doc.start_page_idx,
             "end_page_idx": doc.end_page_idx,
             "doc_type": "pdf",
+            "metadata": result.get("metadata"),
         }
+
+        # Handle split for PDF parts
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
+        if split_type == SplitType.page and isinstance(result_data["markdown"], str):
+            result_data["markdown"] = [result_data["markdown"]]
 
         if (
             extraction_model
@@ -751,8 +853,12 @@ def _parse_doc_parts(
             PageError(page_num=i, error=error_msg, error_code=-1)
             for i in range(doc.start_page_idx, doc.end_page_idx + 1)
         ]
+        split_type = (
+            config.split if config and config.split is not None else SplitType.full
+        )
+        empty_markdown = [] if split_type == SplitType.page else ""
         return ParsedDocument(
-            markdown="",
+            markdown=empty_markdown,
             chunks=[],
             extraction_metadata=None,
             extraction=None,
@@ -803,6 +909,26 @@ def _send_parsing_request(
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
             }
+
+            # Include figure captioning and split parameters from config
+            if config:
+                # Use default values when config is provided but parameters are not set
+                figure_captioning_type = (
+                    config.figure_captioning_type or FigureCaptioningType.verbose
+                )
+                figure_captioning_prompt = config.figure_captioning_prompt
+                split = config.split or SplitType.full
+
+                data["figure_captioning_type"] = figure_captioning_type.value
+                if figure_captioning_prompt is not None:
+                    data["figure_captioning_prompt"] = figure_captioning_prompt
+                data["split"] = split.value
+            else:
+                # Use default values when no config is provided
+                data["figure_captioning_type"] = FigureCaptioningType.verbose.value
+                data["split"] = SplitType.full.value
+            if config and config.enable_rotation_detection is not None:
+                data["enable_rotation_detection"] = config.enable_rotation_detection
 
             def resolve_refs(obj: Any, defs: Dict[str, Any]) -> Any:
                 if isinstance(obj, dict):

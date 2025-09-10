@@ -30,7 +30,6 @@ This Python library wraps that API to provide:
 - 👁️ **Ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
 - 🏃 **Batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
 - 🔄 **Resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
-- 🛠️ **Drop‑in helpers:** `parse_documents`, `parse_and_save_documents`, `parse_and_save_document` → see [Main Functions](#main-functions)
 - ⚙️ **Config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
 - 🌐 **Raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
 
@@ -76,12 +75,6 @@ print(result[0].chunks)  # Get the extracted data as structured chunks of conten
 # Parse a document from a URL
 result = parse("https://example.com/document.pdf")
 print(result[0].markdown)
-
-# Legacy approach (still supported)
-from agentic_doc.parse import parse_documents
-results = parse_documents(["path/to/image.png"])
-parsed_doc = results[0]
-```
 
 #### Extract Data from Multiple Documents
 Run the following script to extract data from multiple documents.
@@ -263,29 +256,22 @@ Each grounding represents a bounding box in the original document, and the libra
 Here's how to use this feature:
 
 ```python
-from agentic_doc.parse import parse_documents
+from agentic_doc.parse import parse
 
-# Save groundings when parsing a document
-results = parse_documents(
-    ["path/to/document.pdf"],
-    grounding_save_dir="path/to/save/groundings"
-)
+# Parse a document from a URL & save groundings
+results = parse(["https://www.rbcroyalbank.com/banking-services/_assets-custom/pdf/eStatement.pdf"],
+                grounding_save_dir="./grounding")
 
-# The grounding images will be saved to:
-# path/to/save/groundings/document_TIMESTAMP/page_X/CHUNK_TYPE_CHUNK_ID_Y.png
-# Where X is the page number, CHUNK_ID is the unique ID of each chunk,
-# and Y is the index of the grounding within the chunk
 
-# Each chunk's grounding in the result will have the image_path set
+# Print the path to each saved grounding
 for chunk in results[0].chunks:
     for grounding in chunk.grounding:
         if grounding.image_path:
             print(f"Grounding saved to: {grounding.image_path}")
 ```
 
-This feature works with all parsing functions: `parse_documents`, `parse_and_save_documents`, and `parse_and_save_document`.
 
-### Visualize Parsing Result
+### Visualize Parsing Results
 
 The library provides a visualization utility that creates annotated images showing where each chunk of content was extracted from the document. This is useful for:
 - Verifying the accuracy of the extraction
