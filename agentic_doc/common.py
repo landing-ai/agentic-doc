@@ -17,6 +17,7 @@ from typing import (
 
 import httpx
 from pydantic import BaseModel, Field, create_model
+import json
 
 
 class ChunkType(str, Enum):
@@ -76,7 +77,7 @@ VT = TypeVar("VT")
 
 class MetadataType(BaseModel, Generic[VT]):
     value: Optional[VT] = None
-    chunk_references: List[str]
+    chunk_references: List[str] = Field(default_factory=list)
     confidence: Optional[float] = None
 
 
@@ -162,6 +163,22 @@ class ParsedDocument(BaseModel, Generic[T]):
     errors: list[PageError] = Field(default_factory=list)
     extraction_error: Optional[str] = None
     metadata: Optional[DocumentMetadata] = None
+
+
+def dump_parsed_doc_json(result: ParsedDocument[Any], **kwargs: Any) -> str:
+    """
+    Properly serialize a ParsedDocument object, so that extraction_metadata is handled correctly.
+    """
+    data = result.model_dump(**kwargs)
+
+    if (
+        hasattr(result, "extraction_metadata")
+        and result.extraction_metadata is not None
+        and not isinstance(result.extraction_metadata, dict)
+    ):
+        data["extraction_metadata"] = result.extraction_metadata.model_dump(**kwargs)
+
+    return json.dumps(data, default=str)
 
 
 class RetryableError(Exception):
