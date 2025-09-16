@@ -4,21 +4,19 @@ This module provides lazy import functions that only attempt to import optional
 dependencies when actually needed, providing clear error messages if they're missing.
 """
 
-from typing import Any, Dict, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import boto3
-    import cv2
-    import pymupdf
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import Resource
-    from googleapiclient.http import MediaIoBaseDownload
+from types import ModuleType
+from typing import Any, Dict
 
 
-def import_boto3() -> Any:
-    """Lazy import boto3 with helpful error message."""
+def import_boto3() -> ModuleType:
+    """Lazy import boto3 with helpful error message.
+
+    Returns:
+        The boto3 module
+
+    Raises:
+        ImportError: If boto3 is not installed
+    """
     try:
         import boto3
         return boto3
@@ -29,8 +27,15 @@ def import_boto3() -> Any:
         )
 
 
-def import_botocore() -> Any:
-    """Lazy import botocore client."""
+def import_botocore() -> type:
+    """Lazy import botocore ClientCreator.
+
+    Returns:
+        The ClientCreator class from botocore
+
+    Raises:
+        ImportError: If botocore is not installed
+    """
     try:
         from botocore.client import ClientCreator
         return ClientCreator
@@ -38,6 +43,26 @@ def import_botocore() -> Any:
         raise ImportError(
             "The S3 connector requires boto3/botocore. "
             "Install with: pip install 'agentic-doc[s3]' or pip install boto3"
+        )
+
+
+def import_numpy() -> ModuleType:
+    """Lazy import numpy.
+
+    Returns:
+        The numpy module
+
+    Raises:
+        ImportError: If numpy is not installed
+    """
+    try:
+        import numpy
+        return numpy
+    except ImportError:
+        raise ImportError(
+            "Visualization features require numpy. "
+            "Install with: pip install 'agentic-doc[visualization]' or "
+            "pip install numpy"
         )
 
 
@@ -67,8 +92,15 @@ def import_google_packages() -> Dict[str, Any]:
         )
 
 
-def import_cv2() -> Any:
-    """Lazy import OpenCV."""
+def import_cv2() -> ModuleType:
+    """Lazy import OpenCV.
+
+    Returns:
+        The cv2 module
+
+    Raises:
+        ImportError: If opencv-python-headless is not installed
+    """
     try:
         import cv2
         return cv2
@@ -80,8 +112,15 @@ def import_cv2() -> Any:
         )
 
 
-def import_pymupdf() -> Any:
-    """Lazy import PyMuPDF."""
+def import_pymupdf() -> ModuleType:
+    """Lazy import PyMuPDF.
+
+    Returns:
+        The pymupdf module
+
+    Raises:
+        ImportError: If pymupdf is not installed
+    """
     try:
         import pymupdf
         return pymupdf
@@ -93,9 +132,6 @@ def import_pymupdf() -> Any:
         )
 
 
-# Note: pillow_heif import helper removed as it's not currently used
-# Can be re-added if HEIF support is implemented in the future
-
-# OpenCV font constant value (cv2.FONT_HERSHEY_SIMPLEX)
-# This allows us to use the constant without importing cv2
-FONT_HERSHEY_SIMPLEX = 0
+# OpenCV constants - hardcoded to avoid importing cv2
+# These values are stable across cv2 versions
+FONT_HERSHEY_SIMPLEX = 0  # cv2.FONT_HERSHEY_SIMPLEX

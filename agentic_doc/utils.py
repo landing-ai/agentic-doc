@@ -2,7 +2,7 @@ import math
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Literal, Union, Optional, TYPE_CHECKING
+from typing import Any, Literal, Union, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -14,11 +14,6 @@ from tenacity import RetryCallState
 
 from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
 from agentic_doc.config import VisualizationConfig, get_settings
-
-if TYPE_CHECKING:
-    import cv2
-    import pymupdf
-    import numpy as np
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -115,9 +110,22 @@ def save_groundings_as_images(
 
 def page_to_image(
     pdf_doc: Any, page_idx: int, pymupdf: Any = None, dpi: int = None
-) -> Any:  # Returns np.ndarray when called
-    """Convert a PDF page to an image. We specifically use pymupdf because it is self-contained and correctly renders annotations."""
-    import numpy as np  # Import numpy only when needed for visualization
+) -> Any:  # Returns numpy.ndarray
+    """Convert a PDF page to an image.
+
+    We specifically use pymupdf because it is self-contained and correctly renders annotations.
+
+    Args:
+        pdf_doc: PyMuPDF document object
+        page_idx: Index of the page to convert
+        pymupdf: PyMuPDF module if already imported, None to import lazily
+        dpi: DPI for image conversion, defaults to settings value if None
+
+    Returns:
+        numpy.ndarray: Image array in RGB format
+    """
+    from agentic_doc._optional_imports import import_numpy
+    np = import_numpy()  # Import numpy only when needed for visualization
 
     if pymupdf is None:
         from agentic_doc._optional_imports import import_pymupdf
@@ -128,9 +136,9 @@ def page_to_image(
     page = pdf_doc[page_idx]
     # Scale image and use RGB colorspace
     pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB)
-    img: np.ndarray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
+    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
         pix.h, pix.w, -1
-    )
+    )  # Returns numpy array
     # Ensure the image has 3 channels (sometimes it may include an alpha channel)
     if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
         img = img[..., :3]
@@ -143,13 +151,24 @@ def get_chunk_from_reference(chunk_id: str, chunks: list[dict]) -> Optional[dict
 
 
 def _crop_groundings(
-    img: Any,  # np.ndarray when called
+    img: Any,  # numpy.ndarray
     chunks: list[Chunk],
     crop_save_dir: Path,
     inplace: bool = True,
     cv2: Any = None,
 ) -> dict[str, list[Path]]:
-    import numpy as np  # Import numpy only when needed
+    """Crop and save image regions based on chunk groundings.
+
+    Args:
+        img: Input image as numpy array
+        chunks: List of chunks with grounding boxes
+        crop_save_dir: Directory to save cropped images
+        inplace: Whether to crop in place or create a copy
+        cv2: OpenCV module if already imported, None to import lazily
+
+    Returns:
+        Dictionary mapping chunk IDs to lists of saved image paths
+    """
 
     if cv2 is None:
         from agentic_doc._optional_imports import import_cv2
@@ -190,7 +209,7 @@ def _crop_groundings(
     return result
 
 
-def _crop_image(image: Any, bbox: ChunkGroundingBox) -> Any:  # np.ndarray when called
+def _crop_image(image: Any, bbox: ChunkGroundingBox) -> Any:  # Returns numpy.ndarray
     # Extract coordinates from the bounding box
     xmin_f, ymin_f, xmax_f, ymax_f = bbox.l, bbox.t, bbox.r, bbox.b
 
@@ -228,7 +247,7 @@ def _crop_image(image: Any, bbox: ChunkGroundingBox) -> Any:  # np.ndarray when 
     xmax = min(width, xmax)
     ymax = min(height, ymax)
 
-    result: np.ndarray = image[ymin:ymax, xmin:xmax]
+    result = image[ymin:ymax, xmin:xmax]  # Returns numpy array slice
     return result
 
 
@@ -320,15 +339,15 @@ def viz_parsed_document(
     viz_config: Union[VisualizationConfig, None] = None,
 ) -> list[Image.Image]:
     # Lazy import visualization dependencies
-    import numpy as np  # Import numpy for visualization
-    from agentic_doc._optional_imports import import_cv2, import_pymupdf
+    from agentic_doc._optional_imports import import_cv2, import_pymupdf, import_numpy
+    np = import_numpy()  # Import numpy for visualization
     cv2 = import_cv2()
     pymupdf = import_pymupdf()
 
     if viz_config is None:
         viz_config = VisualizationConfig()
 
-    viz_result_np: list[np.ndarray] = []
+    viz_result_np: list[Any] = []  # List of numpy.ndarray images
     file_path = Path(file_path)
     file_type = get_file_type(file_path)
     _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
@@ -361,12 +380,22 @@ def viz_parsed_document(
 
 
 def viz_chunks(
-    img: Any,  # np.ndarray when called
+    img: Any,  # numpy.ndarray
     chunks: list[Chunk],
     viz_config: Union[VisualizationConfig, None] = None,
     cv2: Any = None,
-) -> Any:  # Returns np.ndarray
-    import numpy as np  # Import numpy for visualization
+) -> Any:  # Returns numpy.ndarray
+    """Visualize chunks with bounding boxes on an image.
+
+    Args:
+        img: Input image as numpy array
+        chunks: List of chunks to visualize
+        viz_config: Configuration for visualization appearance
+        cv2: OpenCV module if already imported, None to import lazily
+
+    Returns:
+        numpy.ndarray: Image with visualized chunks
+    """
 
     if cv2 is None:
         from agentic_doc._optional_imports import import_cv2
@@ -404,7 +433,7 @@ def viz_chunks(
 
 
 def _place_mark(
-    img: Any,  # np.ndarray when called
+    img: Any,  # numpy.ndarray
     box_xyxy: tuple[int, int, int, int],
     text: str,
     *,
@@ -412,6 +441,16 @@ def _place_mark(
     viz_config: VisualizationConfig,
     cv2: Any = None,
 ) -> None:
+    """Place a bounding box and label on an image.
+
+    Args:
+        img: Image as numpy array (modified in place)
+        box_xyxy: Bounding box coordinates (x1, y1, x2, y2)
+        text: Label text to display
+        color_bgr: Color in BGR format
+        viz_config: Configuration for visualization appearance
+        cv2: OpenCV module if already imported, None to import lazily
+    """
     if cv2 is None:
         from agentic_doc._optional_imports import import_cv2
         cv2 = import_cv2()
@@ -454,16 +493,16 @@ def _place_mark(
     cv2.rectangle(img, box_xyxy[:2], box_xyxy[2:], color_bgr, viz_config.thickness)
 
 
-def _read_img_rgb(img_path: str, cv2: Any = None) -> Any:  # Returns np.ndarray
-    """
-    Read a image given its path.
-    Arguments:
-        img_path : image file path
-        cv2: Optional cv2 module instance
+def _read_img_rgb(img_path: str, cv2: Any = None) -> Any:  # Returns numpy.ndarray
+    """Read an image from file path and convert to RGB.
+
+    Args:
+        img_path: Path to the image file
+        cv2: OpenCV module if already imported, None to import lazily
+
     Returns:
-        img (H, W, 3): a numpy array image in RGB format
+        numpy.ndarray: Image array in RGB format with shape (H, W, 3)
     """
-    import numpy as np  # Import numpy for image processing
 
     if cv2 is None:
         from agentic_doc._optional_imports import import_cv2

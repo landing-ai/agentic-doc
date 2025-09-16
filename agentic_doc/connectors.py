@@ -3,20 +3,11 @@ import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Type
 
 import httpx
 import structlog
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    import boto3
-    from botocore.client import ClientCreator
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import Resource
-    from googleapiclient.http import MediaIoBaseDownload
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -219,8 +210,8 @@ class GoogleDriveConnector(BaseConnector):
     def __init__(self, config: GoogleDriveConnectorConfig):
         super().__init__(config)
         self.config: GoogleDriveConnectorConfig = config
-        self._service: Optional[Any] = None  # Will be Resource when imported
-        self._google_packages: Optional[Dict[str, Any]] = None
+        self._service: Optional[Any] = None  # googleapiclient.discovery.Resource when initialized
+        self._google_packages: Optional[Dict[str, Any]] = None  # Google API packages, imported lazily
 
     def _get_service(self) -> Any:
         """Initialize Google Drive service with user-friendly OAuth."""
@@ -371,8 +362,8 @@ class S3Connector(BaseConnector):
     def __init__(self, config: S3ConnectorConfig):
         super().__init__(config)
         self.config: S3ConnectorConfig = config
-        self._client: Optional[Any] = None  # Will be boto3 client when imported
-        self._boto3: Optional[Any] = None
+        self._client: Optional[Any] = None  # boto3.client('s3') instance when initialized
+        self._boto3: Optional[Any] = None  # boto3 module, imported lazily
 
     def _get_client(self) -> Any:
         """Initialize S3 client if not already done."""
