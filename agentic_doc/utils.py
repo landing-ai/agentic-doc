@@ -2,14 +2,10 @@ import math
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Literal, Union, Optional
+from typing import Any, Literal, Union, Optional, TYPE_CHECKING
 from urllib.parse import urlparse
 
-import cv2
 import httpx
-import numpy as np
-import pymupdf
-import requests
 import structlog
 from PIL import Image
 from pydantic_core import Url
@@ -18,6 +14,11 @@ from tenacity import RetryCallState
 
 from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
 from agentic_doc.config import VisualizationConfig, get_settings
+
+if TYPE_CHECKING:
+    import cv2
+    import pymupdf
+    import numpy as np
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -30,8 +31,8 @@ def check_endpoint_and_api_key(endpoint_url: str, api_key: str) -> None:
     headers = {"Authorization": f"Basic {api_key}"}
 
     try:
-        response = requests.head(endpoint_url, headers=headers, timeout=5)
-    except requests.exceptions.ConnectionError:
+        response = httpx.head(endpoint_url, headers=headers, timeout=5)
+    except httpx.ConnectError:
         raise ValueError(f'The endpoint URL "{endpoint_url}" is down or invalid.')
 
     if response.status_code == 404:
@@ -78,6 +79,11 @@ def save_groundings_as_images(
     Returns:
         dict[str, Path]: The dictionary of saved image paths. The key is the chunk id and the value is the path to the saved image.
     """
+    # Lazy import cv2 and pymupdf
+    from agentic_doc._optional_imports import import_cv2, import_pymupdf
+    cv2 = import_cv2()
+    pymupdf = import_pymupdf()
+
     file_type = get_file_type(file_path)
     _LOGGER.info(
         f"Saving {len(chunks)} chunks as images to '{save_dir}'",
@@ -98,19 +104,27 @@ def save_groundings_as_images(
 
     with pymupdf.open(file_path) as pdf_doc:
         for page_idx, chunks in sorted(chunks_by_page_idx.items()):
-            page_img = page_to_image(pdf_doc, page_idx)
+            page_img = page_to_image(pdf_doc, page_idx, pymupdf)
             # Convert RGB to BGR for consistent color space handling
             page_img_bgr = cv2.cvtColor(page_img, cv2.COLOR_RGB2BGR)
-            page_result = _crop_groundings(page_img_bgr, chunks, save_dir, inplace)
+            page_result = _crop_groundings(page_img_bgr, chunks, save_dir, inplace, cv2)
             result.update(page_result)
 
     return result
 
 
 def page_to_image(
-    pdf_doc: pymupdf.Document, page_idx: int, dpi: int = get_settings().pdf_to_image_dpi
-) -> np.ndarray:
+    pdf_doc: Any, page_idx: int, pymupdf: Any = None, dpi: int = None
+) -> Any:  # Returns np.ndarray when called
     """Convert a PDF page to an image. We specifically use pymupdf because it is self-contained and correctly renders annotations."""
+    import numpy as np  # Import numpy only when needed for visualization
+
+    if pymupdf is None:
+        from agentic_doc._optional_imports import import_pymupdf
+        pymupdf = import_pymupdf()
+    if dpi is None:
+        dpi = get_settings().pdf_to_image_dpi
+
     page = pdf_doc[page_idx]
     # Scale image and use RGB colorspace
     pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB)
@@ -129,11 +143,18 @@ def get_chunk_from_reference(chunk_id: str, chunks: list[dict]) -> Optional[dict
 
 
 def _crop_groundings(
-    img: np.ndarray,
+    img: Any,  # np.ndarray when called
     chunks: list[Chunk],
     crop_save_dir: Path,
     inplace: bool = True,
+    cv2: Any = None,
 ) -> dict[str, list[Path]]:
+    import numpy as np  # Import numpy only when needed
+
+    if cv2 is None:
+        from agentic_doc._optional_imports import import_cv2
+        cv2 = import_cv2()
+
     result: dict[str, list[Path]] = defaultdict(list)
     for c in chunks:
         for i, grounding in enumerate(c.grounding):
@@ -169,7 +190,7 @@ def _crop_groundings(
     return result
 
 
-def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
+def _crop_image(image: Any, bbox: ChunkGroundingBox) -> Any:  # np.ndarray when called
     # Extract coordinates from the bounding box
     xmin_f, ymin_f, xmax_f, ymax_f = bbox.l, bbox.t, bbox.r, bbox.b
 
@@ -298,6 +319,12 @@ def viz_parsed_document(
     output_dir: Union[str, Path, None] = None,
     viz_config: Union[VisualizationConfig, None] = None,
 ) -> list[Image.Image]:
+    # Lazy import visualization dependencies
+    import numpy as np  # Import numpy for visualization
+    from agentic_doc._optional_imports import import_cv2, import_pymupdf
+    cv2 = import_cv2()
+    pymupdf = import_pymupdf()
+
     if viz_config is None:
         viz_config = VisualizationConfig()
 
@@ -306,21 +333,21 @@ def viz_parsed_document(
     file_type = get_file_type(file_path)
     _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
     if file_type == "image":
-        img = _read_img_rgb(str(file_path))
-        viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
+        img = _read_img_rgb(str(file_path), cv2)
+        viz_np = viz_chunks(img, parsed_document.chunks, viz_config, cv2)
         viz_result_np.append(viz_np)
     else:
         with pymupdf.open(file_path) as pdf_doc:
             for page_idx in range(
                 parsed_document.start_page_idx, parsed_document.end_page_idx + 1
             ):
-                img = page_to_image(pdf_doc, page_idx)
+                img = page_to_image(pdf_doc, page_idx, pymupdf)
                 chunks = [
                     chunk
                     for chunk in parsed_document.chunks
                     if chunk.grounding[0].page == page_idx
                 ]
-                viz_np = viz_chunks(img, chunks, viz_config)
+                viz_np = viz_chunks(img, chunks, viz_config, cv2)
                 viz_result_np.append(viz_np)
 
     if output_dir:
@@ -334,10 +361,17 @@ def viz_parsed_document(
 
 
 def viz_chunks(
-    img: np.ndarray,
+    img: Any,  # np.ndarray when called
     chunks: list[Chunk],
     viz_config: Union[VisualizationConfig, None] = None,
-) -> np.ndarray:
+    cv2: Any = None,
+) -> Any:  # Returns np.ndarray
+    import numpy as np  # Import numpy for visualization
+
+    if cv2 is None:
+        from agentic_doc._optional_imports import import_cv2
+        cv2 = import_cv2()
+
     if viz_config is None:
         viz_config = VisualizationConfig()
 
@@ -362,6 +396,7 @@ def viz_chunks(
                 text=f"{idx} {chunk.chunk_type}",
                 color_bgr=viz_config.color_map[chunk.chunk_type],
                 viz_config=viz_config,
+                cv2=cv2,
             )
 
     viz = cv2.cvtColor(viz, cv2.COLOR_BGR2RGB)
@@ -369,13 +404,18 @@ def viz_chunks(
 
 
 def _place_mark(
-    img: np.ndarray,
+    img: Any,  # np.ndarray when called
     box_xyxy: tuple[int, int, int, int],
     text: str,
     *,
     color_bgr: tuple[int, int, int],
     viz_config: VisualizationConfig,
+    cv2: Any = None,
 ) -> None:
+    if cv2 is None:
+        from agentic_doc._optional_imports import import_cv2
+        cv2 = import_cv2()
+
     text_color = color_bgr
     (text_width, text_height), baseline = cv2.getTextSize(
         text, viz_config.font, viz_config.font_scale, viz_config.thickness
@@ -414,14 +454,21 @@ def _place_mark(
     cv2.rectangle(img, box_xyxy[:2], box_xyxy[2:], color_bgr, viz_config.thickness)
 
 
-def _read_img_rgb(img_path: str) -> np.ndarray:
+def _read_img_rgb(img_path: str, cv2: Any = None) -> Any:  # Returns np.ndarray
     """
     Read a image given its path.
     Arguments:
         img_path : image file path
+        cv2: Optional cv2 module instance
     Returns:
         img (H, W, 3): a numpy array image in RGB format
     """
+    import numpy as np  # Import numpy for image processing
+
+    if cv2 is None:
+        from agentic_doc._optional_imports import import_cv2
+        cv2 = import_cv2()
+
     img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
     if img.shape[-1] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)

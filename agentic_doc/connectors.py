@@ -3,25 +3,20 @@ import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, TYPE_CHECKING
 
 import httpx
 import structlog
 from pydantic import BaseModel
 
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
-
-import boto3  # type: ignore
-from botocore.client import ClientCreator  # type: ignore
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
-from googleapiclient.discovery import build  # type: ignore
-from googleapiclient.discovery import Resource
-from googleapiclient.http import MediaIoBaseDownload  # type: ignore
+if TYPE_CHECKING:
+    import boto3
+    from botocore.client import ClientCreator
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from googleapiclient.discovery import Resource
+    from googleapiclient.http import MediaIoBaseDownload
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -224,11 +219,22 @@ class GoogleDriveConnector(BaseConnector):
     def __init__(self, config: GoogleDriveConnectorConfig):
         super().__init__(config)
         self.config: GoogleDriveConnectorConfig = config
-        self._service: Optional[Resource] = None
+        self._service: Optional[Any] = None  # Will be Resource when imported
+        self._google_packages: Optional[Dict[str, Any]] = None
 
-    def _get_service(self) -> Resource:
+    def _get_service(self) -> Any:
         """Initialize Google Drive service with user-friendly OAuth."""
         if self._service is None:
+            # Lazy import Google packages
+            if self._google_packages is None:
+                from agentic_doc._optional_imports import import_google_packages
+                self._google_packages = import_google_packages()
+
+            Credentials = self._google_packages['Credentials']
+            Request = self._google_packages['Request']
+            InstalledAppFlow = self._google_packages['InstalledAppFlow']
+            build = self._google_packages['build']
+
             scopes = ["https://www.googleapis.com/auth/drive.readonly"]
             creds = None
 
@@ -310,6 +316,13 @@ class GoogleDriveConnector(BaseConnector):
                 local_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
             # Download file
+            # Get MediaIoBaseDownload from lazy-loaded packages
+            MediaIoBaseDownload = self._google_packages['MediaIoBaseDownload'] if self._google_packages else None
+            if MediaIoBaseDownload is None:
+                from agentic_doc._optional_imports import import_google_packages
+                self._google_packages = import_google_packages()
+                MediaIoBaseDownload = self._google_packages['MediaIoBaseDownload']
+
             request = service.files().get_media(fileId=file_id)
             with open(local_path_obj, "wb") as f:
                 downloader = MediaIoBaseDownload(f, request)
@@ -358,11 +371,17 @@ class S3Connector(BaseConnector):
     def __init__(self, config: S3ConnectorConfig):
         super().__init__(config)
         self.config: S3ConnectorConfig = config
-        self._client: Optional[ClientCreator] = None
+        self._client: Optional[Any] = None  # Will be boto3 client when imported
+        self._boto3: Optional[Any] = None
 
-    def _get_client(self) -> ClientCreator:
+    def _get_client(self) -> Any:
         """Initialize S3 client if not already done."""
         if self._client is None:
+            # Lazy import boto3
+            if self._boto3 is None:
+                from agentic_doc._optional_imports import import_boto3
+                self._boto3 = import_boto3()
+
             kwargs = {"region_name": self.config.region_name}
 
             if self.config.aws_access_key_id:
@@ -372,7 +391,7 @@ class S3Connector(BaseConnector):
             if self.config.aws_session_token:
                 kwargs["aws_session_token"] = self.config.aws_session_token
 
-            self._client = boto3.client("s3", **kwargs)
+            self._client = self._boto3.client("s3", **kwargs)
 
         return self._client
 

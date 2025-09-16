@@ -1,7 +1,6 @@
 import json
 import logging
 from typing import Literal, Any, Optional, Iterator
-import cv2
 import structlog
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -214,8 +213,8 @@ class VisualizationConfig(BaseSettings):
         ge=0.0,
     )
     font: int = Field(
-        default=cv2.FONT_HERSHEY_SIMPLEX,
-        description="Font of the text",
+        default=0,  # cv2.FONT_HERSHEY_SIMPLEX value
+        description="Font of the text (0 = FONT_HERSHEY_SIMPLEX)",
     )
     color_map: dict[ChunkType, tuple[int, int, int]] = Field(
         default=_COLOR_MAP,

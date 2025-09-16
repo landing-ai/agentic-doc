@@ -1,37 +1,37 @@
 <div align="center">
 
-# Agentic Document Extraction – Python Library
+# Agentic Document Extraction – Python Library
 
 [![Unit test status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci-unit.yml/badge.svg)](https://github.com/landing-ai/agentic-doc/actions/workflows/ci-unit.yml)
 [![Integration test status](https://github.com/landing-ai/agentic-doc/actions/workflows/ci-integ.yml/badge.svg)](https://github.com/landing-ai/agentic-doc/actions/workflows/ci-integ.yml)
 [![](https://dcbadge.vercel.app/api/server/wPdN8RCYew?compact=true&style=flat)](https://discord.gg/RVcW3j9RgR)
 [![PyPI version](https://badge.fury.io/py/agentic-doc.svg)](https://badge.fury.io/py/agentic-doc)
 
-**[Web App](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.com/invite/RVcW3j9RgR) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
+**[Web App](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.com/invite/RVcW3j9RgR) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
 
 </div>
 
 ## Overview
 
-The LandingAI **Agentic Document Extraction** API pulls structured data out of visually complex documents—think tables, pictures, and charts—and returns a hierarchical JSON with exact element locations.
+The LandingAI **Agentic Document Extraction** API pulls structured data out of visually complex documents—think tables, pictures, and charts—and returns a hierarchical JSON with exact element locations.
 
 This Python library wraps that API to provide:
 
-* **Long‑document support** – process 100+ page PDFs in a single call
+* **Long‑document support** – process 100+ page PDFs in a single call
 * **Auto‑retry / paging** – handles concurrency, time‑outs, and rate limits
 * **Helper utilities** – bounding‑box snippets, visual debuggers, and more
 
 ### Features
 
-- 📦 **Batteries‑included install:** `pip install agentic-doc` – nothing else needed → see [Installation](#installation)
-- 🗂️ **All file types:** parse PDFs of *any* length, single images, or URLs → see [Supported Files](#supported-files)
-- 📚 **Long‑doc ready:** auto‑split & parallel‑process 1000+ page PDFs, then stitch results → see [Parse Large PDF Files](#parse-large-pdf-files)
-- 🧩 **Structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
-- 👁️ **Ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
-- 🏃 **Batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
-- 🔄 **Resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
-- ⚙️ **Config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
-- 🌐 **Raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
+- 📦 **Modular install:** Choose minimal (`pip install agentic-doc`, 42.7MB) or full features (`[all]`, 343.5MB) → see [Installation](#installation)
+- 🗂️ **All file types:** parse PDFs of *any* length, single images, or URLs → see [Supported Files](#supported-files)
+- 📚 **Long‑doc ready:** auto‑split & parallel‑process 1000+ page PDFs, then stitch results → see [Parse Large PDF Files](#parse-large-pdf-files)
+- 🧩 **Structured output:** returns hierarchical JSON plus ready‑to‑render Markdown → see [Result Schema](#result-schema)
+- 👁️ **Ground‑truth visuals:** optional bounding‑box snippets and full‑page visualizations → see [Save Groundings as Images](#save-groundings-as-images)
+- 🏃 **Batch & parallel:** feed a list; library manages threads & rate limits (`BATCH_SIZE`, `MAX_WORKERS`) → see [Parse Multiple Files in a Batch](#parse-multiple-files-in-a-batch)
+- 🔄 **Resilient:** exponential‑backoff retries for 408/429/502/503/504 and rate‑limit hits → see [Automatically Handle API Errors and Rate Limits with Retries](#automatically-handle-api-errors-and-rate-limits-with-retries)
+- ⚙️ **Config via env / .env:** tweak parallelism, logging style, retry caps—no code changes → see [Configuration Options](#configuration-options)
+- 🌐 **Raw API ready:** advanced users can still hit the REST endpoint directly → see the [API Docs](https://support.landing.ai/docs/document-extraction)
 
 
 ## Quick Start
@@ -39,12 +39,35 @@ This Python library wraps that API to provide:
 ### Installation
 
 ```bash
+# Minimal install (42.7 MB) - includes all core functionality
 pip install agentic-doc
+
+# With specific features:
+pip install 'agentic-doc[s3]'           # S3 connector support (47.5 MB)
+pip install 'agentic-doc[google-drive]'  # Google Drive support (58.8 MB)
+pip install 'agentic-doc[visualization]' # Visualization tools (204.9 MB)
+pip install 'agentic-doc[connectors]'    # All cloud connectors (59.1 MB)
+pip install 'agentic-doc[all]'           # Everything (343.5 MB)
 ```
 
 ### Requirements
 - Python version 3.9, 3.10, 3.11 or 3.12
 - LandingAI agentic AI API key (get the key [here](https://va.landing.ai/settings/api-key))
+
+### Optional Dependencies
+
+The library uses a modular approach to dependencies, allowing you to install only what you need:
+
+| Feature | Required Extra | Size Increase | Use Case |
+|---------|---------------|---------------|----------|
+| Core functionality | None (minimal) | Baseline (42.7 MB) | Document parsing, basic operations |
+| Amazon S3 | `[s3]` | +4.8 MB | Reading documents from S3 buckets |
+| Google Drive | `[google-drive]` | +16.1 MB | Reading documents from Google Drive |
+| Visualization | `[visualization]` | +162.2 MB | Visual debugging, bounding boxes |
+| All connectors | `[connectors]` | +16.4 MB | All cloud storage connectors |
+| Everything | `[all]` | +300.8 MB | All features |
+
+**Note:** The minimal installation is **87.6% smaller** than the full installation while maintaining all core parsing functionality. You only need the extras for specific cloud connectors or visualization features.
 
 ### Set the API Key as an Environment Variable
 After you get the LandingAI agentic AI API key, set the key as an environment variable (or put it in a `.env` file):
@@ -75,6 +98,7 @@ print(result[0].chunks)  # Get the extracted data as structured chunks of conten
 # Parse a document from a URL
 result = parse("https://example.com/document.pdf")
 print(result[0].markdown)
+```
 
 #### Extract Data from Multiple Documents
 Run the following script to extract data from multiple documents.
@@ -121,7 +145,9 @@ The library now supports various connectors to easily access documents from diff
 
 ##### Google Drive Connector
 
-**Prerequisites: Follow the [Google Drive API Python Quickstart](https://developers.google.com/workspace/drive/api/quickstart/python) tutorial first to set up your credentials.**
+**Prerequisites:**
+1. Install with Google Drive support: `pip install 'agentic-doc[google-drive]'`
+2. Follow the [Google Drive API Python Quickstart](https://developers.google.com/workspace/drive/api/quickstart/python) tutorial to set up your credentials
 
 The Google Drive API quickstart will guide you through:
 1. Creating a Google Cloud project
@@ -148,6 +174,9 @@ results = parse(config, connector_pattern="*.pdf")
 ```
 
 ##### Amazon S3 Connector
+
+**Prerequisites:** Install with S3 support: `pip install 'agentic-doc[s3]'`
+
 ```python
 from agentic_doc.parse import parse
 from agentic_doc.connectors import S3ConnectorConfig
@@ -249,6 +278,8 @@ You can parse multiple files in a single function call with this library. The li
 
 ### Save Groundings as Images
 
+**Prerequisites:** Install with visualization support: `pip install 'agentic-doc[visualization]'`
+
 The library can extract and save the visual regions (groundings) of the document where each chunk of content was found. This is useful for visualizing exactly what parts of the document were extracted and for debugging extraction issues.
 
 Each grounding represents a bounding box in the original document, and the library can save these regions as individual PNG images. The images are organized by page number and chunk ID.
@@ -272,6 +303,8 @@ for chunk in results[0].chunks:
 
 
 ### Visualize Parsing Results
+
+**Prerequisites:** Install with visualization support: `pip install 'agentic-doc[visualization]'`
 
 The library provides a visualization utility that creates annotated images showing where each chunk of content was extracted from the document. This is useful for:
 - Verifying the accuracy of the extraction
@@ -421,3 +454,39 @@ results = parse(
     include_metadata_in_markdown=False  # Exclude metadata from markdown
 )
 ```
+
+## Migration Guide for Existing Users
+
+If you're upgrading from an earlier version, here's what you need to know:
+
+### What Changed
+- The package is now modular - core functionality works with minimal dependencies (87.6% smaller!)
+- Cloud connectors and visualization tools are now optional extras
+- Removed unused dependencies: `requests` (replaced with `httpx`), `typing-extensions`, `pillow-heif`
+
+### How to Upgrade
+
+**If you just use core parsing features:**
+```bash
+pip install --upgrade agentic-doc
+```
+
+**If you use S3 or Google Drive connectors:**
+```bash
+pip install --upgrade 'agentic-doc[connectors]'
+```
+
+**If you want everything like before:**
+```bash
+pip install --upgrade 'agentic-doc[all]'
+```
+
+### Identifying Missing Dependencies
+
+If you try to use a feature that requires optional dependencies, you'll see a clear error message:
+
+- **S3 Connector:** "The S3 connector requires boto3. Install with: pip install 'agentic-doc[s3]'"
+- **Google Drive:** "The Google Drive connector requires additional packages. Install with: pip install 'agentic-doc[google-drive]'"
+- **Visualization:** "Visualization requires additional packages. Install with: pip install 'agentic-doc[visualization]'"
+
+Simply follow the installation command in the error message to add the needed feature.

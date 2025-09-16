@@ -18,27 +18,39 @@ packages = [{include = "agentic_doc"}]
 [tool.poetry.dependencies]  # main dependency group
 python = ">=3.9,<4.0"
 
+# Core dependencies (always installed)
 tqdm = ">=4.64.0,<5.0.0"
-typing_extensions = "4.*"
 pydantic = ">=2.8.0"
 pydantic-settings = "^2.2.1"
 tenacity = ">=8.0.0"
 pillow = ">=10.0.0"
-pillow-heif = ">=0.17.0"
 pypdf = "^5.3.1"
 structlog = "^25.2.0"
 httpx = "^0.28.1"
-pymupdf = "^1.25.5"
-opencv-python-headless = "^4.11.0.86"
-google-api-python-client = "^2.170.0"
-google-auth-oauthlib = "^1.2.2"
-google-auth = "^2.40.2"
-boto3 = "^1.38.23"
 jsonschema = "^4.24.0"
-types-jsonschema = "^4.24.0.20250528"
-requests = "^2.32.4"
-protobuf = "^6.31.1"
 
+# Optional dependencies for cloud connectors
+boto3 = { version = "^1.38.23", optional = true }
+google-api-python-client = { version = "^2.170.0", optional = true }
+google-auth-oauthlib = { version = "^1.2.2", optional = true }
+google-auth = { version = "^2.40.2", optional = true }
+protobuf = { version = "^6.31.1", optional = true }
+
+# Optional dependencies for visualization
+opencv-python-headless = { version = "^4.11.0.86", optional = true }
+pymupdf = { version = "^1.25.5", optional = true }
+numpy = { version = "^1.24.0", optional = true }
+
+[tool.poetry.extras]
+# Cloud connector extras
+s3 = ["boto3"]
+google-drive = ["google-api-python-client", "google-auth-oauthlib", "google-auth", "protobuf"]
+# Visualization extras
+visualization = ["opencv-python-headless", "pymupdf", "numpy"]
+# All cloud connectors
+connectors = ["boto3", "google-api-python-client", "google-auth-oauthlib", "google-auth", "protobuf"]
+# Everything
+all = ["boto3", "google-api-python-client", "google-auth-oauthlib", "google-auth", "protobuf", "opencv-python-headless", "pymupdf", "numpy"]
 
 [tool.poetry.group.dev.dependencies]
 autoflake = "1.*"
@@ -47,7 +59,7 @@ black = ">=23,<25"
 isort = "5.*"
 responses = "^0.23.1"
 mypy = "<1.8.0"
-types-requests = "^2.31.0.0"
+types-jsonschema = "^4.24.0.20250528"  # Type stubs for jsonschema
 types-pillow = "^9.5.0.4"
 data-science-types = "^0.2.23"
 types-tqdm = "^4.65.0.1"
