@@ -99,17 +99,17 @@ def save_groundings_as_images(
 
     with pymupdf.open(file_path) as pdf_doc:
         for page_idx, chunks in sorted(chunks_by_page_idx.items()):
-            page_img = page_to_image(pdf_doc, page_idx, pymupdf)
+            page_img = page_to_image(pdf_doc, page_idx)
             # Convert RGB to BGR for consistent color space handling
             page_img_bgr = cv2.cvtColor(page_img, cv2.COLOR_RGB2BGR)
-            page_result = _crop_groundings(page_img_bgr, chunks, save_dir, inplace, cv2)
+            page_result = _crop_groundings(page_img_bgr, chunks, save_dir, inplace)
             result.update(page_result)
 
     return result
 
 
 def page_to_image(
-    pdf_doc: Any, page_idx: int, pymupdf: Any = None, dpi: int = None
+    pdf_doc: Any, page_idx: int, dpi: int = None
 ) -> Any:  # Returns numpy.ndarray
     """Convert a PDF page to an image.
 
@@ -118,18 +118,14 @@ def page_to_image(
     Args:
         pdf_doc: PyMuPDF document object
         page_idx: Index of the page to convert
-        pymupdf: PyMuPDF module if already imported, None to import lazily
         dpi: DPI for image conversion, defaults to settings value if None
 
     Returns:
         numpy.ndarray: Image array in RGB format
     """
-    from agentic_doc._optional_imports import import_numpy
+    from agentic_doc._optional_imports import import_numpy, import_pymupdf
     np = import_numpy()  # Import numpy only when needed for visualization
-
-    if pymupdf is None:
-        from agentic_doc._optional_imports import import_pymupdf
-        pymupdf = import_pymupdf()
+    pymupdf = import_pymupdf()
     if dpi is None:
         dpi = get_settings().pdf_to_image_dpi
 
@@ -155,7 +151,6 @@ def _crop_groundings(
     chunks: list[Chunk],
     crop_save_dir: Path,
     inplace: bool = True,
-    cv2: Any = None,
 ) -> dict[str, list[Path]]:
     """Crop and save image regions based on chunk groundings.
 
@@ -164,15 +159,12 @@ def _crop_groundings(
         chunks: List of chunks with grounding boxes
         crop_save_dir: Directory to save cropped images
         inplace: Whether to crop in place or create a copy
-        cv2: OpenCV module if already imported, None to import lazily
 
     Returns:
         Dictionary mapping chunk IDs to lists of saved image paths
     """
-
-    if cv2 is None:
-        from agentic_doc._optional_imports import import_cv2
-        cv2 = import_cv2()
+    from agentic_doc._optional_imports import import_cv2
+    cv2 = import_cv2()
 
     result: dict[str, list[Path]] = defaultdict(list)
     for c in chunks:
@@ -352,21 +344,21 @@ def viz_parsed_document(
     file_type = get_file_type(file_path)
     _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
     if file_type == "image":
-        img = _read_img_rgb(str(file_path), cv2)
-        viz_np = viz_chunks(img, parsed_document.chunks, viz_config, cv2)
+        img = _read_img_rgb(str(file_path))
+        viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
         viz_result_np.append(viz_np)
     else:
         with pymupdf.open(file_path) as pdf_doc:
             for page_idx in range(
                 parsed_document.start_page_idx, parsed_document.end_page_idx + 1
             ):
-                img = page_to_image(pdf_doc, page_idx, pymupdf)
+                img = page_to_image(pdf_doc, page_idx)
                 chunks = [
                     chunk
                     for chunk in parsed_document.chunks
                     if chunk.grounding[0].page == page_idx
                 ]
-                viz_np = viz_chunks(img, chunks, viz_config, cv2)
+                viz_np = viz_chunks(img, chunks, viz_config)
                 viz_result_np.append(viz_np)
 
     if output_dir:
@@ -383,7 +375,6 @@ def viz_chunks(
     img: Any,  # numpy.ndarray
     chunks: list[Chunk],
     viz_config: Union[VisualizationConfig, None] = None,
-    cv2: Any = None,
 ) -> Any:  # Returns numpy.ndarray
     """Visualize chunks with bounding boxes on an image.
 
@@ -391,15 +382,12 @@ def viz_chunks(
         img: Input image as numpy array
         chunks: List of chunks to visualize
         viz_config: Configuration for visualization appearance
-        cv2: OpenCV module if already imported, None to import lazily
 
     Returns:
         numpy.ndarray: Image with visualized chunks
     """
-
-    if cv2 is None:
-        from agentic_doc._optional_imports import import_cv2
-        cv2 = import_cv2()
+    from agentic_doc._optional_imports import import_cv2
+    cv2 = import_cv2()
 
     if viz_config is None:
         viz_config = VisualizationConfig()
@@ -425,7 +413,6 @@ def viz_chunks(
                 text=f"{idx} {chunk.chunk_type}",
                 color_bgr=viz_config.color_map[chunk.chunk_type],
                 viz_config=viz_config,
-                cv2=cv2,
             )
 
     viz = cv2.cvtColor(viz, cv2.COLOR_BGR2RGB)
@@ -439,7 +426,6 @@ def _place_mark(
     *,
     color_bgr: tuple[int, int, int],
     viz_config: VisualizationConfig,
-    cv2: Any = None,
 ) -> None:
     """Place a bounding box and label on an image.
 
@@ -449,11 +435,9 @@ def _place_mark(
         text: Label text to display
         color_bgr: Color in BGR format
         viz_config: Configuration for visualization appearance
-        cv2: OpenCV module if already imported, None to import lazily
     """
-    if cv2 is None:
-        from agentic_doc._optional_imports import import_cv2
-        cv2 = import_cv2()
+    from agentic_doc._optional_imports import import_cv2
+    cv2 = import_cv2()
 
     text_color = color_bgr
     (text_width, text_height), baseline = cv2.getTextSize(
@@ -493,20 +477,17 @@ def _place_mark(
     cv2.rectangle(img, box_xyxy[:2], box_xyxy[2:], color_bgr, viz_config.thickness)
 
 
-def _read_img_rgb(img_path: str, cv2: Any = None) -> Any:  # Returns numpy.ndarray
+def _read_img_rgb(img_path: str) -> Any:  # Returns numpy.ndarray
     """Read an image from file path and convert to RGB.
 
     Args:
         img_path: Path to the image file
-        cv2: OpenCV module if already imported, None to import lazily
 
     Returns:
         numpy.ndarray: Image array in RGB format with shape (H, W, 3)
     """
-
-    if cv2 is None:
-        from agentic_doc._optional_imports import import_cv2
-        cv2 = import_cv2()
+    from agentic_doc._optional_imports import import_cv2
+    cv2 = import_cv2()
 
     img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
     if img.shape[-1] == 1:

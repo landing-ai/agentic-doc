@@ -130,8 +130,3 @@ def import_pymupdf() -> ModuleType:
             "Install with: pip install 'agentic-doc[visualization]' or "
             "pip install pymupdf"
         )
-
-
-# OpenCV constants - hardcoded to avoid importing cv2
-# These values are stable across cv2 versions
-FONT_HERSHEY_SIMPLEX = 0  # cv2.FONT_HERSHEY_SIMPLEX

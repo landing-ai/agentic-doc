@@ -485,8 +485,8 @@ pip install --upgrade 'agentic-doc[all]'
 
 If you try to use a feature that requires optional dependencies, you'll see a clear error message:
 
-- **S3 Connector:** "The S3 connector requires boto3. Install with: pip install 'agentic-doc[s3]'"
-- **Google Drive:** "The Google Drive connector requires additional packages. Install with: pip install 'agentic-doc[google-drive]'"
-- **Visualization:** "Visualization requires additional packages. Install with: pip install 'agentic-doc[visualization]'"
+- **S3 Connector:** "The S3 connector requires boto3. Install with: pip install 'agentic-doc[s3]' or pip install boto3"
+- **Google Drive:** "The Google Drive connector requires Google API packages. Install with: pip install 'agentic-doc[google-drive]'"
+- **Visualization:** "Visualization features require opencv-python-headless. Install with: pip install 'agentic-doc[visualization]'"
 
 Simply follow the installation command in the error message to add the needed feature.

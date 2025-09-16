@@ -9,6 +9,11 @@ import warnings
 
 _LOGGER = structlog.get_logger(__name__)
 _MAX_PARALLEL_TASKS = 200
+
+# OpenCV font constant - hardcoded to avoid importing cv2
+# This value is stable across cv2 versions
+FONT_HERSHEY_SIMPLEX = 0
+
 # Colors in BGR format (OpenCV uses BGR)
 _COLOR_MAP = {
     ChunkType.marginalia: (128, 0, 255),  # Purple for marginalia
@@ -213,7 +218,7 @@ class VisualizationConfig(BaseSettings):
         ge=0.0,
     )
     font: int = Field(
-        default=0,  # cv2.FONT_HERSHEY_SIMPLEX value
+        default=FONT_HERSHEY_SIMPLEX,
         description="Font of the text (0 = FONT_HERSHEY_SIMPLEX)",
     )
     color_map: dict[ChunkType, tuple[int, int, int]] = Field(
