@@ -87,6 +87,8 @@ def save_groundings_as_images(
     save_dir.mkdir(parents=True, exist_ok=True)
     if file_type == "image":
         img = cv2.imread(str(file_path))
+        if img is None:
+            raise ValueError(f"Failed to read image from {file_path}")
         return _crop_groundings(img, chunks, save_dir, inplace)
 
     assert file_type == "pdf"
@@ -424,7 +426,10 @@ def _read_img_rgb(img_path: str) -> np.ndarray:
     Returns:
         img (H, W, 3): a numpy array image in RGB format
     """
-    img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
+    img_bgr = cv2.imread(img_path)
+    if img_bgr is None:
+        raise ValueError(f"Failed to read image from {img_path}")
+    img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     if img.shape[-1] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     elif img.shape[-1] == 4:
