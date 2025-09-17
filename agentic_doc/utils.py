@@ -76,6 +76,7 @@ def save_groundings_as_images(
     """
     # Lazy import cv2 and pymupdf
     from agentic_doc._optional_imports import import_cv2, import_pymupdf
+
     cv2 = import_cv2()
     pymupdf = import_pymupdf()
 
@@ -109,7 +110,7 @@ def save_groundings_as_images(
 
 
 def page_to_image(
-    pdf_doc: Any, page_idx: int, dpi: int = None
+    pdf_doc: Any, page_idx: int, dpi: int | None = None
 ) -> Any:  # Returns numpy.ndarray
     """Convert a PDF page to an image.
 
@@ -124,6 +125,7 @@ def page_to_image(
         numpy.ndarray: Image array in RGB format
     """
     from agentic_doc._optional_imports import import_numpy, import_pymupdf
+
     np = import_numpy()  # Import numpy only when needed for visualization
     pymupdf = import_pymupdf()
     if dpi is None:
@@ -164,6 +166,7 @@ def _crop_groundings(
         Dictionary mapping chunk IDs to lists of saved image paths
     """
     from agentic_doc._optional_imports import import_cv2
+
     cv2 = import_cv2()
 
     result: dict[str, list[Path]] = defaultdict(list)
@@ -331,8 +334,8 @@ def viz_parsed_document(
     viz_config: Union[VisualizationConfig, None] = None,
 ) -> list[Image.Image]:
     # Lazy import visualization dependencies
-    from agentic_doc._optional_imports import import_cv2, import_pymupdf, import_numpy
-    np = import_numpy()  # Import numpy for visualization
+    from agentic_doc._optional_imports import import_cv2, import_pymupdf
+
     cv2 = import_cv2()
     pymupdf = import_pymupdf()
 
@@ -387,6 +390,7 @@ def viz_chunks(
         numpy.ndarray: Image with visualized chunks
     """
     from agentic_doc._optional_imports import import_cv2
+
     cv2 = import_cv2()
 
     if viz_config is None:
@@ -437,6 +441,7 @@ def _place_mark(
         viz_config: Configuration for visualization appearance
     """
     from agentic_doc._optional_imports import import_cv2
+
     cv2 = import_cv2()
 
     text_color = color_bgr
@@ -487,6 +492,7 @@ def _read_img_rgb(img_path: str) -> Any:  # Returns numpy.ndarray
         numpy.ndarray: Image array in RGB format with shape (H, W, 3)
     """
     from agentic_doc._optional_imports import import_cv2
+
     cv2 = import_cv2()
 
     img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
