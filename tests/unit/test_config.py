@@ -2,13 +2,13 @@ import json
 import os
 from unittest.mock import MagicMock, patch
 
-import cv2
 import pytest
 
 from agentic_doc.common import ChunkType
 from agentic_doc.config import (
     _COLOR_MAP,
     _MAX_PARALLEL_TASKS,
+    FONT_HERSHEY_SIMPLEX,
     get_settings,
     Settings,
     VisualizationConfig,
@@ -97,7 +97,7 @@ def test_visualization_config_defaults():
     assert viz_config.text_bg_opacity == 0.7
     assert viz_config.padding == 1
     assert viz_config.font_scale == 0.5
-    assert viz_config.font == cv2.FONT_HERSHEY_SIMPLEX
+    assert viz_config.font == FONT_HERSHEY_SIMPLEX
 
     # Check that the color map contains all relevant chunk types
     expected_chunk_types = set(ChunkType)
@@ -112,7 +112,7 @@ def test_visualization_config_custom():
         text_bg_opacity=0.5,
         padding=3,
         font_scale=0.8,
-        font=cv2.FONT_HERSHEY_PLAIN,
+        font=1,  # cv2.FONT_HERSHEY_PLAIN value
         color_map={ChunkType.text: (255, 0, 0), ChunkType.table: (0, 255, 0)},
     )
 
@@ -121,7 +121,7 @@ def test_visualization_config_custom():
     assert custom_viz_config.text_bg_opacity == 0.5
     assert custom_viz_config.padding == 3
     assert custom_viz_config.font_scale == 0.8
-    assert custom_viz_config.font == cv2.FONT_HERSHEY_PLAIN
+    assert custom_viz_config.font == 1  # cv2.FONT_HERSHEY_PLAIN
 
     # Check that the custom color map contains only the specified chunk types
     assert custom_viz_config.color_map[ChunkType.text] == (255, 0, 0)

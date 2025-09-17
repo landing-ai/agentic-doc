@@ -214,19 +214,27 @@ class TestGoogleDriveConnector:
     @pytest.fixture
     def mock_auth_patches(self):
         """Common authentication patches."""
-        with patch('agentic_doc.connectors.build') as mock_build, \
-             patch('agentic_doc.connectors.InstalledAppFlow') as mock_flow, \
-             patch('agentic_doc.connectors.Credentials') as mock_creds, \
-             patch('agentic_doc.connectors.Request') as mock_request, \
+        # Mock the Google packages import function
+        mock_google_packages = {
+            'build': MagicMock(),
+            'InstalledAppFlow': MagicMock(),
+            'Credentials': MagicMock(),
+            'Request': MagicMock(),
+            'Resource': MagicMock(),
+            'MediaIoBaseDownload': MagicMock()
+        }
+
+        with patch('agentic_doc._optional_imports.import_google_packages', return_value=mock_google_packages) as mock_import, \
              patch('builtins.open', new_callable=mock_open), \
              patch('os.path.exists') as mock_exists:
-            
+
             yield {
-                'build': mock_build,
-                'flow': mock_flow,
-                'credentials': mock_creds,
-                'request': mock_request,
-                'exists': mock_exists
+                'build': mock_google_packages['build'],
+                'flow': mock_google_packages['InstalledAppFlow'],
+                'credentials': mock_google_packages['Credentials'],
+                'request': mock_google_packages['Request'],
+                'exists': mock_exists,
+                'import_google': mock_import
             }
 
     def setup_auth_mocks(self, patches, credentials, service, token_exists=False, needs_refresh=False):
@@ -284,10 +292,21 @@ class TestGoogleDriveConnector:
     def test_get_service_missing_client_secret(self):
         """Test service initialization without client secret file."""
         config = GoogleDriveConnectorConfig()  # No client_secret_file
-        
-        with patch('os.path.exists', return_value=False):
+
+        # Mock Google packages import
+        mock_google_packages = {
+            'build': MagicMock(),
+            'InstalledAppFlow': MagicMock(),
+            'Credentials': MagicMock(),
+            'Request': MagicMock(),
+            'Resource': MagicMock(),
+            'MediaIoBaseDownload': MagicMock()
+        }
+
+        with patch('os.path.exists', return_value=False), \
+             patch('agentic_doc._optional_imports.import_google_packages', return_value=mock_google_packages):
             connector = GoogleDriveConnector(config)
-            
+
             with pytest.raises(ValueError, match="client_secret_file must be provided"):
                 connector._get_service()
 
@@ -373,15 +392,25 @@ class TestGoogleDriveConnector:
         
         return mock_files_get, mock_downloader
 
-    def test_download_file(self, config, mock_credentials, mock_service, mock_file_metadata, 
+    def test_download_file(self, config, mock_credentials, mock_service, mock_file_metadata,
                            mock_auth_patches, temp_dir):
         """Test downloading a file from Google Drive."""
         self.setup_auth_mocks(mock_auth_patches, mock_credentials, mock_service, token_exists=False)
         mock_files_get, mock_downloader = self.setup_download_mocks(
             mock_auth_patches, mock_service, mock_file_metadata
         )
-        
-        with patch('agentic_doc.connectors.MediaIoBaseDownload', return_value=mock_downloader):
+
+        # Mock MediaIoBaseDownload in the imported packages
+        mock_media_download = MagicMock(return_value=mock_downloader)
+        with patch('agentic_doc._optional_imports.import_google_packages') as mock_import_func:
+            mock_import_func.return_value = {
+                'MediaIoBaseDownload': mock_media_download,
+                'build': mock_auth_patches['build'],
+                'InstalledAppFlow': mock_auth_patches['flow'],
+                'Credentials': mock_auth_patches['credentials'],
+                'Request': mock_auth_patches['request'],
+                'Resource': MagicMock()
+            }
             connector = GoogleDriveConnector(config)
             result_path = connector.download_file("file_id_123")
             
@@ -391,15 +420,25 @@ class TestGoogleDriveConnector:
             mock_files_get.get.assert_called_once_with(fileId="file_id_123")
             mock_files_get.get_media.assert_called_once_with(fileId="file_id_123")
 
-    def test_download_file_with_local_path(self, config, mock_credentials, mock_service, 
+    def test_download_file_with_local_path(self, config, mock_credentials, mock_service,
                                            mock_file_metadata, mock_auth_patches, temp_dir):
         """Test downloading a file to a specific local path."""
         self.setup_auth_mocks(mock_auth_patches, mock_credentials, mock_service, token_exists=False)
         mock_files_get, mock_downloader = self.setup_download_mocks(
             mock_auth_patches, mock_service, mock_file_metadata, downloader_chunks=[(1.0, True)]
         )
-        
-        with patch('agentic_doc.connectors.MediaIoBaseDownload', return_value=mock_downloader):
+
+        # Mock MediaIoBaseDownload in the imported packages
+        mock_media_download = MagicMock(return_value=mock_downloader)
+        with patch('agentic_doc._optional_imports.import_google_packages') as mock_import_func:
+            mock_import_func.return_value = {
+                'MediaIoBaseDownload': mock_media_download,
+                'build': mock_auth_patches['build'],
+                'InstalledAppFlow': mock_auth_patches['flow'],
+                'Credentials': mock_auth_patches['credentials'],
+                'Request': mock_auth_patches['request'],
+                'Resource': MagicMock()
+            }
             connector = GoogleDriveConnector(config)
             local_path = str(temp_dir / "custom_name.pdf")
             result_path = connector.download_file("file_id_123", local_path)
