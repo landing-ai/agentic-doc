@@ -15,7 +15,7 @@ import tenacity
 from pydantic_core import Url
 from tqdm import tqdm
 import jsonschema
-from pypdf import PdfReader
+import pymupdf
 
 from agentic_doc.common import (
     Document,
@@ -554,12 +554,12 @@ def _parse_pdf(
     config: Optional[ParseConfig] = None,
 ) -> ParsedDocument[T]:
     settings = get_settings()
-    with tempfile.TemporaryDirectory() as temp_dir:
+
+    # Single PDF opening for both page counting and splitting
+    with pymupdf.open(file_path) as pdf_doc:
+        total_pages = pdf_doc.page_count
+
         if extraction_model or extraction_schema is not None:
-            total_pages = 0
-            with open(file_path, "rb") as file:
-                reader = PdfReader(file)
-                total_pages = len(reader.pages)
             split_size = (
                 config.extraction_split_size
                 if config and config.extraction_split_size
@@ -578,21 +578,40 @@ def _parse_pdf(
                 else settings.split_size
             )
 
-        parts = split_pdf(file_path, temp_dir, split_size)
-        file_path = Path(file_path)
-        part_results = _parse_doc_in_parallel(
-            parts,
-            doc_name=file_path.name,
-            include_marginalia=include_marginalia,
-            include_metadata_in_markdown=include_metadata_in_markdown,
-            extraction_model=extraction_model,
-            extraction_schema=extraction_schema,
-            config=config,
-        )
-        split_type = (
-            config.split if config and config.split is not None else SplitType.full
-        )
-        return _merge_part_results(part_results, split_type)
+        # Skip splitting if PDF is small enough
+        if total_pages <= split_size:
+            # Process the PDF directly without splitting
+            file_path = Path(file_path)
+            return _parse_doc_parts(
+                Document(
+                    file_path=file_path,
+                    start_page_idx=0,
+                    end_page_idx=total_pages - 1,
+                ),
+                include_marginalia=include_marginalia,
+                include_metadata_in_markdown=include_metadata_in_markdown,
+                extraction_model=extraction_model,
+                extraction_schema=extraction_schema,
+                config=config,
+            )
+
+        # Split PDF using the already opened document
+        with tempfile.TemporaryDirectory() as temp_dir:
+            file_path = Path(file_path)
+            parts = split_pdf(pdf_doc, temp_dir, split_size, file_stem=file_path.stem)
+            part_results = _parse_doc_in_parallel(
+                parts,
+                doc_name=file_path.name,
+                include_marginalia=include_marginalia,
+                include_metadata_in_markdown=include_metadata_in_markdown,
+                extraction_model=extraction_model,
+                extraction_schema=extraction_schema,
+                config=config,
+            )
+            split_type = (
+                config.split if config and config.split is not None else SplitType.full
+            )
+            return _merge_part_results(part_results, split_type)
 
 
 def _parse_image(
@@ -901,10 +920,10 @@ def _send_parsing_request(
     """
     settings = get_settings()
     with Timer() as timer:
-        file_type = "pdf" if Path(file_path).suffix.lower() == ".pdf" else "image"
+        file_type = get_file_type(Path(file_path))
         # TODO: check if the file extension is a supported image type
         with open(file_path, "rb") as file:
-            files = {file_type: file}
+            files: dict[str, Any] = {file_type: file}
             data: dict[str, Any] = {
                 "include_marginalia": include_marginalia,
                 "include_metadata_in_markdown": include_metadata_in_markdown,
