@@ -210,8 +210,12 @@ class GoogleDriveConnector(BaseConnector):
     def __init__(self, config: GoogleDriveConnectorConfig):
         super().__init__(config)
         self.config: GoogleDriveConnectorConfig = config
-        self._service: Optional[Any] = None  # googleapiclient.discovery.Resource when initialized
-        self._google_packages: Optional[Dict[str, Any]] = None  # Google API packages, imported lazily
+        self._service: Optional[Any] = (
+            None  # googleapiclient.discovery.Resource when initialized
+        )
+        self._google_packages: Optional[Dict[str, Any]] = (
+            None  # Google API packages, imported lazily
+        )
 
     def _get_service(self) -> Any:
         """Initialize Google Drive service with user-friendly OAuth."""
@@ -219,12 +223,13 @@ class GoogleDriveConnector(BaseConnector):
             # Lazy import Google packages
             if self._google_packages is None:
                 from agentic_doc._optional_imports import import_google_packages
+
                 self._google_packages = import_google_packages()
 
-            Credentials = self._google_packages['Credentials']
-            Request = self._google_packages['Request']
-            InstalledAppFlow = self._google_packages['InstalledAppFlow']
-            build = self._google_packages['build']
+            Credentials = self._google_packages["Credentials"]
+            Request = self._google_packages["Request"]
+            InstalledAppFlow = self._google_packages["InstalledAppFlow"]
+            build = self._google_packages["build"]
 
             scopes = ["https://www.googleapis.com/auth/drive.readonly"]
             creds = None
@@ -308,11 +313,16 @@ class GoogleDriveConnector(BaseConnector):
 
             # Download file
             # Get MediaIoBaseDownload from lazy-loaded packages
-            MediaIoBaseDownload = self._google_packages['MediaIoBaseDownload'] if self._google_packages else None
+            MediaIoBaseDownload = (
+                self._google_packages["MediaIoBaseDownload"]
+                if self._google_packages
+                else None
+            )
             if MediaIoBaseDownload is None:
                 from agentic_doc._optional_imports import import_google_packages
+
                 self._google_packages = import_google_packages()
-                MediaIoBaseDownload = self._google_packages['MediaIoBaseDownload']
+                MediaIoBaseDownload = self._google_packages["MediaIoBaseDownload"]
 
             request = service.files().get_media(fileId=file_id)
             with open(local_path_obj, "wb") as f:
@@ -362,7 +372,9 @@ class S3Connector(BaseConnector):
     def __init__(self, config: S3ConnectorConfig):
         super().__init__(config)
         self.config: S3ConnectorConfig = config
-        self._client: Optional[Any] = None  # boto3.client('s3') instance when initialized
+        self._client: Optional[Any] = (
+            None  # boto3.client('s3') instance when initialized
+        )
         self._boto3: Optional[Any] = None  # boto3 module, imported lazily
 
     def _get_client(self) -> Any:
@@ -371,6 +383,7 @@ class S3Connector(BaseConnector):
             # Lazy import boto3
             if self._boto3 is None:
                 from agentic_doc._optional_imports import import_boto3
+
                 self._boto3 = import_boto3()
 
             kwargs = {"region_name": self.config.region_name}

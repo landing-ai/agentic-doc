@@ -19,6 +19,7 @@ def import_boto3() -> ModuleType:
     """
     try:
         import boto3
+
         return boto3
     except ImportError:
         raise ImportError(
@@ -38,6 +39,7 @@ def import_botocore() -> type:
     """
     try:
         from botocore.client import ClientCreator
+
         return ClientCreator
     except ImportError:
         raise ImportError(
@@ -57,6 +59,7 @@ def import_numpy() -> ModuleType:
     """
     try:
         import numpy
+
         return numpy
     except ImportError:
         raise ImportError(
@@ -76,12 +79,12 @@ def import_google_packages() -> Dict[str, Any]:
         from googleapiclient.http import MediaIoBaseDownload
 
         return {
-            'Request': Request,
-            'Credentials': Credentials,
-            'InstalledAppFlow': InstalledAppFlow,
-            'build': build,
-            'Resource': Resource,
-            'MediaIoBaseDownload': MediaIoBaseDownload
+            "Request": Request,
+            "Credentials": Credentials,
+            "InstalledAppFlow": InstalledAppFlow,
+            "build": build,
+            "Resource": Resource,
+            "MediaIoBaseDownload": MediaIoBaseDownload,
         }
     except ImportError as e:
         raise ImportError(
@@ -103,6 +106,7 @@ def import_cv2() -> ModuleType:
     """
     try:
         import cv2
+
         return cv2
     except ImportError:
         raise ImportError(
@@ -123,6 +127,7 @@ def import_pymupdf() -> ModuleType:
     """
     try:
         import pymupdf
+
         return pymupdf
     except ImportError:
         raise ImportError(
