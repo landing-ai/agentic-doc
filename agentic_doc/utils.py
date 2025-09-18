@@ -110,7 +110,7 @@ def save_groundings_as_images(
 
 
 def page_to_image(
-    pdf_doc: Any, page_idx: int, dpi: int | None = None
+    pdf_doc: Any, page_idx: int, dpi: Optional[int] = None
 ) -> Any:  # Returns numpy.ndarray
     """Convert a PDF page to an image.
 

@@ -109,4 +109,9 @@ ignore_missing_imports = true
 module = [
     "cv2.*",
     "pymupdf.*",
+    "boto3.*",
+    "botocore.*",
+    "google.*",
+    "google_auth_oauthlib.*",
+    "googleapiclient.*",
 ]

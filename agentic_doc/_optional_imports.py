@@ -20,7 +20,7 @@ def import_boto3() -> ModuleType:
     try:
         import boto3
 
-        return boto3
+        return boto3  # type: ignore[no-any-return]
     except ImportError:
         raise ImportError(
             "The S3 connector requires boto3. "
@@ -40,7 +40,7 @@ def import_botocore() -> type:
     try:
         from botocore.client import ClientCreator
 
-        return ClientCreator
+        return ClientCreator  # type: ignore[no-any-return]
     except ImportError:
         raise ImportError(
             "The S3 connector requires boto3/botocore. "
@@ -128,7 +128,7 @@ def import_pymupdf() -> ModuleType:
     try:
         import pymupdf
 
-        return pymupdf
+        return pymupdf  # type: ignore[no-any-return]
     except ImportError:
         raise ImportError(
             "PDF visualization requires pymupdf. "
