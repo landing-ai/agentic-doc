@@ -46,8 +46,7 @@ _LOGGER = structlog.getLogger(__name__)
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
 # Pattern: <!-- {chunk_type}, from page {number} (l={left},t={top},r={right},b={bottom}), with ID {chunk_id} -->
 _PAGE_COMMENT_PATTERN = re.compile(
-    r"(<!--\s*\w+,\s*from page\s+)(\d+)(\s*\([^)]+\),\s*with ID\s+[^>]+-->)",
-    re.DOTALL
+    r"(<!--\s*\w+,\s*from page\s+)(\d+)(\s*\([^)]+\),\s*with ID\s+[^>]+-->)", re.DOTALL
 )
 
 
