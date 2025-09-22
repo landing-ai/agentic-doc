@@ -691,10 +691,10 @@ def _fix_page_numbers_in_markdown(markdown_content: str, page_offset: int) -> st
     """
     Fix page numbers in markdown content by adding the page offset to each page number.
 
-    This function uses a regular expression to find all occurrences of
-    "<!-- page [number]>" in the input string. For each match, it
-    extracts the number, adds the specified offset value to it, and
-    replaces the old comment with the updated one.
+    This function uses a regular expression to find all occurrences of comments containing
+    "from page [number]" in the input string. For each match, it extracts the number,
+    adds the specified offset value to it, and replaces the old comment with the updated one
+    while preserving all other comment information.
 
     Args:
         markdown_content: The markdown content to fix
@@ -709,22 +709,29 @@ def _fix_page_numbers_in_markdown(markdown_content: str, page_offset: int) -> st
         This is a helper function passed to re.sub.
         It's called for each match found.
         """
-        # Group 1 captures the digits (\d+) from the regex pattern
-        page_number_str = match.group(1)
+        # Group 1 captures everything before "from page"
+        # Group 2 captures the page number
+        # Group 3 captures everything after the page number
+        prefix = match.group(1)
+        page_number_str = match.group(2)
+        suffix = match.group(3)
+
         # Convert the captured string to an integer
         page_number_int = int(page_number_str)
         # Add the offset value
         new_page_number = page_number_int + page_offset
-        # Construct the new comment string and return it
-        return f"<!-- page {new_page_number}>"
+        # Construct the new comment string preserving all information
+        return f"{prefix}{new_page_number}{suffix}"
 
-    # This pattern looks for "<!-- page ", followed by one or more digits
-    # (captured in a group), and then ">".
-    pattern = r"<!--\s*page\s+(\d+)\s*>"
+    # This pattern looks for comments containing "from page [number]" and captures:
+    # 1. Everything from "<!--" up to and including "from page "
+    # 2. The page number digits
+    # 3. Everything from after the digits to "-->"
+    pattern = r"(<!--.*?from page\s+)(\d+)(.*?-->)"
 
     # re.sub finds all matches for the pattern and replaces them
     # with the result of the replace_match function.
-    return re.sub(pattern, replace_match, markdown_content)
+    return re.sub(pattern, replace_match, markdown_content, flags=re.DOTALL)
 
 
 def _merge_next_part(

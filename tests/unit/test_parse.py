@@ -424,7 +424,7 @@ def test_merge_part_results():
     """Test that page numbers in markdown comments are fixed correctly when merging document parts."""
     # Create first batch: pages 0-9
     batch1 = ParsedDocument(
-        markdown="First batch content <!-- page 0>",
+        markdown="First batch content <!-- marginalia, from page 0 (l=0.077,t=0.034,r=0.338,b=0.051), with ID abc123 -->",
         chunks=[
             Chunk(
                 text="Content from page 0",
@@ -444,7 +444,7 @@ def test_merge_part_results():
 
     # Create second batch: pages 10-19 with markdown containing page comments
     batch2 = ParsedDocument(
-        markdown="Second batch <!-- page 0> with multiple <!-- page 0> page references <!-- page 1>", 
+        markdown="Second batch <!-- text, from page 0 (l=0.076,t=0.058,r=0.499,b=0.123), with ID xyz789 --> with multiple <!-- marginalia, from page 0 (l=0.914,t=0.036,r=0.935,b=0.049), with ID def456 --> page references <!-- figure, from page 1 (l=0.502,t=0.614,r=0.926,b=0.946), with ID ghi012 -->",
         chunks=[
             Chunk(
                 text="Content from page 10",
@@ -476,7 +476,7 @@ def test_merge_part_results():
     result = _merge_part_results([batch1, batch2])
 
     # Verify the result structure
-    expected_markdown = "First batch content <!-- page 0>\n\nSecond batch <!-- page 10> with multiple <!-- page 10> page references <!-- page 11>"
+    expected_markdown = "First batch content <!-- marginalia, from page 0 (l=0.077,t=0.034,r=0.338,b=0.051), with ID abc123 -->\n\nSecond batch <!-- text, from page 10 (l=0.076,t=0.058,r=0.499,b=0.123), with ID xyz789 --> with multiple <!-- marginalia, from page 10 (l=0.914,t=0.036,r=0.935,b=0.049), with ID def456 --> page references <!-- figure, from page 11 (l=0.502,t=0.614,r=0.926,b=0.946), with ID ghi012 -->"
     assert result.markdown == expected_markdown
 
     # Verify grounding page numbers are still fixed correctly
