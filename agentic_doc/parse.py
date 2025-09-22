@@ -44,6 +44,11 @@ from agentic_doc.utils import (
 
 _LOGGER = structlog.getLogger(__name__)
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
+# Pattern: <!-- {chunk_type}, from page {number} (l={left},t={top},r={right},b={bottom}), with ID {chunk_id} -->
+_PAGE_COMMENT_PATTERN = re.compile(
+    r"(<!--\s*\w+,\s*from page\s+)(\d+)(\s*\([^)]+\),\s*with ID\s+[^>]+-->)",
+    re.DOTALL
+)
 
 
 def _get_endpoint_url(settings: Settings) -> str:
@@ -689,49 +694,36 @@ def _merge_part_results(
 
 def _fix_page_numbers_in_markdown(markdown_content: str, page_offset: int) -> str:
     """
-    Fix page numbers in markdown content by adding the page offset to each page number.
+    Fix page numbers in markdown comments during document merging.
 
-    This function uses a regular expression to find all occurrences of comments containing
-    "from page [number]" in the input string. For each match, it extracts the number,
-    adds the specified offset value to it, and replaces the old comment with the updated one
-    while preserving all other comment information.
+    Adjusts page references in comments like:
+    <!-- text, from page 0 (l=0.1,t=0.2,r=0.9,b=0.8), with ID abc123 -->
 
     Args:
-        markdown_content: The markdown content to fix
-        page_offset: The integer value to add to each page number (next.start_page_idx)
+        markdown_content: Markdown with embedded page reference comments
+        page_offset: Value to add to each page number (typically next.start_page_idx)
 
     Returns:
-        The markdown content with corrected page numbers
+        Markdown with corrected page numbers, preserving other metadata
     """
+    # Skip processing if no offset needed
+    if page_offset == 0:
+        return markdown_content
 
     def replace_match(match: re.Match) -> str:
-        """
-        This is a helper function passed to re.sub.
-        It's called for each match found.
-        """
-        # Group 1 captures everything before "from page"
-        # Group 2 captures the page number
-        # Group 3 captures everything after the page number
-        prefix = match.group(1)
-        page_number_str = match.group(2)
-        suffix = match.group(3)
+        prefix = match.group(1)  # Everything before page number
+        page_number_str = match.group(2)  # Page number
+        suffix = match.group(3)  # Everything after page number
 
-        # Convert the captured string to an integer
-        page_number_int = int(page_number_str)
-        # Add the offset value
-        new_page_number = page_number_int + page_offset
-        # Construct the new comment string preserving all information
-        return f"{prefix}{new_page_number}{suffix}"
+        try:
+            page_number = int(page_number_str)
+            new_page_number = page_number + page_offset
+            return f"{prefix}{new_page_number}{suffix}"
+        except ValueError:
+            # Return original match if page number is malformed
+            return str(match.group(0))
 
-    # This pattern looks for comments containing "from page [number]" and captures:
-    # 1. Everything from "<!--" up to and including "from page "
-    # 2. The page number digits
-    # 3. Everything from after the digits to "-->"
-    pattern = r"(<!--.*?from page\s+)(\d+)(.*?-->)"
-
-    # re.sub finds all matches for the pattern and replaces them
-    # with the result of the replace_match function.
-    return re.sub(pattern, replace_match, markdown_content, flags=re.DOTALL)
+    return _PAGE_COMMENT_PATTERN.sub(replace_match, markdown_content)
 
 
 def _merge_next_part(
