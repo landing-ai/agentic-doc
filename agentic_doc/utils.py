@@ -2,22 +2,38 @@ import math
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, List, TYPE_CHECKING
 from urllib.parse import urlparse
 
-import cv2
 import httpx
-import numpy as np
-import pymupdf
 import requests
 import structlog
-from PIL import Image
 from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
 from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
-from agentic_doc.config import VisualizationConfig, get_settings
+from agentic_doc.config import get_settings
+
+# Optional imports for visualization
+try:
+    import cv2
+    import numpy as np
+    import pymupdf
+    from PIL import Image
+    from ade_visualization import (
+        viz_parsed_document as _viz_parsed_document,
+        viz_chunks as _viz_chunks,
+        save_groundings_as_images as _save_groundings_as_images,
+        VisualizationConfig,
+    )
+    VISUALIZATION_AVAILABLE = True
+except ImportError:
+    VISUALIZATION_AVAILABLE = False
+    if TYPE_CHECKING:
+        import numpy as np
+        from PIL import Image
+        from ade_visualization import VisualizationConfig
 
 _LOGGER = structlog.getLogger(__name__)
 
@@ -65,7 +81,7 @@ def save_groundings_as_images(
     chunks: list[Chunk],
     save_dir: Path,
     inplace: bool = True,
-) -> dict[str, list[Path]]:
+) -> dict[str, List[Path]]:
     """
     Save the chunks as images based on the bounding box in each chunk.
 
@@ -78,137 +94,16 @@ def save_groundings_as_images(
     Returns:
         dict[str, Path]: The dictionary of saved image paths. The key is the chunk id and the value is the path to the saved image.
     """
-    file_type = get_file_type(file_path)
-    _LOGGER.info(
-        f"Saving {len(chunks)} chunks as images to '{save_dir}'",
-        file_path=file_path,
-        file_type=file_type,
-    )
-    result: dict[str, list[Path]] = {}
-    save_dir.mkdir(parents=True, exist_ok=True)
-    if file_type == "image":
-        img = cv2.imread(str(file_path))
-        return _crop_groundings(img, chunks, save_dir, inplace)
-
-    assert file_type == "pdf"
-    chunks_by_page_idx = defaultdict(list)
-    for chunk in chunks:
-        page_idx = chunk.grounding[0].page
-        chunks_by_page_idx[page_idx].append(chunk)
-
-    with pymupdf.open(file_path) as pdf_doc:
-        for page_idx, chunks in sorted(chunks_by_page_idx.items()):
-            page_img = page_to_image(pdf_doc, page_idx)
-            # Convert RGB to BGR for consistent color space handling
-            page_img_bgr = cv2.cvtColor(page_img, cv2.COLOR_RGB2BGR)
-            page_result = _crop_groundings(page_img_bgr, chunks, save_dir, inplace)
-            result.update(page_result)
-
-    return result
-
-
-def page_to_image(
-    pdf_doc: pymupdf.Document, page_idx: int, dpi: int = get_settings().pdf_to_image_dpi
-) -> np.ndarray:
-    """Convert a PDF page to an image. We specifically use pymupdf because it is self-contained and correctly renders annotations."""
-    page = pdf_doc[page_idx]
-    # Scale image and use RGB colorspace
-    pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB)
-    img: np.ndarray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
-        pix.h, pix.w, -1
-    )
-    # Ensure the image has 3 channels (sometimes it may include an alpha channel)
-    if img.shape[-1] == 4:  # If RGBA, drop the alpha channel
-        img = img[..., :3]
-
-    return img
+    if not VISUALIZATION_AVAILABLE:
+        raise ImportError(
+            "Visualization is not available. Install it with: "
+            "pip install ade-visualization"
+        )
+    return _save_groundings_as_images(file_path, chunks, save_dir, inplace)
 
 
 def get_chunk_from_reference(chunk_id: str, chunks: list[dict]) -> Optional[dict]:
     return next((chunk for chunk in chunks if chunk.get("chunk_id") == chunk_id), None)
-
-
-def _crop_groundings(
-    img: np.ndarray,
-    chunks: list[Chunk],
-    crop_save_dir: Path,
-    inplace: bool = True,
-) -> dict[str, list[Path]]:
-    result: dict[str, list[Path]] = defaultdict(list)
-    for c in chunks:
-        for i, grounding in enumerate(c.grounding):
-            if grounding.box is None:
-                _LOGGER.error(
-                    "Grounding has no bounding box in non-error chunk",
-                    grounding=grounding,
-                    chunk=c,
-                )
-                continue
-
-            cropped = _crop_image(img, grounding.box)
-            # Convert the cropped image to PNG bytes
-            is_success, buffer = cv2.imencode(".png", cropped)
-            if not is_success:
-                _LOGGER.error(
-                    "Failed to encode cropped image as PNG",
-                    grounding=grounding,
-                )
-                continue
-
-            page = f"page_{grounding.page}"
-            crop_save_path = (
-                crop_save_dir / page / f"{c.chunk_type}_{c.chunk_id}_{i}.png"
-            )
-            crop_save_path.parent.mkdir(parents=True, exist_ok=True)
-            crop_save_path.write_bytes(buffer.tobytes())
-            assert c.chunk_id is not None
-            result[c.chunk_id].append(crop_save_path)
-            if inplace:
-                c.grounding[i].image_path = crop_save_path
-
-    return result
-
-
-def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
-    # Extract coordinates from the bounding box
-    xmin_f, ymin_f, xmax_f, ymax_f = bbox.l, bbox.t, bbox.r, bbox.b
-
-    # Convert normalized coordinates to absolute coordinates
-    height, width = image.shape[:2]
-
-    # Throw warning if coordinates are out of bounds
-    if (
-        xmin_f < 0
-        or ymin_f < 0
-        or xmax_f > 1
-        or ymax_f > 1
-        or xmin_f > xmax_f
-        or ymin_f > ymax_f
-    ):
-        _LOGGER.warning(
-            "Coordinates are out of bounds",
-            bbox=bbox,
-        )
-
-    # Clamp coordinates to valid range [0, 1]
-    xmin_f = max(0, min(1, xmin_f))
-    ymin_f = max(0, min(1, ymin_f))
-    xmax_f = max(0, min(1, xmax_f))
-    ymax_f = max(0, min(1, ymax_f))
-
-    xmin = math.floor(xmin_f * width)
-    xmax = math.ceil(xmax_f * width)
-    ymin = math.floor(ymin_f * height)
-    ymax = math.ceil(ymax_f * height)
-
-    # Ensure coordinates are valid
-    xmin = max(0, xmin)
-    ymin = max(0, ymin)
-    xmax = min(width, xmax)
-    ymax = min(height, ymax)
-
-    result: np.ndarray = image[ymin:ymax, xmin:xmax]
-    return result
 
 
 def split_pdf(
@@ -296,138 +191,29 @@ def viz_parsed_document(
     parsed_document: ParsedDocument,
     *,
     output_dir: Union[str, Path, None] = None,
-    viz_config: Union[VisualizationConfig, None] = None,
-) -> list[Image.Image]:
-    if viz_config is None:
-        viz_config = VisualizationConfig()
-
-    viz_result_np: list[np.ndarray] = []
-    file_path = Path(file_path)
-    file_type = get_file_type(file_path)
-    _LOGGER.info(f"Visualizing parsed document of: '{file_path}'")
-    if file_type == "image":
-        img = _read_img_rgb(str(file_path))
-        viz_np = viz_chunks(img, parsed_document.chunks, viz_config)
-        viz_result_np.append(viz_np)
-    else:
-        with pymupdf.open(file_path) as pdf_doc:
-            for page_idx in range(
-                parsed_document.start_page_idx, parsed_document.end_page_idx + 1
-            ):
-                img = page_to_image(pdf_doc, page_idx)
-                chunks = [
-                    chunk
-                    for chunk in parsed_document.chunks
-                    if chunk.grounding[0].page == page_idx
-                ]
-                viz_np = viz_chunks(img, chunks, viz_config)
-                viz_result_np.append(viz_np)
-
-    if output_dir:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        for i, viz_np in enumerate(viz_result_np):
-            viz_np = cv2.cvtColor(viz_np, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(str(output_dir / f"{file_path.stem}_viz_page_{i}.png"), viz_np)
-
-    return [Image.fromarray(viz_np) for viz_np in viz_result_np]
+    viz_config: Union['VisualizationConfig', None] = None,
+) -> List['Image.Image']:
+    """Visualize a parsed document with bounding boxes."""
+    if not VISUALIZATION_AVAILABLE:
+        raise ImportError(
+            "Visualization is not available. Install it with: "
+            "pip install ade-visualization"
+        )
+    return _viz_parsed_document(file_path, parsed_document, output_dir=output_dir, viz_config=viz_config)
 
 
 def viz_chunks(
-    img: np.ndarray,
-    chunks: list[Chunk],
-    viz_config: Union[VisualizationConfig, None] = None,
-) -> np.ndarray:
-    if viz_config is None:
-        viz_config = VisualizationConfig()
-
-    viz = img.copy()
-    viz = cv2.cvtColor(viz, cv2.COLOR_RGB2BGR)
-    height, width = img.shape[:2]
-    for i, chunk in enumerate(chunks):
-        show_grounding_idx = len(chunk.grounding) > 1
-        for j, grounding in enumerate(chunk.grounding):
-            assert grounding.box is not None
-            xmin, ymin, xmax, ymax = (
-                max(0, math.floor(grounding.box.l * width)),
-                max(0, math.floor(grounding.box.t * height)),
-                min(width, math.ceil(grounding.box.r * width)),
-                min(height, math.ceil(grounding.box.b * height)),
-            )
-            box = (xmin, ymin, xmax, ymax)
-            idx = f"{i}-{j}" if show_grounding_idx else f"{i}"
-            _place_mark(
-                viz,
-                box,
-                text=f"{idx} {chunk.chunk_type}",
-                color_bgr=viz_config.color_map[chunk.chunk_type],
-                viz_config=viz_config,
-            )
-
-    viz = cv2.cvtColor(viz, cv2.COLOR_BGR2RGB)
-    return viz
-
-
-def _place_mark(
-    img: np.ndarray,
-    box_xyxy: tuple[int, int, int, int],
-    text: str,
-    *,
-    color_bgr: tuple[int, int, int],
-    viz_config: VisualizationConfig,
-) -> None:
-    text_color = color_bgr
-    (text_width, text_height), baseline = cv2.getTextSize(
-        text, viz_config.font, viz_config.font_scale, viz_config.thickness
-    )
-    text_x = int((box_xyxy[0] + box_xyxy[2] - text_width) // 2)
-    text_y = int((box_xyxy[1] + box_xyxy[3] + text_height) // 2)
-
-    # Draw the text background with opacity
-    overlay = img.copy()
-    cv2.rectangle(
-        overlay,
-        (text_x - viz_config.padding, text_y - text_height - viz_config.padding),
-        (
-            text_x + text_width + viz_config.padding,
-            text_y + baseline + viz_config.padding,
-        ),
-        viz_config.text_bg_color,
-        -1,
-    )
-    cv2.addWeighted(
-        overlay, viz_config.text_bg_opacity, img, 1 - viz_config.text_bg_opacity, 0, img
-    )
-
-    # Draw the text on top
-    cv2.putText(
-        img,
-        text,
-        (text_x, text_y),
-        viz_config.font,
-        viz_config.font_scale,
-        text_color,
-        viz_config.thickness,
-        cv2.LINE_AA,
-    )
-    # Draw the bounding box
-    cv2.rectangle(img, box_xyxy[:2], box_xyxy[2:], color_bgr, viz_config.thickness)
-
-
-def _read_img_rgb(img_path: str) -> np.ndarray:
-    """
-    Read a image given its path.
-    Arguments:
-        img_path : image file path
-    Returns:
-        img (H, W, 3): a numpy array image in RGB format
-    """
-    img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
-    if img.shape[-1] == 1:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    elif img.shape[-1] == 4:
-        img = img[..., :3]
-    return img
+    img: 'np.ndarray',
+    chunks: List[Chunk],
+    viz_config: Union['VisualizationConfig', None] = None,
+) -> 'np.ndarray':
+    """Visualize chunks on an image."""
+    if not VISUALIZATION_AVAILABLE:
+        raise ImportError(
+            "Visualization is not available. Install it with: "
+            "pip install ade-visualization"
+        )
+    return _viz_chunks(img, chunks, viz_config)
 
 
 def download_file(file_url: Url, output_filepath: str) -> None:

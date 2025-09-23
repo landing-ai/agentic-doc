@@ -1,22 +1,14 @@
 import json
 import logging
 from typing import Literal, Any, Optional, Iterator
-import cv2
 import structlog
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from agentic_doc.common import ChunkType, FigureCaptioningType, SplitType, T
+from agentic_doc.common import FigureCaptioningType, SplitType, T
 import warnings
 
 _LOGGER = structlog.get_logger(__name__)
 _MAX_PARALLEL_TASKS = 200
-# Colors in BGR format (OpenCV uses BGR)
-_COLOR_MAP = {
-    ChunkType.marginalia: (128, 0, 255),  # Purple for marginalia
-    ChunkType.table: (139, 69, 19),  # Brown for tables
-    ChunkType.figure: (50, 205, 50),  # Lime green for figures
-    ChunkType.text: (255, 0, 0),  # Blue for regular text
-}
 
 
 class ParseConfig:
@@ -187,43 +179,22 @@ if get_settings().retry_logging_style == "inline_block":
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-class VisualizationConfig(BaseSettings):
-    thickness: int = Field(
-        default=1,
-        description="Thickness of the bounding box and text",
-        ge=0,
-    )
-    text_bg_color: tuple[int, int, int] = Field(
-        default=(211, 211, 211),  # Light gray
-        description="Background color of the text, in BGR format",
-    )
-    text_bg_opacity: float = Field(
-        default=0.7,
-        description="Opacity of the text background",
-        ge=0.0,
-        le=1.0,
-    )
-    padding: int = Field(
-        default=1,
-        description="Padding of the text background box",
-        ge=0,
-    )
-    font_scale: float = Field(
-        default=0.5,
-        description="Font scale of the text",
-        ge=0.0,
-    )
-    font: int = Field(
-        default=cv2.FONT_HERSHEY_SIMPLEX,
-        description="Font of the text",
-    )
-    color_map: dict[ChunkType, tuple[int, int, int]] = Field(
-        default=_COLOR_MAP,
-        description="Color map for each chunk type",
-    )
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_ignore_empty=True,
-        extra="ignore",
-    )
+# Try to import VisualizationConfig from ade-visualization
+try:
+    from ade_visualization import VisualizationConfig
+    VISUALIZATION_AVAILABLE = True
+except ImportError:
+    VISUALIZATION_AVAILABLE = False
+    # Create a stub class for backward compatibility
+    class VisualizationConfig(BaseSettings):
+        """Stub for VisualizationConfig when visualization is not available."""
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "Visualization is not available. Install it with: "
+                "pip install ade-visualization"
+            )
+        model_config = SettingsConfigDict(
+            env_file=".env",
+            env_ignore_empty=True,
+            extra="ignore",
+        )
