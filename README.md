@@ -38,9 +38,40 @@ This Python library wraps that API to provide:
 
 ### Installation
 
+#### Core Installation (Minimal)
 ```bash
 pip install agentic-doc
 ```
+
+This installs only the core document parsing functionality without connectors or visualization features.
+
+#### Installation with Optional Features
+
+```bash
+# With document connectors (S3, Google Drive, etc.)
+pip install "agentic-doc[connectors]"
+
+# With visualization tools
+pip install "agentic-doc[visualization]"
+
+# With all optional features
+pip install "agentic-doc[all]"
+```
+
+#### Modular Architecture
+
+The library is split into modular components to keep the core lightweight:
+
+- **Core (`agentic-doc`)**: Document parsing API client with automatic retry, pagination, and error handling
+- **Connectors (`ade-connectors`)**: Optional package for accessing documents from various sources (S3, Google Drive, URLs, local files)
+- **Visualization (`ade-visualization`)**: Optional package for visualizing parsing results and saving grounding images
+
+This modular approach means:
+- Faster installation when you only need core functionality
+- Smaller dependency footprint for containerized deployments
+- No unnecessary dependencies (e.g., AWS/Google libraries if you're not using those connectors)
+
+The library maintains full backward compatibility - existing code will work without changes. If you try to use features without installing the required extras, you'll get a helpful error message indicating which package to install.
 
 ### Requirements
 - Python version 3.9, 3.10, 3.11 or 3.12
@@ -117,7 +148,10 @@ print(f"Field value: {fields.employee_name}, confidence: {metadata.employee_name
 
 
 #### Extract Data Using Connectors
-The library now supports various connectors to easily access documents from different sources:
+
+**Note: Connectors require the optional `connectors` dependency. Install with: `pip install "agentic-doc[connectors]"`**
+
+The library supports various connectors to easily access documents from different sources:
 
 ##### Google Drive Connector
 
@@ -229,6 +263,7 @@ This is useful when documents are already loaded into memory (e.g., from an API 
 - **Automatic Large File Processing:** Splits large PDFs into manageable parts and processes them in parallel.
 - **Built-In Error Handling:** Automatically retries requests with exponential backoff and jitter for common HTTP errors.
 - **Parallel Processing:** Efficiently parse multiple documents at once with configurable parallelism.
+- **Modular Architecture:** Install only what you need - core parsing is lightweight, with optional features for connectors and visualization.
 
 ## Main Features
 
@@ -248,6 +283,8 @@ You can parse multiple files in a single function call with this library. The li
 > **NOTE:** You can change the parallelism by setting the `batch_size` setting.
 
 ### Save Groundings as Images
+
+**Note: Visualization features require the optional `visualization` dependency. Install with: `pip install "agentic-doc[visualization]"`**
 
 The library can extract and save the visual regions (groundings) of the document where each chunk of content was found. This is useful for visualizing exactly what parts of the document were extracted and for debugging extraction issues.
 
@@ -272,6 +309,8 @@ for chunk in results[0].chunks:
 
 
 ### Visualize Parsing Results
+
+**Note: Visualization features require the optional `visualization` dependency. Install with: `pip install "agentic-doc[visualization]"`**
 
 The library provides a visualization utility that creates annotated images showing where each chunk of content was extracted from the document. This is useful for:
 - Verifying the accuracy of the extraction
