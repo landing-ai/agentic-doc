@@ -4,7 +4,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Literal, Union, Optional
 from urllib.parse import urlparse
-from typing import Optional, Union
 
 import cv2
 import httpx
