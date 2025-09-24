@@ -35,8 +35,9 @@ class ParseConfig:
         extraction_split_size: Optional[int] = None,
         figure_captioning_type: Optional[FigureCaptioningType] = None,
         figure_captioning_prompt: Optional[str] = None,
-        split: Optional[SplitType] = None,
+        split: Optional[SplitType] = SplitType.full,
         enable_rotation_detection: Optional[bool] = None,
+        timeout: Optional[int] = None,
     ) -> None:
         self.api_key = api_key
         self.include_marginalia = include_marginalia
@@ -49,6 +50,7 @@ class ParseConfig:
         self.figure_captioning_prompt = figure_captioning_prompt
         self.split = split
         self.enable_rotation_detection = enable_rotation_detection
+        self.timeout = timeout 
 
 
 class SettingsOverrides:

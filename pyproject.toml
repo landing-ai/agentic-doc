@@ -38,6 +38,7 @@ jsonschema = "^4.24.0"
 types-jsonschema = "^4.24.0.20250528"
 requests = "^2.32.4"
 protobuf = "^6.31.1"
+landingai-ade = "^0.10.0"
 
 
 [tool.poetry.group.dev.dependencies]

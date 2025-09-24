@@ -1,9 +1,12 @@
 import math
 import os
+import json 
+import copy 
 from collections import defaultdict
 from pathlib import Path
 from typing import Literal, Union, Optional
 from urllib.parse import urlparse
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import cv2
 import httpx
@@ -16,7 +19,7 @@ from pydantic_core import Url
 from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
-from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
+from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument, T
 from agentic_doc.config import VisualizationConfig, get_settings
 
 _LOGGER = structlog.getLogger(__name__)
