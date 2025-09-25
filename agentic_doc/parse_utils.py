@@ -7,10 +7,13 @@ from typing import Any, Dict, Optional, Union, TYPE_CHECKING
 import jsonschema
 import structlog
 import importlib.metadata
+import httpx
+import tenacity
 from landingai_ade import LandingAIADE
 from agentic_doc.config import ParseConfig, get_settings
 from pydantic_core import Url
-from agentic_doc.common import ParsedDocument, SplitType, T, FigureCaptioningType, Timer
+from agentic_doc.common import ParsedDocument, SplitType, T, FigureCaptioningType, Timer, RetryableError, Document
+from agentic_doc.utils import log_retry_failure
 
 if TYPE_CHECKING:
     from agentic_doc.common import create_metadata_model
@@ -69,6 +72,14 @@ def _process_extraction_data(
     return extraction, extraction_metadata
 
 
+@tenacity.retry(
+    wait=tenacity.wait_exponential_jitter(
+        exp_base=1.5, initial=1, max=get_settings().max_retry_wait_time, jitter=10
+    ),
+    stop=tenacity.stop_after_attempt(get_settings().max_retries),
+    retry=tenacity.retry_if_exception_type(RetryableError),
+    after=log_retry_failure,
+)
 def _send_parsing_request(
     file_path: str,
     *,
@@ -90,8 +101,6 @@ def _send_parsing_request(
     Returns:
         dict[str, Any]: The parsed document data.
     """
-    client = _get_client(config)
-
     # Prepare request data
     data: dict[str, Any] = {
         "include_marginalia": include_marginalia,
@@ -114,28 +123,40 @@ def _send_parsing_request(
 
     # Time only the actual API call
     with Timer() as timer:
+        file_type = "pdf" if Path(file_path).suffix.lower() == ".pdf" else "image"
         with open(file_path, "rb") as file:
-            try:
-                response = client.parse(
-                    document=file,
-                    split="page" if data.get("split") == "page" else None,
-                    extra_headers={"runtime_tag": f"agentic-doc-v{_LIB_VERSION}"},
-                    extra_body=data,
-                    timeout=config.timeout,
-                )
-            except Exception as e:
-                # TODO: look at landingai-ade parse and see what exceptions it raises and handle accordingly
-                # Check for retryable errors based on status code if available
-                _LOGGER.info(
-                    f"LandingAI ade-python API call failed with error: {e}. "
-                )
-                raise e
+            files = {file_type: file}
+
+            settings = get_settings()
+            api_key = (
+                config.api_key
+                if config.api_key
+                else settings.vision_agent_api_key
+            )
+
+            headers = {
+                "Authorization": f"Basic {api_key}",
+                "runtime_tag": f"agentic-doc-v{_LIB_VERSION}",
+            }
+
+            timeout = config.timeout if config.timeout else None
+            response = httpx.post(
+                f"{settings.endpoint_host}/v1/tools/agentic-document-analysis",
+                files=files,
+                data=data,
+                headers=headers,
+                timeout=timeout,
+            )
+            if response.status_code in [408, 429, 502, 503, 504]:
+                raise RetryableError(response)
+
+            response.raise_for_status()
 
     _LOGGER.info(
         f"Time taken to successfully parse a document chunk: {timer.elapsed:.2f} seconds"
     )
 
-    return response.model_dump()
+    return response.json()
 
 
 def _parse_image(
@@ -202,7 +223,7 @@ def _parse_image(
 
 
 def _parse_doc_parts(
-    doc_parts_tasks: list[dict[str, Any]],
+    doc: Document,  # Document
     *,
     include_marginalia: bool = True,
     include_metadata_in_markdown: bool = True,
@@ -211,18 +232,23 @@ def _parse_doc_parts(
     config: ParseConfig = ParseConfig(),
 ) -> ParsedDocument[T]:
     try:
+        _LOGGER.info(f"Start parsing document part: '{doc}'")
         response = _send_parsing_request(
-            json.dumps(doc_parts_tasks),
+            str(doc.file_path),
             include_marginalia=include_marginalia,
             include_metadata_in_markdown=include_metadata_in_markdown,
             extraction_model=extraction_model,
             extraction_schema=extraction_schema,
             config=config,
         )
+        _LOGGER.info(f"Successfully parsed document part: '{doc}'")
         result = {
             **response["data"],
             "errors": response.get("errors", []),
             "extraction_error": response.get("extraction_error", None),
+            "start_page_idx": doc.start_page_idx,
+            "end_page_idx": doc.end_page_idx,
+            "doc_type": "pdf",
             "metadata": response.get("metadata"),
         }
 
@@ -499,7 +525,7 @@ def _merge_next_part(
 
 
 def _parse_doc_in_parallel(
-    doc_parts: list[Any],  # list[Document]
+    doc_parts: list[Document], 
     *,
     doc_name: str,
     include_marginalia: bool = True,
