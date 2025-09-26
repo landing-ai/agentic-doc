@@ -94,9 +94,7 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
         origin = get_origin(field_type)
 
         # Preserve the original field's alias if it exists
-        field_kwargs = {}
-        if field.alias:
-            field_kwargs["alias"] = field.alias
+        alias = field.alias if field.alias else None
 
         # Handle Optional/Union types
         if origin is Union:
@@ -109,12 +107,12 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
                     metadata_type = create_metadata_model(non_none_type)
                     fields[name] = (
                         Optional[metadata_type],
-                        Field(default=None, **field_kwargs),
+                        Field(default=None, alias=alias),
                     )
                 else:
                     fields[name] = (
                         Optional[MetadataType[non_none_type]],  # type: ignore[valid-type]
-                        Field(default=None, **field_kwargs),
+                        Field(default=None, alias=alias),
                     )
                 continue
 
@@ -125,23 +123,23 @@ def create_metadata_model(model: type[BaseModel]) -> type[BaseModel]:
                 metadata_inner_type = create_metadata_model(inner_type)
                 fields[name] = (
                     List[metadata_inner_type],  # type: ignore[valid-type]
-                    Field(default_factory=list, **field_kwargs),  # type: ignore[arg-type]
+                    Field(default_factory=list, alias=alias),  # type: ignore[arg-type]
                 )
             else:
                 fields[name] = (
                     List[MetadataType[inner_type]],  # type: ignore[valid-type]
-                    Field(default_factory=list, **field_kwargs),  # type: ignore[arg-type]
+                    Field(default_factory=list, alias=alias),  # type: ignore[arg-type]
                 )
             continue
 
         # Handle nested models
         if inspect.isclass(field_type) and issubclass(field_type, BaseModel):
-            fields[name] = (create_metadata_model(field_type), Field(**field_kwargs))
+            fields[name] = (create_metadata_model(field_type), Field(alias=alias))
         else:
             # Replace primitive leaf with MetadataType[original type]
             fields[name] = (
                 MetadataType[field_type],  # type: ignore[valid-type]
-                Field(**field_kwargs),
+                Field(alias=alias),
             )
 
     return create_model(f"{model.__name__}Metadata", **fields)
