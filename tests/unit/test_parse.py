@@ -2012,7 +2012,9 @@ class TestParseFunctionConsolidated:
                     result = parse(sample_pdf_path, extraction_model=TestExtractionModel, config=config_with_extraction_split_size)
 
                     assert len(result) == 1
-                    mock_split_pdf.assert_not_called()
+                    mock_split_pdf.assert_called_once()
+                    split_size_arg = mock_split_pdf.call_args[0][2]
+                    assert split_size_arg == 15
 
                     captured_requests.clear()
                     mock_split_pdf.reset_mock()
@@ -2020,7 +2022,7 @@ class TestParseFunctionConsolidated:
                     result = parse(sample_pdf_path, extraction_model=TestExtractionModel)
 
                     assert len(result) == 1
-                    mock_split_pdf.assert_not_called()
+                    mock_split_pdf.assert_called_once()
 
                     captured_requests.clear()
 
