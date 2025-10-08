@@ -578,24 +578,7 @@ def _parse_pdf(
                 else settings.split_size
             )
 
-        # Skip splitting if PDF is small enough
-        if total_pages <= split_size:
-            # Process the PDF directly without splitting
-            file_path = Path(file_path)
-            return _parse_doc_parts(
-                Document(
-                    file_path=file_path,
-                    start_page_idx=0,
-                    end_page_idx=total_pages - 1,
-                ),
-                include_marginalia=include_marginalia,
-                include_metadata_in_markdown=include_metadata_in_markdown,
-                extraction_model=extraction_model,
-                extraction_schema=extraction_schema,
-                config=config,
-            )
-
-        # Split PDF using the already opened document
+        # Split PDF
         with tempfile.TemporaryDirectory() as temp_dir:
             file_path = Path(file_path)
             parts = split_pdf(pdf_doc, temp_dir, split_size, file_stem=file_path.stem)

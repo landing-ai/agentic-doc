@@ -220,6 +220,7 @@ def split_pdf(
 ) -> list[Document]:
     """
     Splits a PDF document into smaller PDFs, each with at most split_size pages.
+    If the PDF has fewer pages than split_size, returns a single Document.
 
     Args:
         pdf_doc (pymupdf.Document): The opened PDF document to split.
@@ -231,10 +232,23 @@ def split_pdf(
         0 < split_size <= 100
     ), "split_size must be greater than 0 and less than or equal to 100"
 
+    total_pages = pdf_doc.page_count
+
+    if total_pages <= split_size:
+        _LOGGER.info(
+            f"PDF has {total_pages} pages, which is <= split_size ({split_size}). Skipping split."
+        )
+        return [
+            Document(
+                file_path=Path(pdf_doc.name),
+                start_page_idx=0,
+                end_page_idx=total_pages - 1,
+            )
+        ]
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_dir = str(output_dir)
 
-    total_pages = pdf_doc.page_count
     _LOGGER.info(
         f"Splitting PDF into {total_pages // split_size} parts under '{output_dir}'"
     )
