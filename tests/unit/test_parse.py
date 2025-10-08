@@ -420,6 +420,75 @@ def test_merge_next_part():
     assert current_doc.chunks[1].grounding[0].page == 1
 
 
+def test_merge_part_results():
+    """Test that page numbers in markdown comments are fixed correctly when merging document parts."""
+    # Create first batch: pages 0-9
+    batch1 = ParsedDocument(
+        markdown="First batch content <!-- marginalia, from page 0 (l=0.077,t=0.034,r=0.338,b=0.051), with ID abc123 -->",
+        chunks=[
+            Chunk(
+                text="Content from page 0",
+                chunk_type=ChunkType.text,
+                chunk_id="chunk_0",
+                grounding=[
+                    ChunkGrounding(
+                        page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    )
+                ],
+            )
+        ],
+        start_page_idx=0,
+        end_page_idx=9,
+        doc_type="pdf",
+    )
+
+    # Create second batch: pages 10-19 with markdown containing page comments
+    batch2 = ParsedDocument(
+        markdown="Second batch <!-- text, from page 0 (l=0.076,t=0.058,r=0.499,b=0.123), with ID xyz789 --> with multiple <!-- marginalia, from page 0 (l=0.914,t=0.036,r=0.935,b=0.049), with ID def456 --> page references <!-- figure, from page 1 (l=0.502,t=0.614,r=0.926,b=0.946), with ID ghi012 -->",
+        chunks=[
+            Chunk(
+                text="Content from page 10",
+                chunk_type=ChunkType.text,
+                chunk_id="chunk_10",
+                grounding=[
+                    ChunkGrounding(
+                        page=0, box=ChunkGroundingBox(l=0.1, t=0.1, r=0.9, b=0.2)
+                    )
+                ],
+            ),
+            Chunk(
+                text="Content from page 11",
+                chunk_type=ChunkType.text,
+                chunk_id="chunk_11",
+                grounding=[
+                    ChunkGrounding(
+                        page=1, box=ChunkGroundingBox(l=0.1, t=0.3, r=0.9, b=0.4)
+                    )
+                ],
+            )
+        ],
+        start_page_idx=10,
+        end_page_idx=19,
+        doc_type="pdf",
+    )
+
+    # Merge the batches
+    result = _merge_part_results([batch1, batch2])
+
+    # Verify the result structure
+    expected_markdown = "First batch content <!-- marginalia, from page 0 (l=0.077,t=0.034,r=0.338,b=0.051), with ID abc123 -->\n\nSecond batch <!-- text, from page 10 (l=0.076,t=0.058,r=0.499,b=0.123), with ID xyz789 --> with multiple <!-- marginalia, from page 10 (l=0.914,t=0.036,r=0.935,b=0.049), with ID def456 --> page references <!-- figure, from page 11 (l=0.502,t=0.614,r=0.926,b=0.946), with ID ghi012 -->"
+    assert result.markdown == expected_markdown
+
+    # Verify grounding page numbers are still fixed correctly
+    expected_grounding_pages = [0, 10, 11]
+    actual_grounding_pages = [chunk.grounding[0].page for chunk in result.chunks]
+    assert actual_grounding_pages == expected_grounding_pages
+
+    # Verify document boundaries
+    assert result.start_page_idx == 0
+    assert result.end_page_idx == 19
+
+
 def test_parse_doc_in_parallel(mock_parsed_document):
     # Create Document objects for testing
     doc_parts = [

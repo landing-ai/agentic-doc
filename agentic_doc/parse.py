@@ -8,6 +8,8 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union
+import re
+
 
 import httpx
 import structlog
@@ -43,6 +45,10 @@ from agentic_doc.utils import (
 
 _LOGGER = structlog.getLogger(__name__)
 _LIB_VERSION = importlib.metadata.version("agentic-doc")
+# Pattern: <!-- {chunk_type}, from page {number} (l={left},t={top},r={right},b={bottom}), with ID {chunk_id} -->
+_PAGE_COMMENT_PATTERN = re.compile(
+    r"(<!--\s*\w+,\s*from page\s+)(\d+)(\s*\([^)]+\),\s*with ID\s+[^>]+-->)", re.DOTALL
+)
 
 
 def _get_endpoint_url(settings: Settings) -> str:
@@ -710,6 +716,40 @@ def _merge_part_results(
     return init_result
 
 
+def _fix_page_numbers_in_markdown(markdown_content: str, page_offset: int) -> str:
+    """
+    Fix page numbers in markdown comments during document merging.
+
+    Adjusts page references in comments like:
+    <!-- text, from page 0 (l=0.1,t=0.2,r=0.9,b=0.8), with ID abc123 -->
+
+    Args:
+        markdown_content: Markdown with embedded page reference comments
+        page_offset: Value to add to each page number (typically next.start_page_idx)
+
+    Returns:
+        Markdown with corrected page numbers, preserving other metadata
+    """
+    # Skip processing if no offset needed
+    if page_offset == 0:
+        return markdown_content
+
+    def replace_match(match: re.Match) -> str:
+        prefix = match.group(1)  # Everything before page number
+        page_number_str = match.group(2)  # Page number
+        suffix = match.group(3)  # Everything after page number
+
+        try:
+            page_number = int(page_number_str)
+            new_page_number = page_number + page_offset
+            return f"{prefix}{new_page_number}{suffix}"
+        except ValueError:
+            # Return original match if page number is malformed
+            return str(match.group(0))
+
+    return _PAGE_COMMENT_PATTERN.sub(replace_match, markdown_content)
+
+
 def _merge_next_part(
     curr: ParsedDocument[T],
     next: ParsedDocument[T],
@@ -718,26 +758,56 @@ def _merge_next_part(
     if split == SplitType.page:
         # When split is page, both curr.markdown and next.markdown should be lists
         if isinstance(curr.markdown, list) and isinstance(next.markdown, list):
-            curr.markdown.extend(next.markdown)
+            # Fix page numbers in each markdown item from next
+            fixed_next_markdown = [
+                _fix_page_numbers_in_markdown(item, next.start_page_idx)
+                for item in next.markdown
+            ]
+            curr.markdown.extend(fixed_next_markdown)
         elif isinstance(curr.markdown, str) and isinstance(next.markdown, str):
             # Convert to list if they're strings (shouldn't happen but handle gracefully)
-            curr.markdown = [curr.markdown] + [next.markdown]
+            fixed_next_markdown_str = _fix_page_numbers_in_markdown(
+                next.markdown, next.start_page_idx
+            )
+            curr.markdown = [curr.markdown] + [fixed_next_markdown_str]
         elif isinstance(curr.markdown, list) and isinstance(next.markdown, str):
-            curr.markdown.append(next.markdown)
+            fixed_next_markdown_str = _fix_page_numbers_in_markdown(
+                next.markdown, next.start_page_idx
+            )
+            curr.markdown.append(fixed_next_markdown_str)
         elif isinstance(curr.markdown, str) and isinstance(next.markdown, list):
-            curr.markdown = [curr.markdown] + next.markdown
+            fixed_next_markdown = [
+                _fix_page_numbers_in_markdown(item, next.start_page_idx)
+                for item in next.markdown
+            ]
+            curr.markdown = [curr.markdown] + fixed_next_markdown
     else:
         # When split is full, join with newlines
         if isinstance(curr.markdown, str) and isinstance(next.markdown, str):
-            curr.markdown += "\n\n" + next.markdown
+            fixed_next_markdown_str = _fix_page_numbers_in_markdown(
+                next.markdown, next.start_page_idx
+            )
+            curr.markdown += "\n\n" + fixed_next_markdown_str
         elif isinstance(curr.markdown, list) and isinstance(next.markdown, list):
             # Join lists and convert to string
-            curr.markdown = "\n\n".join(curr.markdown + next.markdown)
+            fixed_next_markdown = [
+                _fix_page_numbers_in_markdown(item, next.start_page_idx)
+                for item in next.markdown
+            ]
+            curr.markdown = "\n\n".join(curr.markdown + fixed_next_markdown)
         elif isinstance(curr.markdown, str) and isinstance(next.markdown, list):
-            curr.markdown = curr.markdown + "\n\n" + "\n\n".join(next.markdown)
+            fixed_next_markdown = [
+                _fix_page_numbers_in_markdown(item, next.start_page_idx)
+                for item in next.markdown
+            ]
+            curr.markdown = curr.markdown + "\n\n" + "\n\n".join(fixed_next_markdown)
         elif isinstance(curr.markdown, list) and isinstance(next.markdown, str):
-            curr.markdown = "\n\n".join(curr.markdown) + "\n\n" + next.markdown
-
+            fixed_next_markdown_str = _fix_page_numbers_in_markdown(
+                next.markdown, next.start_page_idx
+            )
+            curr.markdown = (
+                "\n\n".join(curr.markdown) + "\n\n" + fixed_next_markdown_str
+            )
     next_chunks = next.chunks
     for chunk in next_chunks:
         for grounding in chunk.grounding:
