@@ -11,6 +11,9 @@
 
 </div>
 
+> **Note**
+>  The agentic-doc Python library is now legacy. Please migrate to the new [landingai-ade library](https://github.com/landing-ai/ade-python), which is now the official Python library for Agentic Document Extraction and supports our newer API endpoints.
+
 ## Overview
 
 The LandingAI **Agentic Document Extraction** API pulls structured data out of visually complex documents—think tables, pictures, and charts—and returns a hierarchical JSON with exact element locations.
