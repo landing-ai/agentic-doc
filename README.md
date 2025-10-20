@@ -82,7 +82,7 @@ print(result[0].markdown)
 #### Extract Data from Multiple Documents
 Run the following script to extract data from multiple documents.
 
-```python
+
 from agentic_doc.parse import parse
 
 # Parse multiple local files
