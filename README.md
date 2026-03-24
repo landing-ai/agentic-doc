@@ -1,3 +1,7 @@
+### DEPRECATION WARNING
+
+⚠️⚠️⚠️ The agentic-doc Python library is now legacy. Please migrate to the new [landingai-ade library](https://github.com/landing-ai/ade-python), which is now the official Python library for Agentic Document Extraction and supports our newer API endpoints.
+
 <div align="center">
 
 # Agentic Document Extraction – Python Library
@@ -10,9 +14,6 @@
 **[Web App](https://va.landing.ai/demo/doc-extraction) · [Discord](https://discord.com/invite/RVcW3j9RgR) · [Blog](https://landing.ai/blog/going-beyond-ocrllm-introducing-agentic-document-extraction) · [Docs](https://support.landing.ai/docs/document-extraction)**
 
 </div>
-
-> **Note**
->  The agentic-doc Python library is now legacy. Please migrate to the new [landingai-ade library](https://github.com/landing-ai/ade-python), which is now the official Python library for Agentic Document Extraction and supports our newer API endpoints.
 
 ## Overview
 
