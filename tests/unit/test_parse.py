@@ -206,7 +206,11 @@ def test_parse_pdf(temp_dir, mock_parsed_document):
     with (
         patch("agentic_doc.parse.split_pdf") as mock_split,
         patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts,
+        patch("pymupdf.open") as mock_pymupdf_open,
     ):
+        mock_doc = MagicMock()
+        mock_doc.page_count = 15  # Force splitting (split_size=10)
+        mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
         # Setup mocks
         mock_split.return_value = [
             Document(
@@ -583,13 +587,8 @@ def test_send_parsing_request_success():
     with (
         patch("agentic_doc.parse.httpx.post", return_value=mock_response),
         patch("agentic_doc.parse.open", MagicMock()),
-        patch("agentic_doc.parse.Path") as mock_path,
+        patch("agentic_doc.parse.get_file_type", return_value="pdf"),
     ):
-        # Setup mock to make the suffix check work
-        mock_path_instance = MagicMock()
-        mock_path_instance.suffix.lower.return_value = ".pdf"
-        mock_path.return_value = mock_path_instance
-
         # Call the function
         result = _send_parsing_request("test.pdf")
 
@@ -615,13 +614,8 @@ def test_send_parsing_dont_send_none_parameters():
     with (
         patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
         patch("agentic_doc.parse.open", MagicMock()),
-        patch("agentic_doc.parse.Path") as mock_path,
+        patch("agentic_doc.parse.get_file_type", return_value="pdf"),
     ):
-        # Setup mock to make the suffix check work
-        mock_path_instance = MagicMock()
-        mock_path_instance.suffix.lower.return_value = ".pdf"
-        mock_path.return_value = mock_path_instance
-
         # Call the function
         result = _send_parsing_request(
             "test.pdf",
@@ -660,14 +654,9 @@ def test_send_parsing_send_false_parameters():
     # Mock httpx.post to return the mock response
     with (
         patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
+        patch("agentic_doc.parse.get_file_type", return_value="pdf"),
         patch("agentic_doc.parse.open", MagicMock()),
-        patch("agentic_doc.parse.Path") as mock_path,
     ):
-        # Setup mock to make the suffix check work
-        mock_path_instance = MagicMock()
-        mock_path_instance.suffix.lower.return_value = ".pdf"
-        mock_path.return_value = mock_path_instance
-
         # Call the function
         result = _send_parsing_request(
             "test.pdf",
@@ -731,7 +720,11 @@ def test_parse_pdf_with_empty_result(temp_dir):
     with (
         patch("agentic_doc.parse.split_pdf") as mock_split,
         patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts,
+        patch("pymupdf.open") as mock_pymupdf_open,
     ):
+        mock_doc = MagicMock()
+        mock_doc.page_count = 15  # Force splitting (split_size=10)
+        mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
         # Mock an empty result
         empty_doc = ParsedDocument(
             markdown="", chunks=[], start_page_idx=0, end_page_idx=0, doc_type="pdf"
@@ -871,7 +864,11 @@ def test_parse_pdf_handles_single_page_document(temp_dir):
     with (
         patch("agentic_doc.parse.split_pdf") as mock_split,
         patch("agentic_doc.parse._parse_doc_in_parallel") as mock_parse_parts,
+        patch("pymupdf.open") as mock_pymupdf_open,
     ):
+        mock_doc = MagicMock()
+        mock_doc.page_count = 1  # Single page - should skip splitting
+        mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
         mock_split.return_value = [
             Document(
                 file_path=temp_dir / "single_1.pdf", start_page_idx=0, end_page_idx=0
@@ -2015,7 +2012,13 @@ class TestParseFunctionConsolidated:
 
         with unittest.mock.patch("httpx.post", side_effect=mock_post), \
             unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
-            with unittest.mock.patch("agentic_doc.parse.split_pdf") as mock_split_pdf:
+            with unittest.mock.patch("agentic_doc.parse.split_pdf") as mock_split_pdf, \
+                 unittest.mock.patch("pymupdf.open") as mock_pymupdf_open:
+                # Mock pymupdf.open to return a mock document with page_count
+                mock_doc = MagicMock()
+                mock_doc.page_count = 30  # Force splitting (split_size=25)
+                mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
+
                 mock_split_pdf.return_value = [
                     type('Document', (), {
                         'file_path': sample_pdf_path,
@@ -2048,45 +2051,49 @@ class TestParseFunctionConsolidated:
         with unittest.mock.patch("httpx.post", side_effect=mock_post), \
             unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
             with unittest.mock.patch("agentic_doc.parse.split_pdf") as mock_split_pdf:
-                mock_split_pdf.return_value = [
-                    type('Document', (), {
-                        'file_path': sample_pdf_path,
-                        'start_page_idx': 0,
-                        'end_page_idx': 0
-                    })()
-                ]
+                with unittest.mock.patch("agentic_doc.parse.pymupdf.open") as mock_pymupdf_open:
+                    # Mock pymupdf.open to return a mock document with page_count
+                    mock_doc = MagicMock()
+                    mock_doc.page_count = 10
+                    mock_pymupdf_open.return_value.__enter__.return_value = mock_doc
 
-                class TestExtractionModel:
-                    @staticmethod
-                    def model_json_schema():
-                        return {"type": "object", "properties": {"test_field": {"type": "string"}}}
-                    @staticmethod
-                    def model_validate(data):
-                        return type('ExtractionResult', (), {"test_field": "test_value"})()
+                    mock_split_pdf.return_value = [
+                        type('Document', (), {
+                            'file_path': sample_pdf_path,
+                            'start_page_idx': 0,
+                            'end_page_idx': 0
+                        })()
+                    ]
 
-                config_with_extraction_split_size = ParseConfig(
-                    api_key="extraction_split_size_test_key",
-                    extraction_split_size=30
-                )
+                    class TestExtractionModel:
+                        @staticmethod
+                        def model_json_schema():
+                            return {"type": "object", "properties": {"test_field": {"type": "string"}}}
+                        @staticmethod
+                        def model_validate(data):
+                            return type('ExtractionResult', (), {"test_field": "test_value"})()
 
-                result = parse(sample_pdf_path, extraction_model=TestExtractionModel, config=config_with_extraction_split_size)
+                    config_with_extraction_split_size = ParseConfig(
+                        api_key="extraction_split_size_test_key",
+                        extraction_split_size=15
+                    )
 
-                assert len(result) == 1
-                mock_split_pdf.assert_called_once()
-                extraction_split_size_arg = mock_split_pdf.call_args[0][2]
-                assert extraction_split_size_arg == 30
+                    result = parse(sample_pdf_path, extraction_model=TestExtractionModel, config=config_with_extraction_split_size)
 
-                captured_requests.clear()
-                mock_split_pdf.reset_mock()
+                    assert len(result) == 1
+                    mock_split_pdf.assert_called_once()
+                    split_size_arg = mock_split_pdf.call_args[0][2]
+                    assert split_size_arg == 15
 
-                result = parse(sample_pdf_path, extraction_model=TestExtractionModel)
+                    captured_requests.clear()
+                    mock_split_pdf.reset_mock()
 
-                assert len(result) == 1
-                mock_split_pdf.assert_called_once()
-                extraction_split_size_arg = mock_split_pdf.call_args[0][2]
-                assert extraction_split_size_arg == 15
+                    result = parse(sample_pdf_path, extraction_model=TestExtractionModel)
 
-                captured_requests.clear()
+                    assert len(result) == 1
+                    mock_split_pdf.assert_called_once()
+
+                    captured_requests.clear()
 
         with unittest.mock.patch("httpx.post", side_effect=mock_post), \
             unittest.mock.patch("agentic_doc.parse.check_endpoint_and_api_key"):
@@ -2167,12 +2174,8 @@ class TestFigureCaptioningAndChunking:
         with (
             patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
             patch("agentic_doc.parse.open", MagicMock()),
-            patch("agentic_doc.parse.Path") as mock_path,
+            patch("agentic_doc.parse.get_file_type", return_value="pdf"),
         ):
-            # Setup mock to make the suffix check work
-            mock_path_instance = MagicMock()
-            mock_path_instance.suffix.lower.return_value = ".pdf"
-            mock_path.return_value = mock_path_instance
 
             # Call with custom figure captioning
             config = ParseConfig(
@@ -2203,12 +2206,8 @@ class TestFigureCaptioningAndChunking:
         with (
             patch("agentic_doc.parse.httpx.post", return_value=mock_response) as mock_post,
             patch("agentic_doc.parse.open", MagicMock()),
-            patch("agentic_doc.parse.Path") as mock_path,
+            patch("agentic_doc.parse.get_file_type", return_value="pdf"),
         ):
-            # Setup mock to make the suffix check work
-            mock_path_instance = MagicMock()
-            mock_path_instance.suffix.lower.return_value = ".pdf"
-            mock_path.return_value = mock_path_instance
 
             # Call with defaults
             result = _send_parsing_request("test.pdf")

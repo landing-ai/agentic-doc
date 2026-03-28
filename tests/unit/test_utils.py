@@ -215,7 +215,8 @@ def test_get_file_type_fallback_to_extension(temp_dir):
 def test_split_pdf(multi_page_pdf, temp_dir):
     # Test splitting a multi-page PDF
     output_dir = temp_dir / "split_output"
-    result = split_pdf(multi_page_pdf, output_dir, split_size=2)
+    with pymupdf.open(multi_page_pdf) as pdf_doc:
+        result = split_pdf(pdf_doc, output_dir, split_size=2, file_stem="test_doc")
 
     # For a 5-page PDF with split_size=2, we should get 3 parts
     assert len(result) == 3
@@ -239,8 +240,9 @@ def test_split_pdf_with_invalid_split_size(multi_page_pdf, temp_dir):
     output_dir = temp_dir / "split_output"
 
     # Test with invalid split_size values
-    with pytest.raises(AssertionError):
-        split_pdf(multi_page_pdf, output_dir, split_size=0)
+    with pymupdf.open(multi_page_pdf) as pdf_doc:
+        with pytest.raises(AssertionError):
+            split_pdf(pdf_doc, output_dir, split_size=0)
 
 
 def test_log_retry_failure_inline_block(monkeypatch, capsys):
@@ -669,7 +671,8 @@ def test_split_pdf_edge_cases(temp_dir):
 
     # Test with split_size=1 on a 1-page PDF
     output_dir = temp_dir / "split_single"
-    result = split_pdf(single_page_pdf, output_dir, split_size=1)
+    with pymupdf.open(single_page_pdf) as pdf_doc:
+        result = split_pdf(pdf_doc, output_dir, split_size=1, file_stem="single_page")
 
     assert len(result) == 1
     assert result[0].start_page_idx == 0

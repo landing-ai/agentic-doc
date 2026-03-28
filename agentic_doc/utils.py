@@ -13,7 +13,6 @@ import requests
 import structlog
 from PIL import Image
 from pydantic_core import Url
-from pypdf import PdfReader, PdfWriter
 from tenacity import RetryCallState
 
 from agentic_doc.common import Chunk, ChunkGroundingBox, Document, ParsedDocument
@@ -88,6 +87,8 @@ def save_groundings_as_images(
     save_dir.mkdir(parents=True, exist_ok=True)
     if file_type == "image":
         img = cv2.imread(str(file_path))
+        if img is None:
+            raise ValueError(f"Failed to read image from {file_path}")
         return _crop_groundings(img, chunks, save_dir, inplace)
 
     assert file_type == "pdf"
@@ -212,52 +213,69 @@ def _crop_image(image: np.ndarray, bbox: ChunkGroundingBox) -> np.ndarray:
 
 
 def split_pdf(
-    input_pdf_path: Union[str, Path],
+    pdf_doc: pymupdf.Document,
     output_dir: Union[str, Path],
     split_size: int = 10,
+    file_stem: str = "document",
 ) -> list[Document]:
     """
-    Splits a PDF file into smaller PDFs, each with at most max_pages pages.
+    Splits a PDF document into smaller PDFs, each with at most split_size pages.
+    If the PDF has fewer pages than split_size, returns a single Document.
 
     Args:
-        input_pdf_path (str | Path): Path to the input PDF file.
+        pdf_doc (pymupdf.Document): The opened PDF document to split.
         output_dir (str | Path): Directory where mini PDF files will be saved.
         split_size (int): Maximum number of pages per mini PDF file (default is 10).
+        file_stem (str): Base name for output files (default is "document").
     """
-    input_pdf_path = Path(input_pdf_path)
-    assert input_pdf_path.exists(), f"Input PDF file not found: {input_pdf_path}"
     assert (
         0 < split_size <= 100
     ), "split_size must be greater than 0 and less than or equal to 100"
 
+    total_pages = pdf_doc.page_count
+
+    if total_pages <= split_size:
+        _LOGGER.info(
+            f"PDF has {total_pages} pages, which is <= split_size ({split_size}). Skipping split."
+        )
+        return [
+            Document(
+                file_path=Path(pdf_doc.name),
+                start_page_idx=0,
+                end_page_idx=total_pages - 1,
+            )
+        ]
+
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_dir = str(output_dir)
 
-    pdf_reader = PdfReader(input_pdf_path)
-    total_pages = len(pdf_reader.pages)
     _LOGGER.info(
-        f"Splitting PDF: '{input_pdf_path}' into {total_pages // split_size} parts under '{output_dir}'"
+        f"Splitting PDF into {total_pages // split_size} parts under '{output_dir}'"
     )
     file_count = 1
-
     output_pdfs = []
-    # Process the PDF in chunks of max_pages pages
-    for start in range(0, total_pages, split_size):
-        pdf_writer = PdfWriter()
-        # Add up to max_pages pages to the new PDF writer
-        for page_num in range(start, min(start + split_size, total_pages)):
-            pdf_writer.add_page(pdf_reader.pages[page_num])
 
-        output_pdf = os.path.join(output_dir, f"{input_pdf_path.stem}_{file_count}.pdf")
-        with open(output_pdf, "wb") as out_file:
-            pdf_writer.write(out_file)
+    # Process the PDF in chunks of split_size pages
+    for start in range(0, total_pages, split_size):
+        end_page = min(start + split_size - 1, total_pages - 1)
+
+        # Create a new PDF document
+        new_doc = pymupdf.open()
+
+        # Copy page range with form elements preserved
+        new_doc.insert_pdf(pdf_doc, from_page=start, to_page=end_page)
+
+        output_pdf = os.path.join(output_dir, f"{file_stem}_{file_count}.pdf")
+        new_doc.save(output_pdf)
+        new_doc.close()
+
         _LOGGER.info(f"Created {output_pdf}")
         file_count += 1
         output_pdfs.append(
             Document(
                 file_path=output_pdf,
                 start_page_idx=start,
-                end_page_idx=min(start + split_size - 1, total_pages - 1),
+                end_page_idx=end_page,
             )
         )
 
@@ -422,7 +440,10 @@ def _read_img_rgb(img_path: str) -> np.ndarray:
     Returns:
         img (H, W, 3): a numpy array image in RGB format
     """
-    img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
+    img_bgr = cv2.imread(img_path)
+    if img_bgr is None:
+        raise ValueError(f"Failed to read image from {img_path}")
+    img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     if img.shape[-1] == 1:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     elif img.shape[-1] == 4:
