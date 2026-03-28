@@ -79,6 +79,7 @@ print(result[0].chunks)  # Get the extracted data as structured chunks of conten
 # Parse a document from a URL
 result = parse("https://example.com/document.pdf")
 print(result[0].markdown)
+```
 
 #### Extract Data from Multiple Documents
 Run the following script to extract data from multiple documents.
